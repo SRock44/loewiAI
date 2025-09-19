@@ -167,8 +167,14 @@ class GoogleAuthService implements AuthService {
 }
 */
 
-// Export singleton instance
-export const authService = new MockAuthService();
+// Import real auth service
+import { realAuthService } from './realAuthService';
 
-// Future: Replace with real Google OAuth service
-// export const authService = new GoogleAuthService();
+// Export singleton instance
+// Switch between mock and real by commenting/uncommenting these lines:
+
+// For development/testing - uses mock Google OAuth
+// export const authService = new MockAuthService();
+
+// For production - uses real Google OAuth
+export const authService = realAuthService;
