@@ -17,9 +17,41 @@ A modern, responsive landing page for the Academic AI Assistant platform - your 
 
 - **React 18** - Modern React with hooks and functional components
 - **TypeScript** - Type-safe development with excellent developer experience
+- **React Router** - Client-side routing for navigation
 - **Vite** - Fast build tool and development server
 - **CSS3** - Modern styling with gradients, animations, and responsive design
 - **ESLint** - Code quality and consistency
+
+## 📊 Dashboard Features
+
+- **Unified Interface** - Upload documents and chat with AI in one seamless experience
+- **Tab-Based Navigation** - Easy switching between document upload and AI chat
+- **Document Upload** - Drag & drop interface with file validation (PDF, DOCX, DOC, PPTX, PPT)
+- **AI Chat Integration** - Context-aware conversations using uploaded documents
+- **Progress Tracking** - Real-time upload and processing status
+- **Smart Workflow** - Automatically switches to chat after document upload
+- **Quick Actions** - Easy access to common tasks and features
+- **Responsive Design** - Optimized for desktop, tablet, and mobile devices
+
+## 💬 AI Chat Features
+
+- **Real-time Chat Interface** - Instant messaging with AI assistant
+- **Context-Aware Responses** - AI uses uploaded documents for personalized guidance
+- **Multiple Chat Sessions** - Create and manage separate conversation threads
+- **Quick Actions** - Pre-built prompts for common academic queries
+- **Chat History Persistence** - Conversations saved locally for authenticated users only
+- **Smart Document Integration** - AI references uploaded materials automatically
+- **Typing Indicators** - Visual feedback during AI processing
+- **Mobile-Optimized** - Responsive chat interface for all devices
+
+## 🔐 Authentication Features
+
+- **Google OAuth Integration** - Secure sign-in with Google accounts
+- **User Profile Management** - Personal dashboard with user information
+- **Privacy-First Approach** - Chat history only saved for authenticated users
+- **Session Management** - Automatic sign-out and data clearing
+- **Protected Routes** - Chat functionality requires authentication
+- **User Context** - Personalized experience based on user identity
 
 ## 📋 Prerequisites
 
@@ -81,7 +113,32 @@ src/
 │   ├── Features.tsx     # Features showcase
 │   ├── Features.css     # Features styles
 │   ├── Footer.tsx       # Footer section
-│   └── Footer.css       # Footer styles
+│   ├── Footer.css       # Footer styles
+│   ├── DocumentList.tsx # Document management component
+│   ├── DocumentList.css # Document list styles
+│   ├── ChatInterface.tsx # AI chat interface component
+│   ├── ChatInterface.css # Chat interface styles
+│   ├── DocumentUpload.tsx # Document upload component
+│   ├── DocumentUpload.css # Document upload component styles
+│   ├── UserProfile.tsx  # User profile dropdown component
+│   └── UserProfile.css  # User profile styles
+├── pages/               # Page components
+│   ├── Dashboard.tsx      # Combined dashboard page
+│   └── Dashboard.css      # Dashboard page styles
+├── services/            # API and AI services
+│   ├── aiService.ts     # AI integration service
+│   ├── chatService.ts   # Chat and conversation service
+│   ├── authService.ts   # Authentication service
+│   └── apiService.ts    # Backend API service
+├── types/               # TypeScript type definitions
+│   ├── ai.ts           # AI and document types
+│   ├── chat.ts         # Chat and conversation types
+│   └── auth.ts         # Authentication types
+├── utils/               # Utility functions
+│   └── fileValidation.ts # File validation utilities
+├── contexts/            # React contexts
+│   ├── AuthContext.tsx  # Authentication context provider
+│   └── AuthContext.css  # Authentication UI styles
 ├── App.tsx              # Main application component
 ├── App.css              # Global application styles
 ├── main.tsx             # Application entry point

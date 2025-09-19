@@ -18,11 +18,8 @@ const Hero: React.FC = () => {
             to help you achieve your academic goals.
           </p>
           <div className="hero-buttons">
-            <a href="#features" className="btn btn-primary">
+            <a href="/dashboard" className="btn btn-primary">
               Get Started
-            </a>
-            <a href="#learn-more" className="btn btn-secondary">
-              Learn More
             </a>
           </div>
         </div>
