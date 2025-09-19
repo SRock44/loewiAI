@@ -175,17 +175,4 @@ src/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
 
-This project is licensed under the ISC License.
-
-## 📞 Contact
-
-For questions or support, please contact:
-- Email: contact@academicai.com
-- Twitter: [@AcademicAI](https://twitter.com/academicai)
-- LinkedIn: [Academic AI Assistant](https://linkedin.com/company/academic-ai-assistant)
-
----
-
-**Built with ❤️ for students everywhere**
