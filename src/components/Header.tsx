@@ -25,7 +25,6 @@ const Header: React.FC = () => {
               Dashboard
             </Link>
             <a href="#features" className="nav-link">Features</a>
-            <a href="#about" className="nav-link">About</a>
           </div>
           <div className="nav-auth">
             {isAuthenticated ? (

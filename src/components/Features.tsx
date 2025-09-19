@@ -4,34 +4,34 @@ import './Features.css'
 const Features: React.FC = () => {
   const features = [
     {
-      icon: "🤖",
-      title: "24/7 AI Advisor",
-      description: "Get instant responses to academic queries anytime, anywhere with our intelligent AI assistant."
+      icon: "📚",
+      title: "Document Analysis",
+      description: "Upload syllabi, lectures, and assignments for AI-powered analysis and key concept extraction."
     },
     {
-      icon: "📋",
-      title: "Syllabus-Based Guidance",
-      description: "Receive personalized recommendations for study materials and resources based on your course syllabus."
+      icon: "🎓",
+      title: "Academic Guidance",
+      description: "Get personalized study recommendations and course planning assistance based on your academic goals."
     },
     {
-      icon: "🎮",
-      title: "Gamified Learning",
-      description: "Stay motivated with engaging gamification elements that make learning fun and rewarding."
+      icon: "📝",
+      title: "Assignment Support",
+      description: "Receive help with understanding assignment requirements and structuring your academic work."
     },
     {
-      icon: "⚡",
-      title: "Instant Access",
-      description: "No more waiting for advisor appointments. Get immediate help when you need it most."
+      icon: "🔍",
+      title: "Research Assistance",
+      description: "Find relevant academic sources and get guidance on research methodologies and citation formats."
+    },
+    {
+      icon: "📖",
+      title: "Study Planning",
+      description: "Create effective study schedules and break down complex topics into manageable learning modules."
     },
     {
       icon: "🎯",
-      title: "Goal Tracking",
-      description: "Set and track your academic goals with our intelligent progress monitoring system."
-    },
-    {
-      icon: "📊",
-      title: "Performance Analytics",
-      description: "Get insights into your learning patterns and areas for improvement."
+      title: "Academic Goals",
+      description: "Track your academic progress and receive recommendations to achieve your educational objectives."
     }
   ]
 
@@ -39,9 +39,9 @@ const Features: React.FC = () => {
     <section id="features" className="features section">
       <div className="container">
         <div className="features-header">
-          <h2 className="section-title">Why Choose Academic AI Assistant?</h2>
+          <h2 className="section-title">Academic Features</h2>
           <p className="section-subtitle">
-            Transform your academic journey with intelligent assistance and engaging learning experiences.
+            Enhance your academic performance with specialized tools for students and researchers.
           </p>
         </div>
         <div className="features-grid">
