@@ -22,9 +22,8 @@ const Header: React.FC = () => {
               Home
             </Link>
             <Link to="/dashboard" className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}>
-              Dashboard
+              Chat
             </Link>
-            <a href="#features" className="nav-link">Features</a>
           </div>
           <div className="nav-auth">
             {isAuthenticated ? (

@@ -19,7 +19,7 @@ const Hero: React.FC = () => {
           </p>
           <div className="hero-buttons">
             <a href="/dashboard" className="btn btn-primary">
-              Get Started
+              Chat Now
             </a>
           </div>
         </div>

@@ -21,7 +21,7 @@ const Dashboard: React.FC = () => {
     <div className="dashboard-page">
       <div className="dashboard-header">
         <div className="container">
-          <h1>Academic AI Assistant</h1>
+          <h1>Chat</h1>
           <p>
             {isAuthenticated && user 
               ? `Welcome back, ${user.name}! Upload your documents and chat with your AI assistant.`
