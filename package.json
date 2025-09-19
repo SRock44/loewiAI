@@ -10,12 +10,15 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@google-cloud/local-auth": "^2.1.0",
+    "@google/generative-ai": "^0.2.1",
+    "google-auth-library": "^9.4.1",
+    "pdfjs-dist": "^5.4.149",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.1",
-    "@google-cloud/local-auth": "^2.1.0",
-    "google-auth-library": "^9.4.1",
-    "react-google-login": "^5.2.2"
+    "react-google-login": "^5.2.2",
+    "react-pdf": "^10.1.0",
+    "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -29,7 +32,13 @@
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
   },
-  "keywords": ["academic", "ai", "assistant", "education", "learning"],
+  "keywords": [
+    "academic",
+    "ai",
+    "assistant",
+    "education",
+    "learning"
+  ],
   "author": "",
   "license": "ISC"
 }

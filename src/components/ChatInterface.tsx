@@ -5,6 +5,7 @@ import { DocumentMetadata } from '../types/ai';
 import { validateFile, getFileIcon, formatFileSize } from '../utils/fileValidation';
 import { aiService } from '../services/aiService';
 import { useAuth } from '../contexts/AuthContext';
+import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -18,6 +19,7 @@ interface UploadedFile extends DocumentMetadata {
   uploadProgress: number;
   uploadStatus: 'uploading' | 'processing' | 'completed' | 'error';
   error?: string;
+  processedDocument?: ProcessedDocument;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -60,8 +62,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return;
     }
 
+    console.log('📂 Loading sessions for authenticated user:', user?.email);
     chatService.reloadForUser();
     const existingSessions = chatService.getSessions();
+    console.log('📊 Found existing sessions:', existingSessions.length);
     setSessions(existingSessions);
     
     if (existingSessions.length > 0) {
@@ -135,14 +139,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           ));
         }
 
-        // Process with AI service
+        // Process with document processor
         setUploadedFiles(prev => prev.map(f => 
           f.id === uploadedFile.id 
             ? { ...f, uploadStatus: 'processing' }
             : f
         ));
 
-        const processedDocument = await aiService.processDocument(file);
+        const processedDocument = await documentProcessor.processDocument(file);
+        
+        console.log('📄 Processed document result:', {
+          id: processedDocument.id,
+          fileName: processedDocument.fileName,
+          summary: processedDocument.summary,
+          keyTopics: processedDocument.keyTopics,
+          contentLength: processedDocument.extractedContent.length,
+          contentPreview: processedDocument.extractedContent.substring(0, 200)
+        });
         
         // Update with processed data
         setUploadedFiles(prev => {
@@ -151,20 +164,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               ? { 
                   ...f, 
                   ...processedDocument,
+                  processedDocument: processedDocument,
                   uploadStatus: 'completed',
                   uploadProgress: 100
                 }
               : f
           );
           
-          // Notify parent component of completed documents
-          const completedDocs = updated.filter(f => f.uploadStatus === 'completed');
-          if (completedDocs.length > 0 && onDocumentsChange) {
-            onDocumentsChange(completedDocs);
-          }
-          
           return updated;
         });
+        
+        // Notify parent component of completed documents (outside setState)
+        setTimeout(() => {
+          setUploadedFiles(current => {
+            const completedDocs = current.filter(f => f.uploadStatus === 'completed');
+            if (completedDocs.length > 0 && onDocumentsChange) {
+              onDocumentsChange(completedDocs);
+            }
+            return current;
+          });
+        }, 0);
 
         // Show success message
         const successMessage: ChatMessage = {
@@ -198,7 +217,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [onDocumentsChange]);
 
   const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading || !currentSession) return;
+    if (!content.trim() || isLoading) return;
+
+    console.log('🚀 Attempting to send message:', content);
+    console.log('📊 Current session:', currentSession);
+    console.log('🔐 Is authenticated:', isAuthenticated);
+
+    // Create a session if one doesn't exist
+    let session = currentSession;
+    if (!session) {
+      console.log('📝 Creating new session...');
+      session = await chatService.createNewSession();
+      setCurrentSession(session);
+      setSessions(prev => [session!, ...prev]);
+      console.log('✅ New session created:', session);
+    }
 
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
@@ -212,15 +245,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsLoading(true);
 
     try {
+      // Get processed documents from uploaded files
+      const processedDocs = uploadedFiles
+        .filter(f => f.uploadStatus === 'completed' && f.processedDocument)
+        .map(f => f.processedDocument!);
+
       const context: ChatContext = {
-        sessionId: currentSession.id,
+        sessionId: session.id,
         documentIds: documents.map(doc => doc.id),
-        currentTopic: 'general'
+        currentTopic: 'general',
+        processedDocuments: processedDocs
       };
 
+      console.log('📤 Sending to chat service with context:', context);
+      console.log('📄 Processed documents available:', processedDocs.length);
       const response = await chatService.sendMessage(content.trim(), context);
+      console.log('📥 Received response:', response);
       setMessages(prev => [...prev, response]);
+      
+      // Refresh sessions to get updated titles
+      if (isAuthenticated) {
+        const updatedSessions = chatService.getSessions();
+        setSessions(updatedSessions);
+      }
     } catch (error) {
+      console.error('❌ Error sending message:', error);
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}`,
         role: 'assistant',
@@ -235,11 +284,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📝 Form submitted with input:', inputValue);
+    console.log('⏳ Is loading:', isLoading);
     sendMessage(inputValue);
   };
 
   const handleQuickAction = (action: QuickAction) => {
-    sendMessage(action.prompt);
+    setInputValue(action.prompt);
+    // Focus the input field so user can continue typing
+    const inputElement = document.querySelector('.chat-input') as HTMLInputElement;
+    if (inputElement) {
+      inputElement.focus();
+      // Move cursor to end of text
+      inputElement.setSelectionRange(inputElement.value.length, inputElement.value.length);
+    }
   };
 
   const switchSession = async (sessionId: string) => {
@@ -278,13 +336,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="chat-sidebar">
         <div className="sidebar-header">
           <h3>Chat Sessions</h3>
-          <button 
-            className="new-chat-btn"
-            onClick={createNewSession}
-            title="Start new chat"
-          >
-            ➕
-          </button>
+                <button 
+                  className="new-chat-btn"
+                  onClick={createNewSession}
+                  title="Start new chat"
+                >
+                  ➕
+                </button>
         </div>
         
         <div className="sessions-list">
@@ -410,6 +468,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
 
         <form className="chat-input-form" onSubmit={handleSubmit}>
+          {/* Attached Files Display */}
+          {uploadedFiles.filter(f => f.uploadStatus === 'completed').length > 0 && (
+            <div className="attached-files">
+              <div className="attached-files-header">
+                <span className="attached-files-title">📎 Attached Files</span>
+                <button 
+                  className="clear-files-btn"
+                  onClick={() => setUploadedFiles(prev => prev.filter(f => f.uploadStatus !== 'completed'))}
+                  title="Remove all attached files"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="attached-files-list">
+                {uploadedFiles
+                  .filter(f => f.uploadStatus === 'completed')
+                  .map((file) => (
+                    <div key={file.id} className="attached-file-item">
+                      <div className="file-icon">{getFileIcon(file.fileType)}</div>
+                      <div className="file-info">
+                        <span className="file-name" title={file.fileName}>{file.fileName}</span>
+                        <span className="file-size">{formatFileSize(file.fileSize)}</span>
+                      </div>
+                      <button 
+                        className="remove-file-btn"
+                        onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))}
+                        title="Remove file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           <div className="input-container">
             <div className="input-wrapper">
               <textarea
@@ -452,6 +546,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}
                   className="send-btn"
+                  onClick={() => console.log('🔘 Send button clicked')}
                 >
                   {isLoading ? '⏳' : '📤'}
                 </button>

@@ -22,6 +22,7 @@ export interface ChatContext {
   sessionId: string;
   documentIds: string[];
   currentTopic?: string;
+  processedDocuments?: any[]; // Will be ProcessedDocument[] but avoiding circular import
   userPreferences?: {
     responseStyle: 'concise' | 'detailed' | 'conversational';
     expertiseLevel: 'beginner' | 'intermediate' | 'advanced';
@@ -61,7 +62,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'explain_concept',
     title: 'Explain a Concept',
     description: 'Get a detailed explanation of any topic',
-    prompt: 'Can you explain this concept in detail?',
+    prompt: 'Can you explain ',
     icon: '💡',
     category: 'general'
   },
@@ -69,7 +70,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'study_plan',
     title: 'Create Study Plan',
     description: 'Generate a personalized study schedule',
-    prompt: 'Help me create a study plan for this material',
+    prompt: 'Help me create a study plan for ',
     icon: '📅',
     category: 'study'
   },
@@ -77,7 +78,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'assignment_help',
     title: 'Assignment Help',
     description: 'Get guidance on assignments and projects',
-    prompt: 'I need help with this assignment',
+    prompt: 'I need help with this assignment about ',
     icon: '📝',
     category: 'assignment'
   },
@@ -85,7 +86,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'clarify_doubt',
     title: 'Clarify Doubts',
     description: 'Ask specific questions about the content',
-    prompt: 'I have a question about this topic',
+    prompt: 'I have a question about ',
     icon: '❓',
     category: 'clarification'
   },
@@ -93,7 +94,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'summarize_content',
     title: 'Summarize Content',
     description: 'Get a concise summary of the material',
-    prompt: 'Can you summarize the key points?',
+    prompt: 'Can you summarize ',
     icon: '📋',
     category: 'general'
   },
@@ -101,7 +102,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'practice_questions',
     title: 'Practice Questions',
     description: 'Generate practice questions and answers',
-    prompt: 'Create some practice questions for me',
+    prompt: 'Create practice questions for ',
     icon: '🎯',
     category: 'study'
   }

@@ -1,19 +1,23 @@
 import { ChatMessage, ChatSession, ChatContext, ChatService, QuickAction } from '../types/chat';
 import { authService } from './authService';
+import { geminiAIService, AIResponse } from './geminiService';
+import { documentProcessor, ProcessedDocument } from './documentProcessor';
 
-// Mock Chat Service - Replace with actual AI integration
-class MockChatService implements ChatService {
+// Enhanced Chat Service with Gemini AI integration
+class GeminiChatService implements ChatService {
   private sessions: Map<string, ChatSession> = new Map();
   private messageCounter = 0;
   private storageKey = 'academic-ai-chat-sessions';
 
   constructor() {
+    console.log('🏗️ ChatService constructor called');
     this.loadFromStorage();
   }
 
   private loadFromStorage() {
     const user = authService.getCurrentUser();
     if (!user) {
+      console.log('⚠️ Not loading chat history - user not authenticated');
       // Clear sessions for unauthenticated users
       this.sessions.clear();
       this.messageCounter = 0;
@@ -22,8 +26,11 @@ class MockChatService implements ChatService {
 
     try {
       const stored = localStorage.getItem(this.storageKey);
+      console.log('📂 Loading chat sessions from storage for user:', user.email);
+      
       if (stored) {
         const data = JSON.parse(stored);
+        console.log('📊 Found stored data:', data);
         
         // Only load sessions if they belong to the current user
         if (data.userId === user.id) {
@@ -37,14 +44,18 @@ class MockChatService implements ChatService {
             }))
           }]));
           this.messageCounter = data.messageCounter || 0;
+          console.log('✅ Loaded', this.sessions.size, 'sessions for user:', user.email);
         } else {
+          console.log('⚠️ Stored sessions belong to different user, clearing');
           // Clear sessions if they belong to a different user
           this.sessions.clear();
           this.messageCounter = 0;
         }
+      } else {
+        console.log('📂 No stored chat sessions found');
       }
     } catch (error) {
-      console.error('Error loading chat sessions from storage:', error);
+      console.error('❌ Error loading chat sessions from storage:', error);
       this.sessions.clear();
       this.messageCounter = 0;
     }
@@ -54,6 +65,7 @@ class MockChatService implements ChatService {
     // Only save chat history if user is authenticated
     const user = authService.getCurrentUser();
     if (!user) {
+      console.log('⚠️ Not saving chat history - user not authenticated');
       return; // Don't save chat history for unauthenticated users
     }
 
@@ -64,42 +76,71 @@ class MockChatService implements ChatService {
         userId: user.id // Associate sessions with user
       };
       localStorage.setItem(this.storageKey, JSON.stringify(data));
+      console.log('✅ Saved chat sessions to storage for user:', user.email);
+      console.log('📊 Sessions saved:', this.sessions.size);
     } catch (error) {
-      console.error('Error saving chat sessions to storage:', error);
+      console.error('❌ Error saving chat sessions to storage:', error);
     }
   }
 
   async sendMessage(message: string, context: ChatContext): Promise<ChatMessage> {
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-
     const userMessage: ChatMessage = {
-      id: `msg_${this.messageCounter++}`,
+      id: `msg_${Date.now()}_${++this.messageCounter}`,
       role: 'user',
       content: message,
       timestamp: new Date()
     };
 
-    // Generate AI response based on message content
-    const aiResponse = this.generateAIResponse(message, context);
-    
-    const assistantMessage: ChatMessage = {
-      id: `msg_${this.messageCounter++}`,
-      role: 'assistant',
-      content: aiResponse,
-      timestamp: new Date(),
-      documentId: context.documentIds[0] // Reference to first document if available
-    };
+    try {
+      // Build context from uploaded documents
+      const documentContext = this.buildDocumentContext(context.documentIds, context.processedDocuments);
+      
+      // Get AI response from Gemini
+      const aiResponse: AIResponse = await geminiAIService.generateResponse(
+        message, 
+        documentContext
+      );
 
-    // Update session with new messages
-    if (context.sessionId && this.sessions.has(context.sessionId)) {
-      const session = this.sessions.get(context.sessionId)!;
-      session.messages.push(userMessage, assistantMessage);
-      session.updatedAt = new Date();
-      this.saveToStorage();
+      const assistantMessage: ChatMessage = {
+        id: `msg_${Date.now()}_${++this.messageCounter}`,
+        role: 'assistant',
+        content: aiResponse.content,
+        timestamp: new Date()
+      };
+
+      // Update session with new messages
+      if (context.sessionId && this.sessions.has(context.sessionId)) {
+        const session = this.sessions.get(context.sessionId)!;
+        session.messages.push(userMessage, assistantMessage);
+        session.updatedAt = new Date();
+        
+        // Update session title based on first message if it's generic
+        this.updateSessionTitleIfNeeded(session, message);
+        
+        this.saveToStorage();
+      }
+
+      return assistantMessage;
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      
+      const errorMessage: ChatMessage = {
+        id: `error_${Date.now()}_${++this.messageCounter}`,
+        role: 'assistant',
+        content: 'I apologize, but I\'m having trouble processing your request right now. Please try again in a moment.',
+        timestamp: new Date()
+      };
+
+      // Still save the user message and error response
+      if (context.sessionId && this.sessions.has(context.sessionId)) {
+        const session = this.sessions.get(context.sessionId)!;
+        session.messages.push(userMessage, errorMessage);
+        session.updatedAt = new Date();
+        this.saveToStorage();
+      }
+
+      return errorMessage;
     }
-
-    return assistantMessage;
   }
 
   async getChatHistory(sessionId: string): Promise<ChatMessage[]> {
@@ -109,9 +150,12 @@ class MockChatService implements ChatService {
 
   async createNewSession(title?: string): Promise<ChatSession> {
     const sessionId = `session_${Date.now()}`;
+    const sessionNumber = this.sessions.size + 1;
+    const defaultTitle = title || this.generateSessionTitle();
+    
     const session: ChatSession = {
       id: sessionId,
-      title: title || `Chat ${this.sessions.size + 1}`,
+      title: defaultTitle,
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -120,7 +164,76 @@ class MockChatService implements ChatService {
 
     this.sessions.set(sessionId, session);
     this.saveToStorage();
+    console.log('✅ Created new session:', session);
     return session;
+  }
+
+  private generateSessionTitle(): string {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    const dateStr = now.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    return `Chat ${dateStr} ${timeStr}`;
+  }
+
+  private updateSessionTitleIfNeeded(session: ChatSession, firstMessage: string): void {
+    // Only update title if it's still the generic time-based title and this is the first user message
+    if (session.title.startsWith('Chat ') && session.messages.length === 2) { // 2 because we just added user and assistant messages
+      const newTitle = this.generateTopicBasedTitle(firstMessage);
+      // Only update if the new title is significantly different and more descriptive
+      if (newTitle !== session.title && !newTitle.startsWith('Chat ')) {
+        session.title = newTitle;
+        console.log('📝 Updated session title from', session.title, 'to', newTitle);
+      }
+    }
+  }
+
+  private generateTopicBasedTitle(message: string): string {
+    const lowerMessage = message.toLowerCase();
+    
+    // Check for specific academic topics with more precise matching
+    if ((lowerMessage.includes('statistics') || lowerMessage.includes('probability')) && 
+        (lowerMessage.includes('homework') || lowerMessage.includes('assignment') || lowerMessage.includes('help'))) {
+      return 'Statistics & Probability';
+    } else if ((lowerMessage.includes('calculus') || lowerMessage.includes('derivative') || lowerMessage.includes('integral')) && 
+               (lowerMessage.includes('help') || lowerMessage.includes('problem') || lowerMessage.includes('solve'))) {
+      return 'Calculus Help';
+    } else if (lowerMessage.includes('homework') || lowerMessage.includes('assignment')) {
+      return 'Homework Help';
+    } else if (lowerMessage.includes('exam') || lowerMessage.includes('test') || lowerMessage.includes('quiz')) {
+      return 'Exam Preparation';
+    } else if (lowerMessage.includes('essay') || lowerMessage.includes('writing') || lowerMessage.includes('paper')) {
+      return 'Writing Help';
+    } else if (lowerMessage.includes('research') || lowerMessage.includes('project')) {
+      return 'Research Project';
+    } else if (lowerMessage.includes('programming') || lowerMessage.includes('code') || lowerMessage.includes('algorithm')) {
+      return 'Programming Help';
+    } else if (lowerMessage.includes('physics') || lowerMessage.includes('chemistry') || lowerMessage.includes('biology')) {
+      return 'Science Help';
+    } else if (lowerMessage.includes('math') || lowerMessage.includes('algebra') || lowerMessage.includes('geometry')) {
+      return 'Mathematics Help';
+    } else if (lowerMessage.includes('summarize') || lowerMessage.includes('explain') || lowerMessage.includes('document')) {
+      return 'Document Analysis';
+    }
+    
+    // If no specific topic found, create a title from the first few meaningful words
+    const words = message.trim().split(' ').filter(word => 
+      word.length > 2 && 
+      !['help', 'me', 'with', 'the', 'this', 'that', 'can', 'you', 'please'].includes(word.toLowerCase())
+    ).slice(0, 3);
+    
+    if (words.length > 0) {
+      return words.join(' ').replace(/[^\w\s]/g, '');
+    }
+    
+    // Fallback to time-based title
+    return this.generateSessionTitle();
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -154,8 +267,28 @@ class MockChatService implements ChatService {
 
   // Reload sessions when user authentication changes
   reloadForUser(): void {
+    console.log('🔄 Reloading chat service for user');
     this.loadFromStorage();
   }
+
+  // Debug method to check localStorage contents
+  debugStorage(): void {
+    console.log('🔍 Debugging localStorage:');
+    console.log('Storage key:', this.storageKey);
+    const stored = localStorage.getItem(this.storageKey);
+    console.log('Raw stored data:', stored);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        console.log('Parsed data:', parsed);
+      } catch (e) {
+        console.error('Error parsing stored data:', e);
+      }
+    }
+    console.log('Current sessions in memory:', this.sessions.size);
+    console.log('Current user:', authService.getCurrentUser());
+  }
+
 
   private generateAIResponse(userMessage: string, context: ChatContext): string {
     const message = userMessage.toLowerCase();
@@ -191,11 +324,64 @@ class MockChatService implements ChatService {
     // Default response for other queries
     return `That's an interesting question! Let me help you with that.\n\nBased on my analysis, here's what I can tell you:\n\n• **Key Points**: The main aspects to consider are...\n• **Important Details**: You should pay attention to...\n• **Next Steps**: I recommend that you...\n\nIs there anything specific about this topic you'd like me to elaborate on?`;
   }
+
+  private buildDocumentContext(documentIds: string[], processedDocuments?: any[]): string {
+    if (documentIds.length === 0) return '';
+
+    // Use processed documents if available, otherwise fallback to basic context
+    if (!processedDocuments || processedDocuments.length === 0) {
+      return `The user has uploaded ${documentIds.length} document(s) that may be relevant to their question. Consider this when providing academic guidance.`;
+    }
+
+    // Build rich context from processed document content
+    const documentSummaries = documentProcessor.getDocumentSummaries(processedDocuments);
+    const documentContent = documentProcessor.getDocumentContent(processedDocuments, 3000);
+
+    console.log('📄 Document summaries:', documentSummaries);
+    console.log('📄 Document content length:', documentContent.length);
+    console.log('📄 Document content preview:', documentContent.substring(0, 300));
+
+    return `The user has uploaded ${processedDocuments.length} document(s) with the following content:
+
+${documentSummaries}
+
+ACTUAL DOCUMENT CONTENT (use this as the source of truth):
+${documentContent}
+
+CRITICAL INSTRUCTIONS:
+- The content above IS the actual document content - treat it as real assignment text
+- When asked to summarize, provide a detailed summary based on this exact content
+- Do NOT ask for more information - use the content provided above
+- Reference specific sections, requirements, and topics from the document content
+- Provide actionable guidance based on the assignment details shown above
+- For homework assignments, extract and summarize assignment title, requirements, problems, and instructions
+- For study guides, identify key concepts, formulas, and learning objectives
+- For exams, note question types, point values, and topics covered
+
+The document content above contains all the information needed to provide comprehensive help. Use it directly.`;
+  }
+
+  private getProcessedDocuments(documentIds: string[]): ProcessedDocument[] {
+    // In a real app, you'd fetch from a database or storage
+    // For now, we'll return an empty array as documents are stored in component state
+    // This will be enhanced when we integrate with the chat interface
+    return [];
+  }
+
+  // Get AI provider info for debugging
+  getAIProviderInfo(): string {
+    return geminiAIService.getCurrentProvider();
+  }
+
+  getAvailableAIProviders(): string[] {
+    return geminiAIService.getAvailableProviders();
+  }
+
+  // Test Gemini connection
+  async testGeminiConnection(): Promise<boolean> {
+    return await geminiAIService.testConnection();
+  }
 }
 
 // Export singleton instance
-export const chatService = new MockChatService();
-
-// Future: Replace with actual AI service integration
-// export const chatService = new OpenAIAPIService(process.env.REACT_APP_OPENAI_API_KEY);
-// export const chatService = new AnthropicAPIService(process.env.REACT_APP_ANTHROPIC_API_KEY);
+export const chatService = new GeminiChatService();
