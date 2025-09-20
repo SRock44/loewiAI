@@ -13,7 +13,10 @@
     "@google-cloud/local-auth": "^2.1.0",
     "@google/generative-ai": "^0.2.1",
     "google-auth-library": "^9.4.1",
+    "katex": "^0.16.22",
+    "mammoth": "^1.11.0",
     "pdfjs-dist": "^5.4.149",
+    "pptx-parser": "^1.1.7-beta.9",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-google-login": "^5.2.2",
@@ -21,6 +24,8 @@
     "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
+    "@types/katex": "^0.16.7",
+    "@types/node": "^24.5.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^6.14.0",

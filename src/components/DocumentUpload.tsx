@@ -39,7 +39,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           uploadDate: new Date(),
           processed: false,
           uploadProgress: 0,
-          uploadStatus: 'error',
+          uploadStatus: 'error' as const,
           error: validation.error
         }]);
         continue;
@@ -54,7 +54,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         uploadDate: new Date(),
         processed: false,
         uploadProgress: 0,
-        uploadStatus: 'uploading'
+        uploadStatus: 'uploading' as const
       };
 
       setUploadedFiles(prev => [...prev, uploadedFile]);
@@ -73,7 +73,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         // Change status to processing
         setUploadedFiles(prev => prev.map(f => 
           f.id === uploadedFile.id 
-            ? { ...f, uploadStatus: 'processing' }
+            ? { ...f, uploadStatus: 'processing' as const }
             : f
         ));
 
@@ -87,7 +87,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               ? { 
                   ...f, 
                   ...processedDocument,
-                  uploadStatus: 'completed',
+                  uploadStatus: 'completed' as const,
                   uploadProgress: 100
                 }
               : f
@@ -107,7 +107,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           f.id === uploadedFile.id 
             ? { 
                 ...f, 
-                uploadStatus: 'error',
+                uploadStatus: 'error' as const,
                 error: 'Failed to process document'
               }
             : f
@@ -160,7 +160,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const retryUpload = useCallback((fileId: string) => {
     setUploadedFiles(prev => prev.map(f => 
       f.id === fileId 
-        ? { ...f, uploadStatus: 'uploading', uploadProgress: 0, error: undefined }
+        ? { ...f, uploadStatus: 'uploading' as const, uploadProgress: 0, error: undefined }
         : f
     ));
     // Re-process the file

@@ -340,6 +340,7 @@ class GeminiChatService implements ChatService {
     console.log('📄 Document summaries:', documentSummaries);
     console.log('📄 Document content length:', documentContent.length);
     console.log('📄 Document content preview:', documentContent.substring(0, 300));
+    console.log('📄 Full document context being sent to Gemini:', documentContent);
 
     return `The user has uploaded ${processedDocuments.length} document(s) with the following content:
 

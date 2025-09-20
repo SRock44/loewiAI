@@ -1,7 +1,13 @@
 // Browser-Compatible Document Processing Service
-// Handles file uploads with intelligent fallback content
+// Handles file uploads with real text extraction
 
 import { DocumentMetadata } from '../types/ai';
+import * as pdfjsLib from 'pdfjs-dist';
+import * as mammoth from 'mammoth';
+import { PPTXParser } from 'pptx-parser';
+
+// Configure PDF.js worker for Vite environment
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export interface ProcessedDocument extends DocumentMetadata {
   extractedContent: string;
@@ -83,38 +89,95 @@ export class DocumentProcessor {
   }
 
   private async extractFromPDF(file: File): Promise<string> {
-    console.log('📄 Attempting PDF text extraction...');
+    console.log('📄 Attempting PDF text extraction with PDF.js...');
+    console.log('📄 PDF.js worker configured at:', pdfjsLib.GlobalWorkerOptions.workerSrc);
     
     try {
-      // Try to read as text first (won't work for most PDFs but worth trying)
-      const textContent = await this.readFileAsText(file);
+      // Convert file to ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      console.log(`📄 File converted to ArrayBuffer: ${arrayBuffer.byteLength} bytes`);
       
-      // Check if we got meaningful text (not just binary data)
-      if (textContent && textContent.length > 100 && !textContent.includes('')) {
-        console.log('✅ PDF text extraction successful via FileReader');
-        return this.cleanText(textContent);
+      // Load the PDF document
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0 // Reduce console output
+      });
+      
+      const pdf = await loadingTask.promise;
+      console.log(`📄 PDF loaded successfully: ${pdf.numPages} pages`);
+      
+      let fullText = '';
+      
+      // Extract text from each page
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        try {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          
+          // Combine text items from the page
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          
+          fullText += pageText + '\n';
+          console.log(`📄 Extracted text from page ${pageNum}: ${pageText.length} characters`);
+        } catch (pageError) {
+          console.error(`❌ Error extracting text from page ${pageNum}:`, pageError);
+        }
       }
       
-      console.log('⚠️ PDF text extraction limited in browser environment');
-      return '';
+      const cleanedText = this.cleanText(fullText);
+      
+      if (cleanedText && cleanedText.length > 50) {
+        console.log(`✅ PDF text extraction successful: ${cleanedText.length} characters`);
+        console.log('📄 Extracted text preview:', cleanedText.substring(0, 200));
+        return cleanedText;
+      } else {
+        console.log('⚠️ PDF text extraction returned minimal content');
+        console.log('📄 Raw extracted text:', fullText.substring(0, 200));
+        return '';
+      }
     } catch (error) {
       console.error('❌ PDF extraction failed:', error);
+      console.error('❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return '';
     }
   }
 
   private async extractFromWord(file: File): Promise<string> {
-    console.log('📝 Attempting Word document extraction...');
+    console.log('📝 Attempting Word document extraction with Mammoth...');
     
     try {
-      const textContent = await this.readFileAsText(file);
-      
-      if (textContent && textContent.length > 50) {
-        console.log('✅ Word document text extraction successful');
-        return this.cleanText(textContent);
+      // Check if it's a DOCX file (mammoth only supports DOCX)
+      if (file.name.toLowerCase().endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        
+        if (result.value && result.value.length > 50) {
+          console.log(`✅ DOCX text extraction successful: ${result.value.length} characters`);
+          return this.cleanText(result.value);
+        } else {
+          console.log('⚠️ DOCX extraction returned minimal content');
+          return '';
+        }
+      } else if (file.name.toLowerCase().endsWith('.doc')) {
+        // For older DOC files, try reading as text (limited success)
+        console.log('⚠️ DOC files not fully supported, attempting basic text extraction...');
+        const textContent = await this.readFileAsText(file);
+        
+        if (textContent && textContent.length > 50) {
+          console.log('✅ DOC text extraction successful via FileReader');
+          return this.cleanText(textContent);
+        }
+        
+        console.log('⚠️ DOC file extraction limited in browser environment');
+        return '';
       }
       
-      console.log('⚠️ Word document extraction limited in browser environment');
       return '';
     } catch (error) {
       console.error('❌ Word extraction failed:', error);
@@ -123,17 +186,71 @@ export class DocumentProcessor {
   }
 
   private async extractFromPowerPoint(file: File): Promise<string> {
-    console.log('📊 Attempting PowerPoint extraction...');
+    console.log('📊 Attempting PowerPoint extraction with PPTX Parser...');
     
     try {
-      const textContent = await this.readFileAsText(file);
-      
-      if (textContent && textContent.length > 50) {
-        console.log('✅ PowerPoint text extraction successful');
-        return this.cleanText(textContent);
+      // Check if it's a PPTX file (pptx-parser only supports PPTX)
+      if (file.name.toLowerCase().endsWith('.pptx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const parser = new PPTXParser();
+        
+        // Parse the PPTX file
+        await parser.parse(arrayBuffer);
+        
+        let fullText = '';
+        
+        // Extract text from all slides
+        const slides = parser.slides;
+        console.log(`📊 PPTX loaded: ${slides.length} slides`);
+        
+        for (let i = 0; i < slides.length; i++) {
+          const slide = slides[i];
+          
+          // Extract text from slide content
+          if (slide.content && slide.content.length > 0) {
+            const slideText = slide.content
+              .map((item: any) => {
+                // Handle different content types
+                if (item.type === 'text' && item.text) {
+                  return item.text;
+                } else if (typeof item === 'string') {
+                  return item;
+                }
+                return '';
+              })
+              .filter((text: string) => text.trim().length > 0)
+              .join(' ');
+            
+            if (slideText.trim()) {
+              fullText += `Slide ${i + 1}:\n${slideText}\n\n`;
+              console.log(`📊 Extracted text from slide ${i + 1}: ${slideText.length} characters`);
+            }
+          }
+        }
+        
+        const cleanedText = this.cleanText(fullText);
+        
+        if (cleanedText && cleanedText.length > 50) {
+          console.log(`✅ PPTX text extraction successful: ${cleanedText.length} characters`);
+          return cleanedText;
+        } else {
+          console.log('⚠️ PPTX extraction returned minimal content');
+          return '';
+        }
+      } else if (file.name.toLowerCase().endsWith('.ppt')) {
+        // For older PPT files, try reading as text (limited success)
+        console.log('⚠️ PPT files not fully supported, attempting basic text extraction...');
+        const textContent = await this.readFileAsText(file);
+        
+        if (textContent && textContent.length > 50) {
+          console.log('✅ PPT text extraction successful via FileReader');
+          return this.cleanText(textContent);
+        }
+        
+        console.log('⚠️ PPT file extraction limited in browser environment');
+        return '';
       }
       
-      console.log('⚠️ PowerPoint extraction limited in browser environment');
       return '';
     } catch (error) {
       console.error('❌ PowerPoint extraction failed:', error);
@@ -442,7 +559,7 @@ Please describe what you need help with from this document, and I'll provide det
     if (fileNameLower.includes('notes') || fileNameLower.includes('lecture')) topics.push('Lecture Notes');
     
     // Remove duplicates and limit to 5 topics
-    const uniqueTopics = [...new Set(topics)];
+    const uniqueTopics = Array.from(new Set(topics));
     
     if (uniqueTopics.length === 0) {
       uniqueTopics.push('Academic Content');

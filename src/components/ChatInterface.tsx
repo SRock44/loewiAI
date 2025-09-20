@@ -146,6 +146,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             : f
         ));
 
+        // Use documentProcessor directly to get full ProcessedDocument
         const processedDocument = await documentProcessor.processDocument(file);
         
         console.log('📄 Processed document result:', {
@@ -165,7 +166,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   ...f, 
                   ...processedDocument,
                   processedDocument: processedDocument,
-                  uploadStatus: 'completed',
+                  uploadStatus: 'completed' as const,
                   uploadProgress: 100
                 }
               : f
@@ -259,6 +260,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       console.log('📤 Sending to chat service with context:', context);
       console.log('📄 Processed documents available:', processedDocs.length);
+      console.log('📄 Processed documents details:', processedDocs.map(doc => ({
+        id: doc.id,
+        fileName: doc.fileName,
+        contentLength: doc.extractedContent.length,
+        contentPreview: doc.extractedContent.substring(0, 200)
+      })));
       const response = await chatService.sendMessage(content.trim(), context);
       console.log('📥 Received response:', response);
       setMessages(prev => [...prev, response]);
