@@ -64,7 +64,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: 'Explain a Concept',
     description: 'Get a detailed explanation of any topic',
     prompt: 'Can you explain ',
-    icon: '💡',
+    icon: 'Lightbulb',
     category: 'general'
   },
   {
@@ -72,7 +72,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: 'Create Study Plan',
     description: 'Generate a personalized study schedule',
     prompt: 'Help me create a study plan for ',
-    icon: '📅',
+    icon: 'Calendar',
     category: 'study'
   },
   {
@@ -80,7 +80,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: 'Assignment Help',
     description: 'Get guidance on assignments and projects',
     prompt: 'I need help with this assignment about ',
-    icon: '📝',
+    icon: 'Edit',
     category: 'assignment'
   },
   {
@@ -88,7 +88,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: 'Clarify Doubts',
     description: 'Ask specific questions about the content',
     prompt: 'I have a question about ',
-    icon: '❓',
+    icon: 'QuestionCircle',
     category: 'clarification'
   },
   {
@@ -96,7 +96,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: 'Summarize Content',
     description: 'Get a concise summary of the material',
     prompt: 'Can you summarize ',
-    icon: '📋',
+    icon: 'List',
     category: 'general'
   },
   {
@@ -104,15 +104,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     title: 'Practice Questions',
     description: 'Generate practice questions and answers',
     prompt: 'Create practice questions for ',
-    icon: '🎯',
+    icon: 'Target',
     category: 'study'
   },
-  {
-    id: 'generate_flashcards',
-    title: 'Generate Flashcards',
-    description: 'Create flashcards from your documents',
-    prompt: 'Generate flashcards from my uploaded documents focusing on ',
-    icon: '🎴',
-    category: 'study'
-  }
 ];

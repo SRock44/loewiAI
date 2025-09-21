@@ -162,11 +162,6 @@
   max-width: 600px;
 }
 
-.welcome-icon {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-  animation: float 3s ease-in-out infinite;
-}
 
 .welcome-content h3 {
   font-size: 2rem;
@@ -180,6 +175,16 @@
   color: #4a5568;
   margin-bottom: 2rem;
   line-height: 1.6;
+}
+
+.welcome-title {
+  animation: fadeInUpSmooth 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s both;
+  will-change: transform, opacity;
+}
+
+.welcome-description {
+  animation: fadeInUpSmooth 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.6s both;
+  will-change: transform, opacity;
 }
 
 .auth-notice {
@@ -257,6 +262,7 @@
   justify-content: center;
   background: rgba(102, 126, 234, 0.1);
   border-radius: 8px;
+  color: #667eea;
 }
 
 .action-content {
@@ -299,9 +305,9 @@
 }
 
 .message.user .message-content {
-  background: rgba(255, 255, 255, 0.95);
-  color: #2d3748;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #2d3748;
+  color: #ffffff;
+  border: 1px solid #4a5568;
 }
 
 .message-text {
@@ -311,7 +317,7 @@
 }
 
 .message.user .message-text {
-  color: #2d3748;
+  color: #ffffff;
 }
 
 .message-text strong {
@@ -330,7 +336,7 @@
 }
 
 .message.user .message-time {
-  color: #718096;
+  color: #a0aec0;
 }
 
 .typing-indicator {
@@ -455,7 +461,7 @@
 
 .attach-btn, .test-btn {
   background: transparent;
-  color: #718096;
+  color: #667eea;
   border: none;
   width: 36px;
   height: 36px;
@@ -489,7 +495,7 @@
 }
 
 .send-btn {
-  background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+  background: #667eea;
   color: white;
   border: none;
   width: 36px;
@@ -505,7 +511,7 @@
 
 .send-btn:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(45, 55, 72, 0.3);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .send-btn:disabled {
@@ -540,7 +546,7 @@
 .attached-files-title {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #4a5568;
+  color: #667eea;
 }
 
 .clear-files-btn {
@@ -738,6 +744,29 @@
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
+}
+
+@keyframes fadeInUpSmooth {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+    filter: blur(4px);
+  }
+  20% {
+    opacity: 0.3;
+    transform: translateY(25px) scale(0.98);
+    filter: blur(2px);
+  }
+  60% {
+    opacity: 0.8;
+    transform: translateY(-5px) scale(1.02);
+    filter: blur(0.5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
 }
 
 @keyframes typing {
@@ -1003,46 +1032,88 @@
 
 /* Flashcard Info Section */
 .flashcard-info {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-top: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #2d3748;
+  border-radius: 16px;
+  padding: 24px;
+  margin-top: 24px;
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: flex-start;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.flashcard-info:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.flashcard-action-btn {
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.flashcard-action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.flashcard-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .info-icon {
   font-size: 32px;
   flex-shrink: 0;
+  color: #667eea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
 }
 
 .info-content h4 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
-  font-weight: 600;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
 }
 
 .info-content p {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  line-height: 1.5;
-  opacity: 0.9;
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #4a5568;
 }
 
 .example-commands {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px;
-  backdrop-filter: blur(10px);
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid rgba(102, 126, 234, 0.1);
 }
 
 .example-commands strong {
   display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  opacity: 0.9;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .example-commands ul {
@@ -1052,33 +1123,38 @@
 }
 
 .example-commands li {
-  font-size: 12px;
-  margin-bottom: 4px;
-  opacity: 0.8;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #4a5568;
   position: relative;
 }
 
 .example-commands li:before {
-  content: "💡";
+  content: "•";
   position: absolute;
   left: -16px;
+  color: #667eea;
+  font-weight: bold;
 }
 
 /* Responsive flashcard info */
 @media (max-width: 768px) {
   .flashcard-info {
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
+    gap: 16px;
+    padding: 20px;
+    text-align: center;
   }
   
   .info-icon {
     font-size: 28px;
     align-self: center;
+    width: 48px;
+    height: 48px;
   }
   
   .info-content h4 {
-    font-size: 16px;
+    font-size: 18px;
     text-align: center;
   }
   

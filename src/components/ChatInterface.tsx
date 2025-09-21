@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
-import { Card } from 'solar-icons';
+import { Card, Lightbulb, Calendar, Document, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
 import { flashcardService } from '../services/flashcardService';
 import { flashcardEventTarget } from '../hooks/useSessionFlashcards';
 import './ChatInterface.css';
@@ -560,6 +560,30 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       .replace(/\n/g, '<br/>');
   };
 
+  const renderSolarIcon = (iconName: string, size: number = 16) => {
+    const iconProps = { size };
+    switch (iconName) {
+      case 'Lightbulb':
+        return <Lightbulb {...iconProps} />;
+      case 'Calendar':
+        return <Calendar {...iconProps} />;
+      case 'Document':
+        return <Document {...iconProps} />;
+      case 'Edit':
+        return <Pen {...iconProps} />;
+      case 'QuestionCircle':
+        return <QuestionCircle {...iconProps} />;
+      case 'List':
+        return <List {...iconProps} />;
+      case 'Target':
+        return <Target {...iconProps} />;
+      case 'Card':
+        return <Card {...iconProps} />;
+      default:
+        return <Document {...iconProps} />;
+    }
+  };
+
   return (
     <div className="chat-interface">
       
@@ -569,9 +593,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           {messages.length === 0 ? (
             <div className="welcome-message">
               <div className="welcome-content">
-                <div className="welcome-icon">🤖</div>
-                <h3>Welcome to Academic AI Assistant!</h3>
-                <p>I'm here to help you with your academic journey. Ask me anything about your studies!</p>
+                <h3 className="welcome-title">Welcome to Newton 1.0!</h3>
+                <p className="welcome-description">I am an advisor, professor, tutor, and chatbot all in one!</p>
                 
                 {!isAuthenticated && (
                   <div className="auth-notice">
@@ -590,7 +613,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         onClick={() => handleQuickAction(action)}
                         disabled={isLoading}
                       >
-                        <span className="action-icon">{action.icon}</span>
+                        <span className="action-icon">{renderSolarIcon(action.icon, 18)}</span>
                         <div className="action-content">
                           <strong>{action.title}</strong>
                           <small>{action.description}</small>
@@ -600,21 +623,34 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   </div>
                 </div>
                 
-                <div className="flashcard-info">
-                  <div className="info-icon">🎴</div>
+                <button 
+                  className="flashcard-info flashcard-action-btn"
+                  onClick={() => handleQuickAction({
+                    id: 'create_flashcards',
+                    title: 'Create Flashcards',
+                    description: 'Generate flashcards for any topic',
+                    prompt: 'Create flashcards about ',
+                    icon: 'Card',
+                    category: 'study'
+                  })}
+                  disabled={isLoading}
+                >
+                  <div className="info-icon">
+                    <ClipboardList size={24} />
+                  </div>
                   <div className="info-content">
                     <h4>Create Flashcards Instantly!</h4>
-                    <p>Just type "create flashcards about [topic]" or "generate flashcards for my document" and I'll create study cards for you automatically!</p>
+                    <p>Just type "create flashcards about [topic]" and I'll create study cards for you automatically! Works with any subject or uploaded documents.</p>
                     <div className="example-commands">
                       <strong>Examples:</strong>
                       <ul>
                         <li>"Create flashcards about photosynthesis"</li>
-                        <li>"Generate flashcards for my uploaded document"</li>
-                        <li>"Make flashcards about calculus derivatives"</li>
+                        <li>"Make flashcards for calculus derivatives"</li>
+                        <li>"Generate flashcards from my uploaded PDF"</li>
                       </ul>
                     </div>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           ) : (
@@ -659,7 +695,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           {uploadedFiles.filter(f => f.uploadStatus === 'completed').length > 0 && (
             <div className="attached-files">
               <div className="attached-files-header">
-                <span className="attached-files-title">📎 Attached Files</span>
+                <span className="attached-files-title">
+                  <Paperclip size={14} style={{ marginRight: '6px' }} />
+                  Attached Files
+                </span>
                 <button 
                   className="clear-files-btn"
                   onClick={() => setUploadedFiles(prev => prev.filter(f => f.uploadStatus !== 'completed'))}
@@ -738,7 +777,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   disabled={isLoading}
                   title="Attach files"
                 >
-                  📎
+                  <Paperclip size={16} />
                 </button>
                 <button
                   type="submit"
@@ -746,7 +785,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   className="send-btn"
                   onClick={() => console.log('🔘 Send button clicked')}
                 >
-                  {isLoading ? '⏳' : '📤'}
+                  {isLoading ? (
+                    <div className="loading-spinner"></div>
+                  ) : (
+                    <ArrowRight size={16} />
+                  )}
                 </button>
               </div>
             </div>
@@ -801,7 +844,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           )}
           
           <div className="input-hint">
-            Press Enter to send, Shift+Enter for new line • Drag & drop files or click 📎 to attach
+            Press Enter to send, Shift+Enter for new line • Drag & drop files or click <Paperclip size={12} style={{ display: 'inline', margin: '0 2px' }} /> to attach
           </div>
         </form>
       </div>
