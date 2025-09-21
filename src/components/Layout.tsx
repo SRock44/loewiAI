@@ -5,7 +5,8 @@ import UserProfile from './UserProfile';
 import UserSettings from './UserSettings';
 import { Home, ChatSquare, AddSquare, TextSquare, Card, Document } from 'solar-icons';
 import FlashcardModal from './FlashcardModal';
-import { useSessionFlashcards } from '../hooks/useSessionFlashcards';
+import FlashcardList from './FlashcardList';
+import { useAllFlashcards } from '../hooks/useAllFlashcards';
 import { chatService } from '../services/chatService';
 import { ChatSession } from '../types/chat';
 import './Layout.css';
@@ -24,10 +25,14 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const { isAuthenticated, user, signInWithGoogle, signOut, isLoading } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showFlashcardList, setShowFlashcardList] = useState(false);
+  const [showIndividualFlashcard, setShowIndividualFlashcard] = useState(false);
+  const [currentFlashcardSet, setCurrentFlashcardSet] = useState<any>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [flashcardToDelete, setFlashcardToDelete] = useState<any>(null);
   
   // Use custom hooks for efficient state management
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const { flashcardSets, updateFlashcardSet } = useSessionFlashcards(currentChatId);
+  const { flashcardSets, updateFlashcardSet, removeFlashcardSet } = useAllFlashcards();
   
   // Load chat sessions
   useEffect(() => {
@@ -71,6 +76,25 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
     if (onChatSelect) {
       onChatSelect(chatId);
     }
+  };
+
+  const handleDeleteFlashcard = (flashcardSet: any, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent opening the flashcard set
+    setFlashcardToDelete(flashcardSet);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (flashcardToDelete) {
+      removeFlashcardSet(flashcardToDelete.id);
+      setShowDeleteConfirm(false);
+      setFlashcardToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setFlashcardToDelete(null);
   };
 
 
@@ -167,27 +191,15 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
           {/* Flashcard Button */}
           {location.pathname === '/dashboard' && (
             <div>
-              {flashcardSets.length > 0 ? (
-                <button
-                  className="nav-item flashcard-nav-btn"
-                  onClick={() => setShowFlashcardList(true)}
-                  title={`View your flashcard sets (${flashcardSets.length})`}
-                >
-                  <span className="nav-icon">
-                    <Card size={16} />
-                  </span>
-                </button>
-                  ) : (
-                    <button
-                      className="nav-item flashcard-nav-btn"
-                      onClick={() => setShowFlashcardList(true)}
-                      title="No flashcards yet - click to create some"
-                    >
-                      <span className="nav-icon">
-                        <Document size={16} />
-                      </span>
-                    </button>
-                  )}
+              <button
+                className="nav-item flashcard-nav-btn"
+                onClick={() => setShowFlashcardList(true)}
+                title={flashcardSets.length > 0 ? `View your flashcard sets (${flashcardSets.length})` : "No flashcards yet - click to create some"}
+              >
+                <span className="nav-icon">
+                  {flashcardSets.length > 0 ? <Card size={16} /> : <Document size={16} />}
+                </span>
+              </button>
             </div>
           )}
         </nav>
@@ -251,12 +263,96 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
       {/* Flashcard Modal */}
       {showFlashcardList && (
-        <FlashcardModal
-          isOpen={showFlashcardList}
-          onClose={() => setShowFlashcardList(false)}
-          flashcardSets={flashcardSets}
-          onSetUpdate={updateFlashcardSet}
-        />
+        <div className="flashcard-list-overlay">
+          <div className="flashcard-list-modal">
+            <button 
+              className="floating-close-btn" 
+              onClick={() => setShowFlashcardList(false)}
+            >
+              ✕
+            </button>
+            <div className="flashcard-list-content">
+              {flashcardSets.length === 0 ? (
+                <div className="no-flashcards">
+                  <h3>No Flashcards Yet</h3>
+                  <p>Generate some flashcards by asking Newton 1.0 to create them from your documents or text!</p>
+                </div>
+              ) : (
+                <div className="flashcard-selection">
+                  <h3>Select Flashcard Set</h3>
+                  <div className="flashcard-sets-grid">
+                    {flashcardSets.map((set) => (
+                      <div key={set.id} className="flashcard-set-card-container">
+                        <button
+                          className="flashcard-set-card"
+                          onClick={() => {
+                            setCurrentFlashcardSet(set);
+                            setShowFlashcardList(false);
+                            setShowIndividualFlashcard(true);
+                          }}
+                        >
+                          <h4>{set.title}</h4>
+                          <p>{set.description}</p>
+                          <div className="set-stats">
+                            <span>{set.flashcards.length} cards</span>
+                            <span>{new Date(set.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </button>
+                        <button
+                          className="delete-flashcard-btn"
+                          onClick={(e) => handleDeleteFlashcard(set, e)}
+                          title="Delete flashcard set"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Individual Flashcard Modal */}
+      {showIndividualFlashcard && currentFlashcardSet && (
+        <div className="flashcard-list-overlay">
+          <div className="flashcard-list-modal">
+            <button 
+              className="floating-close-btn" 
+              onClick={() => setShowIndividualFlashcard(false)}
+            >
+              ✕
+            </button>
+            <div className="flashcard-list-content">
+              <FlashcardList
+                flashcardSet={currentFlashcardSet}
+                onSetUpdate={updateFlashcardSet}
+                showFilters={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="delete-confirm-overlay">
+          <div className="delete-confirm-modal">
+            <h3>Delete Flashcard Set</h3>
+            <p>Are you sure you want to delete <strong>"{flashcardToDelete?.title}"</strong>?</p>
+            <p className="warning-text">This action cannot be undone.</p>
+            <div className="delete-confirm-actions">
+              <button className="cancel-btn" onClick={cancelDelete}>
+                Cancel
+              </button>
+              <button className="delete-btn" onClick={confirmDelete}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -14,7 +14,7 @@ const Header: React.FC = () => {
         <nav className="nav">
           <div className="nav-brand">
             <Link to="/" className="brand-link">
-              <h2>Academic AI Assistant</h2>
+              <h2>Newton 1.0</h2>
             </Link>
           </div>
           <div className="nav-menu">

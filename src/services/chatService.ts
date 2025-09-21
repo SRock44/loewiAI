@@ -309,7 +309,7 @@ class GeminiChatService implements ChatService {
       }
       
       if (message.includes('study') || message.includes('learn')) {
-        return `I've reviewed your course materials and can help you create an effective study plan. Here's what I recommend:\n\n📚 **Priority Topics**: Focus on these areas first based on your syllabus\n⏰ **Study Schedule**: Allocate 2-3 hours daily for these topics\n🎯 **Assessment Prep**: Practice these specific concepts for upcoming exams\n\nWould you like me to create a detailed weekly schedule for you?`;
+        return `I've reviewed your course materials and can help you create an effective study plan. Here's what I recommend:\n\n**Priority Topics**: Focus on these areas first based on your syllabus\n**Study Schedule**: Allocate 2-3 hours daily for these topics\n**Assessment Prep**: Practice these specific concepts for upcoming exams\n\nWould you like me to create a detailed weekly schedule for you?`;
       }
       
       if (message.includes('assignment') || message.includes('project')) {
@@ -319,15 +319,15 @@ class GeminiChatService implements ChatService {
 
     // General academic assistance responses
     if (message.includes('hello') || message.includes('hi')) {
-      return `Hello! I'm your Academic AI Assistant. I'm here to help you with:\n\n• Understanding course materials\n• Creating study plans\n• Assignment guidance\n• Concept explanations\n• Academic questions\n\nWhat would you like to work on today?`;
+      return `Hello! I'm Newton 1.0, your next-generation academic AI prototype. I'm here to help you with:\n\n• Understanding course materials\n• Creating study plans\n• Assignment guidance\n• Concept explanations\n• Academic questions\n\nWhat would you like to work on today?`;
     }
 
     if (message.includes('help') || message.includes('stuck')) {
-      return `I'm here to help! Here are some ways I can assist you:\n\n💡 **Explain concepts** - Ask me to clarify any topic\n📅 **Study planning** - Get personalized study schedules\n📝 **Assignment help** - Guidance on projects and homework\n❓ **Question answering** - Ask specific academic questions\n🎯 **Practice problems** - Generate exercises and solutions\n\nWhat would you like to start with?`;
+      return `I'm here to help! Here are some ways I can assist you:\n\n**Explain concepts** - Ask me to clarify any topic\n**Study planning** - Get personalized study schedules\n**Assignment help** - Guidance on projects and homework\n**Question answering** - Ask specific academic questions\n**Practice problems** - Generate exercises and solutions\n\nWhat would you like to start with?`;
     }
 
     if (message.includes('thank')) {
-      return `You're very welcome! I'm glad I could help. Feel free to ask me anything else about your studies. I'm here 24/7 to support your academic journey! 🎓`;
+      return `You're very welcome! I'm glad I could help. Feel free to ask me anything else about your studies. I'm here 24/7 to support your academic journey.`;
     }
 
     // Default response for other queries
@@ -496,12 +496,12 @@ The document content above contains all the information needed to provide compre
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_${++this.messageCounter}`,
         role: 'assistant',
-        content: `🎴 I've created ${response.flashcards.length} flashcards for you! 
+        content: `I've successfully created ${response.flashcards.length} flashcards for you.
 
 **Set Title:** ${response.setTitle}
 **Description:** ${response.setDescription}
 
-The flashcards are now ready for you to study. You can view them by clicking the "📚 View Flashcards" button in the header, or just ask me to "show my flashcards" to study them right here in the chat!`,
+Your flashcards are now ready for study. You can view them by clicking the "View Flashcards" button in the header, or simply ask me to "show my flashcards" to study them directly in the chat.`,
         timestamp: new Date(),
         flashcardSet: flashcardSet // Add flashcard set to message for UI handling
       };

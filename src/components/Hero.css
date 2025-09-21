@@ -36,6 +36,8 @@
   margin-bottom: 1rem;
   line-height: 1.2;
   color: #2d3748;
+  animation: fadeInUpSmooth 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
+  will-change: transform, opacity;
 }
 
 .hero-subtitle {
@@ -43,6 +45,8 @@
   font-weight: 300;
   margin-bottom: 1.5rem;
   color: #4a5568;
+  animation: fadeInUpSmooth 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+  will-change: transform, opacity;
 }
 
 .hero-description {
@@ -53,12 +57,16 @@
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
+  animation: fadeInUpSmooth 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both;
+  will-change: transform, opacity;
 }
 
 .hero-buttons {
   display: flex;
   justify-content: center;
   margin-top: 1rem;
+  animation: fadeInUpSmooth 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
+  will-change: transform, opacity;
 }
 
 .hero-visual {
@@ -141,6 +149,29 @@
 @keyframes orbit {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeInUpSmooth {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.98);
+    filter: blur(1px);
+  }
+  30% {
+    opacity: 0.4;
+    transform: translateY(15px) scale(0.99);
+    filter: blur(0.5px);
+  }
+  70% {
+    opacity: 0.9;
+    transform: translateY(-2px) scale(1.01);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
 }
 
 @media (max-width: 768px) {

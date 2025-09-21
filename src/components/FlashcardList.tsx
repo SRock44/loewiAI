@@ -192,6 +192,7 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
         </div>
       )}
 
+
       <div className="flashcard-display">
         <div className="flashcard-navigation-container">
           <button 

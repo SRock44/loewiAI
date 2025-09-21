@@ -7,15 +7,15 @@ const Hero: React.FC = () => {
       <div className="container">
         <div className="hero-content">
           <h1 className="hero-title">
-            Academic AI Assistant
+            Newton 1.0
           </h1>
           <p className="hero-subtitle">
-            Intelligent Advisor and Learning Companion
+            Next-Generation Academic AI Prototype
           </p>
           <p className="hero-description">
-            Your 24/7 virtual advisor providing instant academic guidance, 
-            syllabus-based recommendations, and gamified learning experiences 
-            to help you achieve your academic goals.
+            Experience the future of education with Newton 1.0 - an intelligent 
+            academic companion that revolutionizes how you learn, study, and 
+            achieve your educational goals through advanced AI technology.
           </p>
           <div className="hero-buttons">
             <a href="/dashboard" className="btn btn-primary">

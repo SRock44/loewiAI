@@ -49,7 +49,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [isDragOver, setIsDragOver] = useState(false);
   const [showFlashcardList, setShowFlashcardList] = useState(false);
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);
-  const [flashcardSets, setFlashcardSets] = useState<FlashcardSet[]>([]);
   const [typingText, setTypingText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -161,13 +160,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   useEffect(() => {
     if (isAuthenticated) {
       loadSessions();
-      loadFlashcardSets();
     } else {
       // Clear sessions for unauthenticated users
       setSessions([]);
       setMessages([]);
       setCurrentSession(null);
-      setFlashcardSets([]);
       chatService.clearAllData();
     }
   }, [isAuthenticated]);
@@ -210,34 +207,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     switchToSession: switchSession
   }));
 
-  const loadFlashcardSets = () => {
-    if (!isAuthenticated || !currentSession) {
-      setFlashcardSets([]);
-      return;
-    }
-    
-    const sessionFlashcards = sessionStorage.getItem(`flashcards_${currentSession.id}`);
-    if (sessionFlashcards) {
-      try {
-        const parsed = JSON.parse(sessionFlashcards);
-        setFlashcardSets(parsed);
-        console.log('Loaded flashcard sets for session:', currentSession.id, parsed);
-      } catch (error) {
-        console.error('Error loading session flashcards:', error);
-        setFlashcardSets([]);
-      }
-    } else {
-      setFlashcardSets([]);
-    }
-  };
-
-  // Load flashcard sets when session changes
-  useEffect(() => {
-    loadFlashcardSets();
-  }, [currentSession, isAuthenticated]);
-
   const handleFlashcardsGenerated = (flashcardSet: FlashcardSet) => {
-    setFlashcardSets(prev => [flashcardSet, ...prev]);
+    // Flashcard sets are now managed by the unified system
     setCurrentFlashcardSet(flashcardSet);
     setShowFlashcardList(true);
     
@@ -264,7 +235,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   };
 
   const handleFlashcardSetUpdate = (updatedSet: FlashcardSet) => {
-    setFlashcardSets(prev => prev.map(set => set.id === updatedSet.id ? updatedSet : set));
+    // Flashcard updates are now managed by the unified system
     if (currentFlashcardSet?.id === updatedSet.id) {
       setCurrentFlashcardSet(updatedSet);
     }
@@ -298,7 +269,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         const errorMessage: ChatMessage = {
           id: `error_${Date.now()}`,
           role: 'assistant',
-          content: `❌ Upload failed: ${validation.error}`,
+          content: `Upload failed: ${validation.error}`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, errorMessage]);
@@ -390,7 +361,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         const successMessage: ChatMessage = {
           id: `success_${Date.now()}`,
           role: 'assistant',
-          content: `✅ Successfully uploaded and processed "${file.name}". I can now help you with questions about this document!`,
+          content: `Successfully uploaded and processed "${file.name}". I can now help you with questions about this document.`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, successMessage]);
@@ -409,7 +380,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         const errorMessage: ChatMessage = {
           id: `error_${Date.now()}`,
           role: 'assistant',
-          content: `❌ Failed to process "${file.name}". Please try again.`,
+          content: `Failed to process "${file.name}". Please try again.`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, errorMessage]);
@@ -551,10 +522,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     return message.content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // Handle numbered lists
-      .replace(/^\d+\.\s+(.*)$/gm, '<div style="margin: 4px 0; padding-left: 16px;">$1</div>')
-      // Handle bullet points with better spacing
-      .replace(/^[-•]\s+(.*)$/gm, '<div style="margin: 4px 0; padding-left: 16px;">• $1</div>')
+      // Handle numbered lists with better styling
+      .replace(/^\d+\.\s+(.*)$/gm, '<div class="list-item numbered">$1</div>')
+      // Handle bullet points with better spacing and styling
+      .replace(/^[-•]\s+(.*)$/gm, '<div class="list-item bulleted">$1</div>')
       // Handle line breaks with proper spacing
       .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
@@ -594,7 +565,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
             <div className="welcome-message">
               <div className="welcome-content">
                 <h3 className="welcome-title">Welcome to Newton 1.0!</h3>
-                <p className="welcome-description">I am an advisor, professor, tutor, and chatbot all in one!</p>
+                <p className="welcome-description">Your next-generation academic AI prototype - combining the expertise of an advisor, professor, tutor, and intelligent assistant in one powerful platform.</p>
                 
                 {!isAuthenticated && (
                   <div className="auth-notice">
@@ -657,9 +628,15 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
             messages.map((message) => (
               <div
                 key={message.id}
-                className={`message ${message.role}`}
+                className={`message ${message.role} ${message.flashcardSet ? 'flashcard-message' : ''}`}
               >
-                <div className="message-content">
+                <div 
+                  className={`message-content ${message.flashcardSet ? 'clickable-flashcard-message' : ''}`}
+                  onClick={message.flashcardSet ? () => {
+                    setCurrentFlashcardSet(message.flashcardSet!);
+                    setShowFlashcardList(true);
+                  } : undefined}
+                >
                   <div className="message-text">
                     <div
                       dangerouslySetInnerHTML={{
@@ -667,6 +644,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                       }}
                     />
                   </div>
+                  {message.flashcardSet && (
+                    <div className="flashcard-message-hint">
+                      <span className="hint-text">Click to view flashcards</span>
+                      <span className="hint-icon">👆</span>
+                    </div>
+                  )}
                   <div className="message-time">
                     {message.timestamp.toLocaleTimeString()}
                   </div>
