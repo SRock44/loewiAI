@@ -6,6 +6,9 @@ import { validateFile, getFileIcon, formatFileSize } from '../utils/fileValidati
 import { aiService } from '../services/aiService';
 import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
+import FlashcardList from './FlashcardList';
+import { FlashcardSet } from '../types/flashcard';
+import { flashcardService } from '../services/flashcardService';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -36,6 +39,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showFlashcardList, setShowFlashcardList] = useState(false);
+  const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);
+  const [flashcardSets, setFlashcardSets] = useState<FlashcardSet[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,11 +54,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   useEffect(() => {
     if (isAuthenticated) {
       loadSessions();
+      loadFlashcardSets();
     } else {
       // Clear sessions for unauthenticated users
       setSessions([]);
       setMessages([]);
       setCurrentSession(null);
+      setFlashcardSets([]);
       chatService.clearAllData();
     }
   }, [isAuthenticated]);
@@ -84,6 +92,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setMessages([]);
     if (onNewSession) {
       onNewSession(newSession);
+    }
+  };
+
+  const loadFlashcardSets = () => {
+    if (!isAuthenticated) {
+      return;
+    }
+    const sets = flashcardService.getFlashcardSets();
+    setFlashcardSets(sets);
+  };
+
+  const handleFlashcardsGenerated = (flashcardSet: FlashcardSet) => {
+    setFlashcardSets(prev => [flashcardSet, ...prev]);
+    setCurrentFlashcardSet(flashcardSet);
+    setShowFlashcardList(true);
+  };
+
+  const handleFlashcardSetUpdate = (updatedSet: FlashcardSet) => {
+    setFlashcardSets(prev => prev.map(set => set.id === updatedSet.id ? updatedSet : set));
+    if (currentFlashcardSet?.id === updatedSet.id) {
+      setCurrentFlashcardSet(updatedSet);
     }
   };
 
@@ -270,6 +299,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       console.log('📥 Received response:', response);
       setMessages(prev => [...prev, response]);
       
+      // Check if the response contains a flashcard set
+      if (response.flashcardSet) {
+        handleFlashcardsGenerated(response.flashcardSet);
+      }
+      
       // Refresh sessions to get updated titles
       if (isAuthenticated) {
         const updatedSessions = chatService.getSessions();
@@ -330,11 +364,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const formatMessage = (message: ChatMessage) => {
-    // Convert markdown-like formatting to HTML
+    // Convert markdown-like formatting to HTML with better list handling
     return message.content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/• (.*?)(?=\n|$)/g, '• $1<br/>')
+      // Handle numbered lists
+      .replace(/^\d+\.\s+(.*)$/gm, '<div style="margin: 4px 0; padding-left: 16px;">$1</div>')
+      // Handle bullet points with better spacing
+      .replace(/^[-•]\s+(.*)$/gm, '<div style="margin: 4px 0; padding-left: 16px;">• $1</div>')
+      // Handle line breaks with proper spacing
+      .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
   };
 
@@ -391,6 +430,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </p>
           </div>
           <div className="header-actions">
+            {flashcardSets.length > 0 && (
+              <button
+                className="flashcard-icon-btn"
+                onClick={() => setShowFlashcardList(true)}
+                title={`View your flashcard sets (${flashcardSets.length})`}
+              >
+                <svg className="flashcard-icon" viewBox="0 0 24 24" width="20" height="20">
+                  <rect x="3" y="4" width="18" height="12" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2"/>
+                  <line x1="3" y1="8" x2="21" y2="8" stroke="currentColor" strokeWidth="1"/>
+                  <line x1="3" y1="12" x2="15" y2="12" stroke="currentColor" strokeWidth="1"/>
+                  <line x1="3" y1="16" x2="12" y2="16" stroke="currentColor" strokeWidth="1"/>
+                </svg>
+                {flashcardSets.length > 0 && (
+                  <span className="flashcard-count">{flashcardSets.length}</span>
+                )}
+              </button>
+            )}
             <span className="status-indicator">
               {isLoading ? '🤔 Thinking...' : '🟢 Online'}
             </span>
@@ -429,6 +485,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         </div>
                       </button>
                     ))}
+                  </div>
+                </div>
+                
+                <div className="flashcard-info">
+                  <div className="info-icon">🎴</div>
+                  <div className="info-content">
+                    <h4>Create Flashcards Instantly!</h4>
+                    <p>Just type "create flashcards about [topic]" or "generate flashcards for my document" and I'll create study cards for you automatically!</p>
+                    <div className="example-commands">
+                      <strong>Examples:</strong>
+                      <ul>
+                        <li>"Create flashcards about photosynthesis"</li>
+                        <li>"Generate flashcards for my uploaded document"</li>
+                        <li>"Make flashcards about calculus derivatives"</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -614,6 +686,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         </form>
       </div>
+
+
+      {/* Flashcard List Modal */}
+      {showFlashcardList && currentFlashcardSet && (
+        <div className="flashcard-list-overlay">
+          <div className="flashcard-list-modal">
+            <div className="flashcard-list-header">
+              <h2>Your Flashcards</h2>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowFlashcardList(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flashcard-list-content">
+              <FlashcardList
+                flashcardSet={currentFlashcardSet}
+                onSetUpdate={handleFlashcardSetUpdate}
+                showFilters={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

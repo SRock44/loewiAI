@@ -822,3 +822,255 @@
     font-size: 0.75rem;
   }
 }
+
+/* Flashcard Integration Styles */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.flashcard-icon-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  width: 48px;
+  height: 36px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.flashcard-icon-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
+}
+
+.flashcard-icon {
+  flex-shrink: 0;
+}
+
+.flashcard-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ff4444;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+/* Flashcard List Modal */
+.flashcard-list-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.flashcard-list-modal {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.flashcard-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 16px;
+  border-bottom: 2px solid #e9ecef;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.flashcard-list-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.flashcard-list-header .close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.flashcard-list-header .close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.flashcard-list-content {
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Responsive flashcard buttons */
+@media (max-width: 768px) {
+  .header-actions {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .flashcard-icon-btn {
+    width: 44px;
+    height: 32px;
+  }
+  
+  .flashcard-icon-btn .flashcard-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .flashcard-list-overlay {
+    padding: 10px;
+  }
+
+  .flashcard-list-modal {
+    max-height: 95vh;
+  }
+
+  .flashcard-list-header {
+    padding: 20px 20px 12px;
+  }
+
+  .flashcard-list-header h2 {
+    font-size: 20px;
+  }
+}
+
+/* Flashcard Info Section */
+.flashcard-info {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.info-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.info-content h4 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.info-content p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.example-commands {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.example-commands strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.example-commands ul {
+  margin: 0;
+  padding-left: 16px;
+  list-style: none;
+}
+
+.example-commands li {
+  font-size: 12px;
+  margin-bottom: 4px;
+  opacity: 0.8;
+  position: relative;
+}
+
+.example-commands li:before {
+  content: "💡";
+  position: absolute;
+  left: -16px;
+}
+
+/* Responsive flashcard info */
+@media (max-width: 768px) {
+  .flashcard-info {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .info-icon {
+    font-size: 28px;
+    align-self: center;
+  }
+  
+  .info-content h4 {
+    font-size: 16px;
+    text-align: center;
+  }
+  
+  .info-content p {
+    font-size: 13px;
+    text-align: center;
+  }
+  
+  .example-commands {
+    padding: 10px;
+  }
+  
+  .example-commands strong {
+    font-size: 12px;
+  }
+  
+  .example-commands li {
+    font-size: 11px;
+  }
+}

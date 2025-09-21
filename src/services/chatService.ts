@@ -2,6 +2,8 @@ import { ChatMessage, ChatSession, ChatContext, ChatService, QuickAction } from 
 import { authService } from './authService';
 import { geminiAIService, AIResponse } from './geminiService';
 import { documentProcessor, ProcessedDocument } from './documentProcessor';
+import { flashcardService } from './flashcardService';
+import { FlashcardGenerationRequest } from '../types/flashcard';
 
 // Enhanced Chat Service with Gemini AI integration
 class GeminiChatService implements ChatService {
@@ -92,6 +94,13 @@ class GeminiChatService implements ChatService {
     };
 
     try {
+      // Check if this is a flashcard generation request
+      const flashcardRequest = this.detectFlashcardRequest(message, context);
+      
+      if (flashcardRequest) {
+        return await this.handleFlashcardGeneration(flashcardRequest, context, userMessage);
+      }
+
       // Build context from uploaded documents
       const documentContext = this.buildDocumentContext(context.documentIds, context.processedDocuments);
       
@@ -381,6 +390,151 @@ The document content above contains all the information needed to provide compre
   // Test Gemini connection
   async testGeminiConnection(): Promise<boolean> {
     return await geminiAIService.testConnection();
+  }
+
+  // Flashcard generation methods
+  private detectFlashcardRequest(message: string, context: ChatContext): FlashcardGenerationRequest | null {
+    const lowerMessage = message.toLowerCase();
+    
+    // Check for flashcard generation keywords
+    const flashcardKeywords = [
+      'create flashcards',
+      'generate flashcards',
+      'make flashcards',
+      'flashcards for',
+      'flashcards about',
+      'study cards',
+      'quiz cards'
+    ];
+    
+    const hasFlashcardKeyword = flashcardKeywords.some(keyword => lowerMessage.includes(keyword));
+    
+    if (!hasFlashcardKeyword) {
+      return null;
+    }
+
+    // Extract topic from message
+    let topic = '';
+    const topicPatterns = [
+      /flashcards?\s+(?:for|about|on)\s+(.+)/i,
+      /create\s+flashcards?\s+(?:for|about|on)\s+(.+)/i,
+      /generate\s+flashcards?\s+(?:for|about|on)\s+(.+)/i,
+      /make\s+flashcards?\s+(?:for|about|on)\s+(.+)/i
+    ];
+    
+    for (const pattern of topicPatterns) {
+      const match = message.match(pattern);
+      if (match && match[1]) {
+        topic = match[1].trim();
+        break;
+      }
+    }
+    
+    // If no specific topic found, use the whole message as content
+    if (!topic) {
+      topic = message.replace(/create\s+flashcards?|generate\s+flashcards?|make\s+flashcards?|flashcards?\s+(?:for|about|on)/gi, '').trim();
+    }
+
+    // Determine if this should use document content or text content
+    const hasDocuments = context.processedDocuments && context.processedDocuments.length > 0;
+    
+    if (hasDocuments) {
+      // Use first document for generation
+      const document = context.processedDocuments[0];
+      return {
+        documentId: document.id,
+        topic: topic || undefined,
+        count: 10,
+        difficulty: 'medium',
+        format: 'q&a',
+        sourceType: 'document'
+      };
+    } else {
+      // Use the message content for text-based generation
+      return {
+        textContent: message,
+        topic: topic || undefined,
+        count: 10,
+        difficulty: 'medium',
+        format: 'q&a',
+        sourceType: 'text'
+      };
+    }
+  }
+
+  private async handleFlashcardGeneration(
+    request: FlashcardGenerationRequest, 
+    context: ChatContext, 
+    userMessage: ChatMessage
+  ): Promise<ChatMessage> {
+    try {
+      console.log('🎴 Generating flashcards from chat request:', request);
+      
+      let response;
+      if (request.sourceType === 'document' && request.documentId) {
+        const document = context.processedDocuments?.find(doc => doc.id === request.documentId);
+        if (document) {
+          response = await flashcardService.generateFlashcards(request, document);
+        } else {
+          throw new Error('Document not found');
+        }
+      } else {
+        response = await flashcardService.generateFlashcardsFromText(request);
+      }
+      
+      // Create flashcard set
+      const flashcardSet = flashcardService.createFlashcardSet(
+        response.setTitle,
+        response.setDescription,
+        response.flashcards,
+        response.sourceDocumentId ? [response.sourceDocumentId] : undefined
+      );
+      
+      // Save the set
+      flashcardService.saveFlashcardSet(flashcardSet);
+      
+      const assistantMessage: ChatMessage = {
+        id: `msg_${Date.now()}_${++this.messageCounter}`,
+        role: 'assistant',
+        content: `🎴 I've created ${response.flashcards.length} flashcards for you! 
+
+**Set Title:** ${response.setTitle}
+**Description:** ${response.setDescription}
+
+The flashcards are now ready for you to study. You can view them by clicking the "📚 View Flashcards" button in the header, or just ask me to "show my flashcards" to study them right here in the chat!`,
+        timestamp: new Date(),
+        flashcardSet: flashcardSet // Add flashcard set to message for UI handling
+      };
+
+      // Update session with new messages
+      if (context.sessionId && this.sessions.has(context.sessionId)) {
+        const session = this.sessions.get(context.sessionId)!;
+        session.messages.push(userMessage, assistantMessage);
+        session.updatedAt = new Date();
+        this.saveToStorage();
+      }
+
+      return assistantMessage;
+    } catch (error) {
+      console.error('❌ Error generating flashcards:', error);
+      
+      const errorMessage: ChatMessage = {
+        id: `error_${Date.now()}_${++this.messageCounter}`,
+        role: 'assistant',
+        content: `I apologize, but I had trouble generating flashcards for you. Please try again with a more specific request, like "create flashcards about photosynthesis" or "generate flashcards for my uploaded document".`,
+        timestamp: new Date()
+      };
+
+      // Still save the user message and error response
+      if (context.sessionId && this.sessions.has(context.sessionId)) {
+        const session = this.sessions.get(context.sessionId)!;
+        session.messages.push(userMessage, errorMessage);
+        session.updatedAt = new Date();
+        this.saveToStorage();
+      }
+
+      return errorMessage;
+    }
   }
 }
 

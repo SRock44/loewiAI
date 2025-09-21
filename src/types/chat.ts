@@ -7,6 +7,7 @@ export interface ChatMessage {
   timestamp: Date;
   documentId?: string; // Reference to uploaded document if relevant
   isTyping?: boolean;
+  flashcardSet?: any; // FlashcardSet generated from this message
 }
 
 export interface ChatSession {
@@ -104,6 +105,14 @@ export const QUICK_ACTIONS: QuickAction[] = [
     description: 'Generate practice questions and answers',
     prompt: 'Create practice questions for ',
     icon: '🎯',
+    category: 'study'
+  },
+  {
+    id: 'generate_flashcards',
+    title: 'Generate Flashcards',
+    description: 'Create flashcards from your documents',
+    prompt: 'Generate flashcards from my uploaded documents focusing on ',
+    icon: '🎴',
     category: 'study'
   }
 ];
