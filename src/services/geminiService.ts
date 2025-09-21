@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/generative-ai';
+import { UserProfileService } from './userProfileService';
 
 export interface AIResponse {
   content: string;
@@ -110,11 +111,20 @@ Guidelines:
 - Maintain an academic tone while being approachable
 - Focus on learning and understanding over just answers`;
 
-    if (context) {
-      return `${basePrompt}\n\nAdditional Context: ${context}`;
+    // Get user profile information for personalization
+    const userProfileContext = UserProfileService.buildPersonalizationContext();
+    
+    let fullPrompt = basePrompt;
+    
+    if (userProfileContext) {
+      fullPrompt += `\n\n${userProfileContext}`;
     }
     
-    return basePrompt;
+    if (context) {
+      fullPrompt += `\n\nAdditional Context: ${context}`;
+    }
+    
+    return fullPrompt;
   }
 }
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { ArrowDown } from 'solar-icons';
 import './UserProfile.css';
 
 const UserProfile: React.FC = () => {
@@ -32,21 +33,10 @@ const UserProfile: React.FC = () => {
           )}
         </div>
         <span className="profile-name">{user.name}</span>
-        <svg
+        <ArrowDown 
           className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}
-          width="12"
-          height="8"
-          viewBox="0 0 12 8"
-          fill="none"
-        >
-          <path
-            d="M1 1L6 6L11 1"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+          size={12}
+        />
       </button>
 
       {showDropdown && (

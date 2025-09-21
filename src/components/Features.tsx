@@ -4,24 +4,24 @@ import './Features.css'
 const Features: React.FC = () => {
   const features = [
     {
+      icon: "🎴",
+      title: "Flashcard Generation",
+      description: "AI-powered flashcard creation from your documents and text. Generate study cards with smooth animations and mastery tracking."
+    },
+    {
+      icon: "🎓",
+      title: "Advanced Academic Advisement",
+      description: "Get personalized study recommendations, course planning assistance, and academic guidance based on your goals and performance."
+    },
+    {
       icon: "📚",
       title: "Document Analysis",
       description: "Upload syllabi, lectures, and assignments for AI-powered analysis and key concept extraction."
     },
     {
-      icon: "🎓",
-      title: "Academic Guidance",
-      description: "Get personalized study recommendations and course planning assistance based on your academic goals."
-    },
-    {
-      icon: "📝",
-      title: "Assignment Support",
-      description: "Receive help with understanding assignment requirements and structuring your academic work."
-    },
-    {
-      icon: "🔍",
-      title: "Research Assistance",
-      description: "Find relevant academic sources and get guidance on research methodologies and citation formats."
+      icon: "💬",
+      title: "Intelligent Chat Assistant",
+      description: "24/7 AI assistant that understands your academic context and provides instant help with questions and assignments."
     },
     {
       icon: "📖",
@@ -29,9 +29,9 @@ const Features: React.FC = () => {
       description: "Create effective study schedules and break down complex topics into manageable learning modules."
     },
     {
-      icon: "🎯",
-      title: "Academic Goals",
-      description: "Track your academic progress and receive recommendations to achieve your educational objectives."
+      icon: "🔍",
+      title: "Research Assistance",
+      description: "Find relevant academic sources and get guidance on research methodologies and citation formats."
     }
   ]
 

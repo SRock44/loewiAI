@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import ChatInterface from '../components/ChatInterface';
+import ChatInterface, { ChatInterfaceRef } from '../components/ChatInterface';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { DocumentMetadata } from '../types/ai';
 import './Dashboard.css';
 
-const Dashboard: React.FC = () => {
+export interface DashboardRef {
+  createNewChat: () => void;
+  switchToChat: (chatId: string) => void;
+}
+
+const Dashboard = forwardRef<DashboardRef>((props, ref) => {
   const { isAuthenticated, user } = useAuth();
   const [uploadedDocuments, setUploadedDocuments] = useState<DocumentMetadata[]>([]);
+  const chatInterfaceRef = useRef<ChatInterfaceRef>(null);
 
   const handleDocumentsUploaded = (documents: DocumentMetadata[]) => {
     setUploadedDocuments(documents);
@@ -17,36 +23,40 @@ const Dashboard: React.FC = () => {
     setUploadedDocuments(prev => prev.filter(doc => doc.id !== documentId));
   };
 
+  const createNewChat = () => {
+    if (chatInterfaceRef.current?.createNewSession) {
+      chatInterfaceRef.current.createNewSession();
+    }
+  };
+
+  const switchToChat = (chatId: string) => {
+    if (chatInterfaceRef.current?.switchToSession) {
+      chatInterfaceRef.current.switchToSession(chatId);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    createNewChat,
+    switchToChat
+  }));
+
   return (
     <div className="dashboard-page">
-      <div className="dashboard-header">
-        <div className="container">
-          <h1>Chat</h1>
-          <p>
-            {isAuthenticated && user 
-              ? `Welcome back, ${user.name}! Upload your documents and chat with your AI assistant.`
-              : 'Upload your academic documents and get instant AI-powered guidance and support.'
-            }
-          </p>
-        </div>
-      </div>
-
-      <div className="dashboard-content">
-        <div className="chat-container">
-          <ErrorBoundary>
-            <ChatInterface 
-              documents={uploadedDocuments}
-              onDocumentsChange={handleDocumentsUploaded}
-              onDocumentDelete={handleDocumentDeleted}
-              onNewSession={(session) => {
-                console.log('New chat session created:', session);
-              }}
-            />
-          </ErrorBoundary>
-        </div>
-      </div>
+      <ErrorBoundary>
+        <ChatInterface 
+          ref={chatInterfaceRef}
+          documents={uploadedDocuments}
+          onDocumentsChange={handleDocumentsUploaded}
+          onDocumentDelete={handleDocumentDeleted}
+          onNewSession={(session) => {
+            console.log('New chat session created:', session);
+          }}
+        />
+      </ErrorBoundary>
     </div>
   );
-};
+});
+
+Dashboard.displayName = 'Dashboard';
 
 export default Dashboard;

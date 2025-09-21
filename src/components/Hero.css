@@ -1,12 +1,14 @@
 .hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #f8fafc;
+  color: #2d3748;
   padding: 120px 0 80px;
   min-height: 100vh;
   display: flex;
   align-items: center;
   position: relative;
   overflow: hidden;
+  margin-left: -60px;
+  padding-left: 60px;
 }
 
 .hero::before {
@@ -33,19 +35,20 @@
   font-weight: 800;
   margin-bottom: 1rem;
   line-height: 1.2;
+  color: #2d3748;
 }
 
 .hero-subtitle {
   font-size: 1.5rem;
   font-weight: 300;
   margin-bottom: 1.5rem;
-  opacity: 0.9;
+  color: #4a5568;
 }
 
 .hero-description {
   font-size: 1.2rem;
   margin-bottom: 2.5rem;
-  opacity: 0.8;
+  color: #718096;
   line-height: 1.6;
   max-width: 600px;
   margin-left: auto;

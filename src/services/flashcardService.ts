@@ -6,6 +6,7 @@ import {
   FlashcardGenerationResponse 
 } from '../types/flashcard';
 import { ProcessedDocument } from './documentProcessor';
+import { UserProfileService } from './userProfileService';
 
 export interface FlashcardService {
   generateFlashcards(request: FlashcardGenerationRequest, document?: ProcessedDocument): Promise<FlashcardGenerationResponse>;
@@ -96,6 +97,9 @@ class RealFlashcardService implements FlashcardService {
   private buildFlashcardPrompt(request: FlashcardGenerationRequest, document: ProcessedDocument): string {
     const { count = 10, difficulty = 'medium', format = 'q&a', topic } = request;
     
+    // Get user profile context for personalization
+    const userProfileContext = UserProfileService.buildPersonalizationContext();
+    
     let prompt = `You are an expert educational content creator. Generate ${count} high-quality flashcards based on the following document content.
 
 Document: ${document.fileName}
@@ -132,6 +136,11 @@ CRITICAL:
 - No trailing commas
 - Valid JSON syntax only
 - Each flashcard must have all required fields`;
+
+    // Add user profile context if available
+    if (userProfileContext) {
+      prompt += `\n\n${userProfileContext}`;
+    }
 
     return prompt;
   }
@@ -269,6 +278,9 @@ CRITICAL:
   private buildTextFlashcardPrompt(request: FlashcardGenerationRequest): string {
     const { count = 10, difficulty = 'medium', format = 'q&a', topic, textContent } = request;
     
+    // Get user profile context for personalization
+    const userProfileContext = UserProfileService.buildPersonalizationContext();
+    
     let prompt = `You are an expert educational content creator. Generate ${count} high-quality flashcards based on the following text content.
 
 Text Content: ${textContent}
@@ -304,6 +316,11 @@ CRITICAL:
 - No trailing commas
 - Valid JSON syntax only
 - Each flashcard must have all required fields`;
+
+    // Add user profile context if available
+    if (userProfileContext) {
+      prompt += `\n\n${userProfileContext}`;
+    }
 
     return prompt;
   }

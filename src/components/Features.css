@@ -1,6 +1,10 @@
 .features {
   background: #f8fafc;
   padding: 100px 0;
+  position: relative;
+  overflow: hidden;
+  margin-left: -60px;
+  padding-left: 60px;
 }
 
 .features-header {
@@ -11,13 +15,13 @@
 .section-title {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1a202c;
+  color: #2d3748;
   margin-bottom: 1rem;
 }
 
 .section-subtitle {
   font-size: 1.2rem;
-  color: #64748b;
+  color: #718096;
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.6;
@@ -33,17 +37,36 @@
 .feature-card {
   background: white;
   padding: 2.5rem;
-  border-radius: 16px;
+  border-radius: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s ease;
+  border: none;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(45, 55, 72, 0.1), transparent);
+  transition: left 0.6s ease;
+}
+
+.feature-card:hover::before {
+  left: 100%;
 }
 
 .feature-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border-color: #667eea;
+  transform: translateY(-12px) scale(1.02);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
+  border-color: transparent;
+  background: white;
 }
 
 .feature-icon {
@@ -55,12 +78,12 @@
 .feature-title {
   font-size: 1.4rem;
   font-weight: 600;
-  color: #1a202c;
+  color: #2d3748;
   margin-bottom: 1rem;
 }
 
 .feature-description {
-  color: #64748b;
+  color: #718096;
   line-height: 1.6;
   font-size: 1rem;
 }

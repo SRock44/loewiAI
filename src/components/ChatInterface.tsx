@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { ChatMessage, ChatSession, ChatContext, QuickAction, QUICK_ACTIONS } from '../types/chat';
 import { chatService } from '../services/chatService';
 import { DocumentMetadata } from '../types/ai';
@@ -8,7 +8,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
+import { Card } from 'solar-icons';
 import { flashcardService } from '../services/flashcardService';
+import { flashcardEventTarget } from '../hooks/useSessionFlashcards';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -18,6 +20,11 @@ interface ChatInterfaceProps {
   onNewSession?: (session: ChatSession) => void;
 }
 
+export interface ChatInterfaceRef {
+  createNewSession: () => void;
+  switchToSession: (sessionId: string) => void;
+}
+
 interface UploadedFile extends DocumentMetadata {
   uploadProgress: number;
   uploadStatus: 'uploading' | 'processing' | 'completed' | 'error';
@@ -25,12 +32,13 @@ interface UploadedFile extends DocumentMetadata {
   processedDocument?: ProcessedDocument;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
-  documents = [], 
-  onDocumentsChange,
-  onDocumentDelete,
-  onNewSession 
-}) => {
+const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, ref) => {
+  const { 
+    documents = [], 
+    onDocumentsChange,
+    onDocumentDelete,
+    onNewSession 
+  } = props;
   const { isAuthenticated, user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -42,13 +50,112 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [showFlashcardList, setShowFlashcardList] = useState(false);
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);
   const [flashcardSets, setFlashcardSets] = useState<FlashcardSet[]>([]);
+  const [typingText, setTypingText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isTypingRef = useRef(false);
+
+  // Example prompts to cycle through
+  const examplePrompts = [
+    "Ask me about calculus derivatives...",
+    "Help me understand photosynthesis...",
+    "Create flashcards for my biology exam...",
+    "Explain quantum mechanics simply...",
+    "Summarize this research paper...",
+    "Help me write an essay about...",
+    "What are the key concepts in...",
+    "Generate practice problems for...",
+    "Ask me anything about your studies..."
+  ];
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Typing animation effect
+  useEffect(() => {
+    if (messages.length === 0 && !isLoading && inputValue === '') {
+      // Add a small delay to ensure component is fully mounted
+      setTimeout(() => {
+        startTypingAnimation();
+      }, 500);
+    } else {
+      stopTypingAnimation();
+    }
+
+    return () => {
+      stopTypingAnimation();
+    };
+  }, [messages.length, isLoading, inputValue]);
+
+  const startTypingAnimation = () => {
+    if (isTypingRef.current) {
+      return;
+    }
+    
+    setIsTyping(true);
+    isTypingRef.current = true;
+    
+    // Start with a random prompt
+    let currentPromptIndex = Math.floor(Math.random() * examplePrompts.length);
+    let currentPrompt = examplePrompts[currentPromptIndex];
+    let currentIndex = 0;
+    
+    const typeText = () => {
+      if (currentIndex < currentPrompt.length && isTypingRef.current) {
+        const currentText = currentPrompt.substring(0, currentIndex + 1);
+        setTypingText(currentText);
+        currentIndex++;
+        typingTimeoutRef.current = setTimeout(typeText, 100);
+      } else if (isTypingRef.current) {
+        // Wait a bit, then start erasing
+        typingTimeoutRef.current = setTimeout(() => {
+          if (isTypingRef.current) {
+            eraseText();
+          }
+        }, 2000);
+      }
+    };
+
+    const eraseText = () => {
+      let index = currentPrompt.length;
+      const erase = () => {
+        if (index > 0 && isTypingRef.current) {
+          const currentText = currentPrompt.substring(0, index - 1);
+          setTypingText(currentText);
+          index--;
+          typingTimeoutRef.current = setTimeout(erase, 50);
+        } else if (isTypingRef.current) {
+          // Wait a bit, then start typing a new prompt
+          typingTimeoutRef.current = setTimeout(() => {
+            if (isTypingRef.current) {
+              // Select next prompt (cycle through)
+              currentPromptIndex = (currentPromptIndex + 1) % examplePrompts.length;
+              currentPrompt = examplePrompts[currentPromptIndex];
+              currentIndex = 0;
+              typeText();
+            }
+          }, 1000);
+        }
+      };
+      erase();
+    };
+
+    typeText();
+  };
+
+  const stopTypingAnimation = () => {
+    setIsTyping(false);
+    isTypingRef.current = false;
+    setTypingText('');
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  };
 
   // Load existing sessions on component mount and when auth state changes
   useEffect(() => {
@@ -93,26 +200,90 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (onNewSession) {
       onNewSession(newSession);
     }
+    
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('sessionUpdated'));
   };
 
+  useImperativeHandle(ref, () => ({
+    createNewSession,
+    switchToSession: switchSession
+  }));
+
   const loadFlashcardSets = () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !currentSession) {
+      setFlashcardSets([]);
       return;
     }
-    const sets = flashcardService.getFlashcardSets();
-    setFlashcardSets(sets);
+    
+    const sessionFlashcards = sessionStorage.getItem(`flashcards_${currentSession.id}`);
+    if (sessionFlashcards) {
+      try {
+        const parsed = JSON.parse(sessionFlashcards);
+        setFlashcardSets(parsed);
+        console.log('Loaded flashcard sets for session:', currentSession.id, parsed);
+      } catch (error) {
+        console.error('Error loading session flashcards:', error);
+        setFlashcardSets([]);
+      }
+    } else {
+      setFlashcardSets([]);
+    }
   };
+
+  // Load flashcard sets when session changes
+  useEffect(() => {
+    loadFlashcardSets();
+  }, [currentSession, isAuthenticated]);
 
   const handleFlashcardsGenerated = (flashcardSet: FlashcardSet) => {
     setFlashcardSets(prev => [flashcardSet, ...prev]);
     setCurrentFlashcardSet(flashcardSet);
     setShowFlashcardList(true);
+    
+    // Save to sessionStorage and dispatch event for current session
+    if (currentSession) {
+      const sessionFlashcards = sessionStorage.getItem(`flashcards_${currentSession.id}`);
+      let existingFlashcards = [];
+      if (sessionFlashcards) {
+        try {
+          existingFlashcards = JSON.parse(sessionFlashcards);
+        } catch (error) {
+          console.error('Error parsing existing session flashcards:', error);
+        }
+      }
+      
+      const updatedFlashcards = [flashcardSet, ...existingFlashcards];
+      sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
+      
+      // Dispatch event to notify other components
+      flashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate', {
+        detail: { sessionId: currentSession.id, flashcardSets: updatedFlashcards }
+      }));
+    }
   };
 
   const handleFlashcardSetUpdate = (updatedSet: FlashcardSet) => {
     setFlashcardSets(prev => prev.map(set => set.id === updatedSet.id ? updatedSet : set));
     if (currentFlashcardSet?.id === updatedSet.id) {
       setCurrentFlashcardSet(updatedSet);
+    }
+    
+    // Save updated flashcard set to sessionStorage
+    if (currentSession) {
+      const sessionFlashcards = sessionStorage.getItem(`flashcards_${currentSession.id}`);
+      let existingFlashcards = [];
+      if (sessionFlashcards) {
+        try {
+          existingFlashcards = JSON.parse(sessionFlashcards);
+        } catch (error) {
+          console.error('Error parsing existing session flashcards:', error);
+        }
+      }
+      
+      const updatedFlashcards = existingFlashcards.map(set => set.id === updatedSet.id ? updatedSet : set);
+      sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
+      console.log('Updated flashcard set in session storage for session:', currentSession.id);
     }
   };
 
@@ -255,12 +426,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     // Create a session if one doesn't exist
     let session = currentSession;
+    let isNewSession = false;
     if (!session) {
       console.log('📝 Creating new session...');
       session = await chatService.createNewSession();
       setCurrentSession(session);
       setSessions(prev => [session!, ...prev]);
+      isNewSession = true;
       console.log('✅ New session created:', session);
+      
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('sessionUpdated'));
     }
 
     const userMessage: ChatMessage = {
@@ -298,6 +474,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const response = await chatService.sendMessage(content.trim(), context);
       console.log('📥 Received response:', response);
       setMessages(prev => [...prev, response]);
+      
+      // Chat sessions are automatically managed by the chat service
+      // No need to manually add to history - the Layout component will pick up new sessions
       
       // Check if the response contains a flashcard set
       if (response.flashcardSet) {
@@ -342,7 +521,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const switchSession = async (sessionId: string) => {
-    const session = sessions.find(s => s.id === sessionId);
+    // Get the latest sessions from the chat service
+    const latestSessions = chatService.getSessions();
+    setSessions(latestSessions);
+    
+    const session = latestSessions.find(s => s.id === sessionId);
     if (session) {
       setCurrentSession(session);
       setMessages(session.messages);
@@ -379,79 +562,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="chat-interface">
-      <div className="chat-sidebar">
-        <div className="sidebar-header">
-          <h3>Chat Sessions</h3>
-                <button 
-                  className="new-chat-btn"
-                  onClick={createNewSession}
-                  title="Start new chat"
-                >
-                  ➕
-                </button>
-        </div>
-        
-        <div className="sessions-list">
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              className={`session-item ${currentSession?.id === session.id ? 'active' : ''}`}
-              onClick={() => switchSession(session.id)}
-            >
-              <div className="session-content">
-                <h4>{session.title}</h4>
-                <p>{session.messages.length} messages</p>
-                <small>{session.updatedAt.toLocaleDateString()}</small>
-              </div>
-              <button
-                className="delete-session-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteSession(session.id);
-                }}
-                title="Delete session"
-              >
-                🗑️
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      
       <div className="chat-main">
-        <div className="chat-header">
-          <div className="header-info">
-            <h2>{currentSession?.title || 'Academic AI Assistant'}</h2>
-            <p>
-              {documents.length > 0 
-                ? `Context: ${documents.length} document(s) loaded`
-                : 'Ready to help with your academic questions'
-              }
-            </p>
-          </div>
-          <div className="header-actions">
-            {flashcardSets.length > 0 && (
-              <button
-                className="flashcard-icon-btn"
-                onClick={() => setShowFlashcardList(true)}
-                title={`View your flashcard sets (${flashcardSets.length})`}
-              >
-                <svg className="flashcard-icon" viewBox="0 0 24 24" width="20" height="20">
-                  <rect x="3" y="4" width="18" height="12" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2"/>
-                  <line x1="3" y1="8" x2="21" y2="8" stroke="currentColor" strokeWidth="1"/>
-                  <line x1="3" y1="12" x2="15" y2="12" stroke="currentColor" strokeWidth="1"/>
-                  <line x1="3" y1="16" x2="12" y2="16" stroke="currentColor" strokeWidth="1"/>
-                </svg>
-                {flashcardSets.length > 0 && (
-                  <span className="flashcard-count">{flashcardSets.length}</span>
-                )}
-              </button>
-            )}
-            <span className="status-indicator">
-              {isLoading ? '🤔 Thinking...' : '🟢 Online'}
-            </span>
-          </div>
-        </div>
 
         <div className="chat-messages">
           {messages.length === 0 ? (
@@ -511,9 +623,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 key={message.id}
                 className={`message ${message.role}`}
               >
-                <div className="message-avatar">
-                  {message.role === 'user' ? '👤' : '🤖'}
-                </div>
                 <div className="message-content">
                   <div className="message-text">
                     <div
@@ -532,7 +641,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           
           {isLoading && (
             <div className="message assistant">
-              <div className="message-avatar">🤖</div>
               <div className="message-content">
                 <div className="typing-indicator">
                   <span></span>
@@ -588,13 +696,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me anything about your studies..."
+                placeholder={inputValue === '' && !isLoading && typingText ? typingText : "Ask me anything about your studies..."}
                 disabled={isLoading}
                 rows={1}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSubmit(e);
+                  }
+                }}
+                onFocus={() => {
+                  stopTypingAnimation();
+                }}
+                onBlur={() => {
+                  if (messages.length === 0 && !isLoading && inputValue === '') {
+                    setTimeout(() => startTypingAnimation(), 1000);
                   }
                 }}
                 onDragOver={(e) => {
@@ -611,6 +727,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   handleFiles(e.dataTransfer.files);
                 }}
               />
+              {inputValue === '' && !isLoading && isTyping && (
+                <div className="typing-cursor">|</div>
+              )}
               <div className="input-actions">
                 <button
                   type="button"
@@ -713,6 +832,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       )}
     </div>
   );
-};
+});
+
+ChatInterface.displayName = 'ChatInterface';
 
 export default ChatInterface;
