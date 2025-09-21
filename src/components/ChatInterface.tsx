@@ -854,15 +854,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       {showFlashcardList && currentFlashcardSet && (
         <div className="flashcard-list-overlay">
           <div className="flashcard-list-modal">
-            <div className="flashcard-list-header">
-              <h2>Your Flashcards</h2>
-              <button 
-                className="close-btn" 
-                onClick={() => setShowFlashcardList(false)}
-              >
-                ✕
-              </button>
-            </div>
+            <button 
+              className="floating-close-btn" 
+              onClick={() => setShowFlashcardList(false)}
+            >
+              ✕
+            </button>
             <div className="flashcard-list-content">
               <FlashcardList
                 flashcardSet={currentFlashcardSet}

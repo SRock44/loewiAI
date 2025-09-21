@@ -933,56 +933,50 @@
 
 .flashcard-list-modal {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  width: 100%;
-  max-width: 1000px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  max-width: 90vw;
   max-height: 90vh;
-  overflow: hidden;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  position: relative;
 }
 
-.flashcard-list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 24px 16px;
-  border-bottom: 2px solid #e9ecef;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
-}
-
-.flashcard-list-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.flashcard-list-header .close-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+.floating-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  font-size: 1.2rem;
+  color: #6b7280;
   cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  transition: all 0.2s ease;
+  width: 36px;
+  height: 36px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
 }
 
-.flashcard-list-header .close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+.floating-close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #9ca3af;
+  transform: scale(1.05);
 }
 
 .flashcard-list-content {
-  padding: 0;
-  overflow-y: auto;
   flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  padding-top: 56px;
 }
 
 /* Responsive header actions */
@@ -1021,12 +1015,17 @@
     max-height: 95vh;
   }
 
-  .flashcard-list-header {
-    padding: 20px 20px 12px;
+  .flashcard-list-content {
+    padding: 20px;
+    padding-top: 48px;
   }
-
-  .flashcard-list-header h2 {
-    font-size: 20px;
+  
+  .floating-close-btn {
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
   }
 }
 

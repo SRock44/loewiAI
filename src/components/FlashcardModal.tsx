@@ -25,12 +25,9 @@ const FlashcardModal: React.FC<FlashcardModalProps> = ({
   return (
     <div className="flashcard-modal-overlay" onClick={onClose}>
       <div className="flashcard-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="flashcard-modal-header">
-          <h2>Your Flashcards</h2>
-          <button className="close-btn" onClick={onClose}>
-            ✕
-          </button>
-        </div>
+        <button className="floating-close-btn" onClick={onClose}>
+          ✕
+        </button>
         
         <div className="flashcard-modal-content">
           {flashcardSets.length > 0 ? (

@@ -142,10 +142,7 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
         <div className="no-cards-message">
           <div className="no-cards-icon">📚</div>
           <h3>No flashcards match your filters</h3>
-          <p>Try adjusting your filter settings or reset to see all cards.</p>
-          <button className="reset-filters-btn" onClick={resetFilters}>
-            Reset Filters
-          </button>
+          <p>Try adjusting your filter settings above to see more cards.</p>
         </div>
       </div>
     );
@@ -192,10 +189,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
               <option value="weak">Focus on Weak</option>
             </select>
           </div>
-
-          <button className="reset-filters-btn" onClick={resetFilters}>
-            Reset
-          </button>
         </div>
       )}
 
