@@ -69,6 +69,33 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Handle copy button clicks for code blocks
+  useEffect(() => {
+    const handleCopyClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      if (target.classList.contains('copy-code-btn')) {
+        const codeContent = target.getAttribute('data-code-content');
+        if (codeContent) {
+          navigator.clipboard.writeText(codeContent).then(() => {
+            // Show feedback
+            const originalText = target.textContent;
+            target.textContent = 'Copied!';
+            target.style.color = '#10b981';
+            setTimeout(() => {
+              target.textContent = originalText;
+              target.style.color = '';
+            }, 2000);
+          }).catch(err => {
+            console.error('Failed to copy code:', err);
+          });
+        }
+      }
+    };
+
+    document.addEventListener('click', handleCopyClick);
+    return () => document.removeEventListener('click', handleCopyClick);
+  }, []);
+
   // Typing animation effect
   useEffect(() => {
     if (messages.length === 0 && !isLoading && inputValue === '') {
@@ -497,17 +524,53 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   };
 
   const formatMessage = (message: ChatMessage) => {
-    // Convert markdown-like formatting to HTML with better list handling
-    return message.content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // Handle numbered lists with better styling
-      .replace(/^\d+\.\s+(.*)$/gm, '<div class="list-item numbered">$1</div>')
-      // Handle bullet points with better spacing and styling
-      .replace(/^[-•]\s+(.*)$/gm, '<div class="list-item bulleted">$1</div>')
-      // Handle line breaks with proper spacing
-      .replace(/\n\n/g, '<br/><br/>')
-      .replace(/\n/g, '<br/>');
+    let content = message.content;
+    
+    // First, handle code blocks (triple backticks) - must be done before other replacements
+    content = content.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, language, code) => {
+      const lang = language || 'text';
+      const cleanCode = code.trim();
+      const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      return `<div class="code-block-container">
+        <div class="code-block-header">
+          <span class="code-language">${lang}</span>
+          <button class="copy-code-btn" data-code-id="${codeId}" data-code-content="${cleanCode.replace(/"/g, '&quot;')}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy
+          </button>
+        </div>
+        <pre class="code-block" id="${codeId}"><code class="language-${lang}">${cleanCode}</code></pre>
+      </div>`;
+    });
+    
+    // Handle inline code (single backticks)
+    content = content.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Handle math expressions (basic LaTeX-style)
+    content = content.replace(/\$\$([^$]+)\$\$/g, '<div class="math-block">$$$1$$</div>');
+    content = content.replace(/\$([^$]+)\$/g, '<span class="math-inline">$$1$</span>');
+    
+    // Handle step-by-step math solutions
+    content = content.replace(/Step (\d+):\s*(.*)/g, '<div class="math-step"><strong>Step $1:</strong> $2</div>');
+    
+    // Handle bold and italic text
+    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // Handle numbered lists with better styling
+    content = content.replace(/^\d+\.\s+(.*)$/gm, '<div class="list-item numbered">$1</div>');
+    
+    // Handle bullet points with better spacing and styling
+    content = content.replace(/^[-•]\s+(.*)$/gm, '<div class="list-item bulleted">$1</div>');
+    
+    // Handle line breaks with proper spacing
+    content = content.replace(/\n\n/g, '<br/><br/>');
+    content = content.replace(/\n/g, '<br/>');
+    
+    return content;
   };
 
   const renderSolarIcon = (iconName: string, size: number = 16) => {

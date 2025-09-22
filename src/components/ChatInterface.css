@@ -1269,6 +1269,170 @@
   font-weight: bold;
 }
 
+/* Code Block Styles */
+.code-block-container {
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e293b;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #334155;
+  border-bottom: 1px solid #475569;
+}
+
+.code-language {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.copy-code-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #64748b;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-code-btn:hover {
+  background: #475569;
+  color: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.copy-code-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.code-block {
+  margin: 0;
+  padding: 16px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+  text-align: left;
+}
+
+.code-block code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-family: inherit;
+}
+
+/* Inline Code Styles */
+.inline-code {
+  background: #f1f5f9;
+  color: #1e293b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.875em;
+  border: 1px solid #e2e8f0;
+}
+
+.message.user .inline-code {
+  background: #4a5568;
+  color: #e2e8f0;
+  border-color: #718096;
+}
+
+/* Math Styles */
+.math-block {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+  font-family: 'Times New Roman', serif;
+  font-size: 1.1rem;
+  color: #1e293b;
+}
+
+.math-inline {
+  background: #f1f5f9;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: 'Times New Roman', serif;
+  font-style: italic;
+  color: #1e293b;
+}
+
+.message.user .math-block {
+  background: #4a5568;
+  color: #e2e8f0;
+  border-color: #718096;
+}
+
+.message.user .math-inline {
+  background: #4a5568;
+  color: #e2e8f0;
+}
+
+/* Math Step Styles */
+.math-step {
+  margin: 8px 0;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-left: 4px solid #667eea;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.message.user .math-step {
+  background: #4a5568;
+  border-left-color: #94a3b8;
+  color: #e2e8f0;
+}
+
+.math-step strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.message.user .math-step strong {
+  color: #94a3b8;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e2e8f0;
+  border-top: 2px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* Responsive flashcard info */
 @media (max-width: 768px) {
   .flashcard-info {
@@ -1305,5 +1469,25 @@
   
   .example-commands li {
     font-size: 11px;
+  }
+
+  /* Mobile code block adjustments */
+  .code-block-container {
+    margin: 12px 0;
+  }
+  
+  .code-block {
+    padding: 12px;
+    font-size: 0.8rem;
+  }
+  
+  .math-block {
+    padding: 12px;
+    font-size: 1rem;
+  }
+  
+  .math-step {
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }
