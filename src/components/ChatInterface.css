@@ -1035,6 +1035,34 @@
   position: relative;
 }
 
+.back-arrow-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.back-arrow-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #1f2937;
+  transform: scale(1.05);
+}
+
 .floating-close-btn {
   position: absolute;
   top: 16px;
@@ -1106,6 +1134,14 @@
     max-width: 95vw;
     width: 95vw;
     max-height: 90vh;
+  }
+
+  .back-arrow-btn {
+    top: 12px;
+    left: 12px;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 
   .flashcard-list-content {

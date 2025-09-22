@@ -10,7 +10,7 @@ import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
 import { flashcardService } from '../services/flashcardService';
-import { flashcardEventTarget } from '../hooks/useSessionFlashcards';
+import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -228,7 +228,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
       
       // Dispatch event to notify other components
-      flashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate', {
+      allFlashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate', {
         detail: { sessionId: currentSession.id, flashcardSets: updatedFlashcards }
       }));
     }

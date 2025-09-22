@@ -320,6 +320,16 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
         <div className="flashcard-list-overlay">
           <div className="flashcard-list-modal">
             <button 
+              className="back-arrow-btn" 
+              onClick={() => {
+                setShowIndividualFlashcard(false);
+                setShowFlashcardList(true);
+              }}
+              title="Back to flashcard history"
+            >
+              ←
+            </button>
+            <button 
               className="floating-close-btn" 
               onClick={() => setShowIndividualFlashcard(false)}
             >
