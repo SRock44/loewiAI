@@ -17,6 +17,15 @@
   font-weight: 700;
   color: #2d3748;
   margin-bottom: 1rem;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+.section-title.animate {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .section-subtitle {
@@ -25,6 +34,15 @@
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.6;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+  will-change: transform, opacity;
+}
+
+.section-subtitle.animate {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .features-grid {
@@ -45,6 +63,14 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  opacity: 0;
+  transform: translateY(30px) scale(0.98);
+  will-change: transform, opacity;
+}
+
+.feature-card.animate {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .feature-card::before {
@@ -70,9 +96,17 @@
 }
 
 .feature-icon {
-  font-size: 3rem;
   margin-bottom: 1.5rem;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #667eea;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+  color: #4c51bf;
+  transform: scale(1.1) rotate(5deg);
 }
 
 .feature-title {
@@ -86,6 +120,30 @@
   color: #718096;
   line-height: 1.6;
   font-size: 1rem;
+}
+
+/* Keyframes for animations */
+@keyframes fadeInUpSmooth {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.98);
+    filter: blur(1px);
+  }
+  30% {
+    opacity: 0.7;
+    transform: translateY(15px) scale(0.99);
+    filter: blur(0.5px);
+  }
+  70% {
+    opacity: 0.9;
+    transform: translateY(-2px) scale(1.01);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
 }
 
 @media (max-width: 768px) {

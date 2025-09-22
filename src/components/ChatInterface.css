@@ -152,9 +152,10 @@
 
 .welcome-message {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   height: 100%;
+  padding-top: 80px;
 }
 
 .welcome-content {
