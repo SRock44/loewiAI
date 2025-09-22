@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import UserProfile from './UserProfile';
 import UserSettings from './UserSettings';
-import { Home, ChatSquare, AddSquare, TextSquare, Card, Document } from 'solar-icons';
-import FlashcardModal from './FlashcardModal';
+import { Home, ChatSquare, AddSquare, Card, Document } from 'solar-icons';
 import FlashcardList from './FlashcardList';
 import { useAllFlashcards } from '../hooks/useAllFlashcards';
 import { chatService } from '../services/chatService';
@@ -29,6 +27,8 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<any>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [flashcardToDelete, setFlashcardToDelete] = useState<any>(null);
+  const [isGridScrollable, setIsGridScrollable] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
   
   // Use custom hooks for efficient state management
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -43,6 +43,23 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
       setChatSessions([]);
     }
   }, [isAuthenticated]);
+
+  // Check if flashcard grid is scrollable
+  useEffect(() => {
+    const checkScrollable = () => {
+      if (gridRef.current) {
+        const isScrollable = gridRef.current.scrollHeight > gridRef.current.clientHeight;
+        setIsGridScrollable(isScrollable);
+      }
+    };
+
+    checkScrollable();
+    
+    // Check again when flashcard sets change
+    const timer = setTimeout(checkScrollable, 100);
+    
+    return () => clearTimeout(timer);
+  }, [flashcardSets]);
 
   // Listen for session updates (when new chats are created)
   useEffect(() => {
@@ -169,7 +186,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
             <div className="chat-history-section">
               {chatSessions.slice(0, 10).map((session, index) => {
                 const firstMessage = session.messages.find(m => m.role === 'user');
-                const title = firstMessage ? firstMessage.content.substring(0, 30) + (firstMessage.content.length > 30 ? '...' : '') : 'New Chat';
                 const summary = firstMessage ? `Chat about: ${firstMessage.content.substring(0, 100)}${firstMessage.content.length > 100 ? '...' : ''}` : 'New conversation';
                 
                 return (
@@ -280,7 +296,10 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               ) : (
                 <div className="flashcard-selection">
                   <h3>Select Flashcard Set</h3>
-                  <div className="flashcard-sets-grid">
+                  <div 
+                    ref={gridRef}
+                    className={`flashcard-sets-grid ${isGridScrollable ? 'scrollable' : ''}`}
+                  >
                     {flashcardSets.map((set) => (
                       <div key={set.id} className="flashcard-set-card-container">
                         <button
