@@ -1,4 +1,4 @@
-import { User, GoogleUserInfo, AuthService } from '../types/auth';
+import { User, AuthService } from '../types/auth';
 
 // Real Google OAuth Service Implementation
 class RealGoogleAuthService implements AuthService {

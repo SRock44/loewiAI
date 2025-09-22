@@ -1,5 +1,5 @@
 import { DocumentMetadata, AIAnalysis, AIQuery, AIRecommendation, AIService } from '../types/ai';
-import { documentProcessor, ProcessedDocument } from './documentProcessor';
+import { documentProcessor } from './documentProcessor';
 
 // Real AI Service with actual document processing
 class RealAIService implements AIService {
@@ -36,11 +36,11 @@ class RealAIService implements AIService {
     }
   }
 
-  async analyzeDocument(documentId: string): Promise<AIAnalysis> {
+  async analyzeDocument(_documentId: string): Promise<AIAnalysis> {
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     return {
-      documentId,
+      documentId: _documentId,
       analysisType: 'syllabus',
       summary: 'This document contains course information, learning objectives, and assessment criteria.',
       keyTopics: ['Course Overview', 'Learning Objectives', 'Assessment', 'Schedule'],
@@ -54,12 +54,12 @@ class RealAIService implements AIService {
     };
   }
 
-  async queryDocument(documentId: string, question: string): Promise<AIQuery> {
+  async queryDocument(_documentId: string, question: string): Promise<AIQuery> {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     return {
       id: `query_${Date.now()}`,
-      documentId,
+      documentId: _documentId,
       question,
       response: `Based on the document content, here's what I found regarding your question: "${question}". The document suggests...`,
       timestamp: new Date(),
@@ -67,7 +67,7 @@ class RealAIService implements AIService {
     };
   }
 
-  async generateRecommendations(documentId: string): Promise<AIRecommendation[]> {
+  async generateRecommendations(_documentId: string): Promise<AIRecommendation[]> {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     return [
@@ -91,7 +91,7 @@ class RealAIService implements AIService {
     ];
   }
 
-  async generateStudyPlan(documentIds: string[]): Promise<AIRecommendation[]> {
+  async generateStudyPlan(_documentIds: string[]): Promise<AIRecommendation[]> {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     return [
@@ -107,17 +107,6 @@ class RealAIService implements AIService {
     ];
   }
 
-  private getDocumentType(fileName: string): string {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'pdf': return 'PDF document';
-      case 'docx':
-      case 'doc': return 'Word document';
-      case 'pptx':
-      case 'ppt': return 'PowerPoint presentation';
-      default: return 'document';
-    }
-  }
 }
 
 // Export singleton instance
@@ -137,17 +126,17 @@ class MockAIService implements AIService {
       uploadDate: new Date(),
       processed: true,
       extractedText: `Extracted text from ${file.name}...`,
-      summary: `This document appears to be a ${this.getDocumentType(file.name)} containing important academic content.`,
+      summary: `This document appears to be a document containing important academic content.`,
       keyTopics: ['Topic 1', 'Topic 2', 'Topic 3'],
       difficulty: 'intermediate'
     };
   }
 
-  async analyzeDocument(documentId: string): Promise<AIAnalysis> {
+  async analyzeDocument(_documentId: string): Promise<AIAnalysis> {
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     return {
-      documentId,
+      documentId: _documentId,
       analysisType: 'syllabus',
       summary: 'This document contains course information, learning objectives, and assessment criteria.',
       keyTopics: ['Course Overview', 'Learning Objectives', 'Assessment', 'Schedule'],
@@ -161,12 +150,12 @@ class MockAIService implements AIService {
     };
   }
 
-  async queryDocument(documentId: string, question: string): Promise<AIQuery> {
+  async queryDocument(_documentId: string, question: string): Promise<AIQuery> {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     return {
       id: `query_${Date.now()}`,
-      documentId,
+      documentId: _documentId,
       question,
       response: `Based on the document content, here's what I found regarding your question: "${question}". The document suggests...`,
       timestamp: new Date(),
@@ -174,7 +163,7 @@ class MockAIService implements AIService {
     };
   }
 
-  async generateRecommendations(documentId: string): Promise<AIRecommendation[]> {
+  async generateRecommendations(_documentId: string): Promise<AIRecommendation[]> {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     return [
@@ -198,7 +187,7 @@ class MockAIService implements AIService {
     ];
   }
 
-  async generateStudyPlan(documentIds: string[]): Promise<AIRecommendation[]> {
+  async generateStudyPlan(_documentIds: string[]): Promise<AIRecommendation[]> {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     return [
@@ -214,17 +203,6 @@ class MockAIService implements AIService {
     ];
   }
 
-  private getDocumentType(fileName: string): string {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'pdf': return 'PDF document';
-      case 'docx':
-      case 'doc': return 'Word document';
-      case 'pptx':
-      case 'ppt': return 'PowerPoint presentation';
-      default: return 'document';
-    }
-  }
 }
 
 export const mockAiService = new MockAIService();

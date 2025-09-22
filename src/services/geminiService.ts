@@ -14,7 +14,7 @@ export interface AIResponse {
 
 export interface AIProvider {
   name: string;
-  generateResponse(message: string, context?: string): Promise<AIResponse>;
+  generateResponse(_message: string, _context?: string): Promise<AIResponse>;
   isAvailable(): boolean;
 }
 
@@ -64,15 +64,15 @@ class GeminiProvider implements AIProvider {
     return this.genAI !== null && this.model !== null;
   }
 
-  async generateResponse(message: string, context?: string): Promise<AIResponse> {
+  async generateResponse(_message: string, _context?: string): Promise<AIResponse> {
     if (!this.isAvailable()) {
       throw new Error('Gemini AI is not available');
     }
 
     try {
       // Build the prompt with academic context
-      const systemPrompt = this.buildAcademicPrompt(context);
-      const fullPrompt = `${systemPrompt}\n\nUser: ${message}`;
+      const systemPrompt = this.buildAcademicPrompt(_context);
+      const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
       console.log('🤖 Sending request to Gemini...');
       
@@ -136,7 +136,7 @@ class MockProvider implements AIProvider {
     return true;
   }
 
-  async generateResponse(message: string, context?: string): Promise<AIResponse> {
+  async generateResponse(_message: string, _context?: string): Promise<AIResponse> {
     // Simulate AI processing time
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -188,13 +188,13 @@ export class GeminiAIService {
     console.log(`🎯 Selected AI provider: ${this.currentProvider?.name || 'None'}`);
   }
 
-  async generateResponse(message: string, context?: string): Promise<AIResponse> {
+  async generateResponse(_message: string, _context?: string): Promise<AIResponse> {
     if (!this.currentProvider) {
       throw new Error('No AI provider available');
     }
 
     try {
-      return await this.currentProvider.generateResponse(message, context);
+      return await this.currentProvider.generateResponse(_message, _context);
     } catch (error) {
       console.error(`❌ Error with ${this.currentProvider.name}:`, error);
       
@@ -203,7 +203,7 @@ export class GeminiAIService {
         if (provider !== this.currentProvider && provider.isAvailable()) {
           console.log(`🔄 Falling back to ${provider.name}`);
           try {
-            return await provider.generateResponse(message, context);
+            return await provider.generateResponse(_message, _context);
           } catch (fallbackError) {
             console.error(`❌ Fallback ${provider.name} also failed:`, fallbackError);
           }

@@ -1,6 +1,6 @@
-import { User, GoogleUserInfo, AuthService } from '../types/auth';
-
 // Mock Authentication Service - Replace with actual Google OAuth integration
+/*
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class MockAuthService implements AuthService {
   private currentUser: User | null = null;
   private storageKey = 'academic-ai-auth-user';
@@ -91,6 +91,7 @@ class MockAuthService implements AuthService {
     }
   }
 }
+*/
 
 // Real Google OAuth Service (commented out for now)
 /*

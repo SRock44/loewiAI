@@ -140,9 +140,9 @@ export class DocumentProcessor {
     } catch (error) {
       console.error('❌ PDF extraction failed:', error);
       console.error('❌ Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
       });
       return '';
     }

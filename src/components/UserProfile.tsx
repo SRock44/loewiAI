@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowDown } from 'solar-icons';
+import { ArrowRight } from 'solar-icons';
 import './UserProfile.css';
 
 const UserProfile: React.FC = () => {
@@ -33,7 +33,7 @@ const UserProfile: React.FC = () => {
           )}
         </div>
         <span className="profile-name">{user.name}</span>
-        <ArrowDown 
+        <ArrowRight 
           className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}
           size={12}
         />

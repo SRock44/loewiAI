@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle, useRef } from 'react';
+import { useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ChatInterface, { ChatInterfaceRef } from '../components/ChatInterface';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -10,8 +10,8 @@ export interface DashboardRef {
   switchToChat: (chatId: string) => void;
 }
 
-const Dashboard = forwardRef<DashboardRef>((props, ref) => {
-  const { isAuthenticated, user } = useAuth();
+const Dashboard = forwardRef<DashboardRef>((_, ref) => {
+  const { } = useAuth();
   const [uploadedDocuments, setUploadedDocuments] = useState<DocumentMetadata[]>([]);
   const chatInterfaceRef = useRef<ChatInterfaceRef>(null);
 
@@ -19,9 +19,6 @@ const Dashboard = forwardRef<DashboardRef>((props, ref) => {
     setUploadedDocuments(documents);
   };
 
-  const handleDocumentDeleted = (documentId: string) => {
-    setUploadedDocuments(prev => prev.filter(doc => doc.id !== documentId));
-  };
 
   const createNewChat = () => {
     if (chatInterfaceRef.current?.createNewSession) {
@@ -47,7 +44,6 @@ const Dashboard = forwardRef<DashboardRef>((props, ref) => {
           ref={chatInterfaceRef}
           documents={uploadedDocuments}
           onDocumentsChange={handleDocumentsUploaded}
-          onDocumentDelete={handleDocumentDeleted}
           onNewSession={(session) => {
             console.log('New chat session created:', session);
           }}

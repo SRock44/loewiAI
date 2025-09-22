@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Flashcard from './Flashcard';
-import { Flashcard as FlashcardType, FlashcardSet } from '../types/flashcard';
+import { FlashcardSet } from '../types/flashcard';
 import './FlashcardList.css';
 
 interface FlashcardListProps {
@@ -23,12 +23,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
   const [currentCardFlipped, setCurrentCardFlipped] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const getMasteryLabel = (level: number) => {
-    if (level === 1) return 'Needs Review';
-    if (level === 2) return 'Needs Improvement';
-    if (level === 3) return 'Understand';
-    return 'Unassigned';
-  };
 
   const getMasteryColor = (level: number) => {
     if (level === 1) return '#f44336'; // Red
@@ -128,12 +122,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
     }, 300); // Half of the flip animation duration
   };
 
-  const resetFilters = () => {
-    setFilterDifficulty('all');
-    setFilterMastery('all');
-    setStudyMode('sequential');
-    setCurrentIndex(0);
-  };
 
 
   if (filteredFlashcards.length === 0) {

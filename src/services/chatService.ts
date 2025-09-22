@@ -1,7 +1,7 @@
-import { ChatMessage, ChatSession, ChatContext, ChatService, QuickAction } from '../types/chat';
+import { ChatMessage, ChatSession, ChatContext, ChatService } from '../types/chat';
 import { authService } from './authService';
 import { geminiAIService, AIResponse } from './geminiService';
-import { documentProcessor, ProcessedDocument } from './documentProcessor';
+import { documentProcessor } from './documentProcessor';
 import { flashcardService } from './flashcardService';
 import { FlashcardGenerationRequest } from '../types/flashcard';
 
@@ -159,7 +159,6 @@ class GeminiChatService implements ChatService {
 
   async createNewSession(title?: string): Promise<ChatSession> {
     const sessionId = `session_${Date.now()}`;
-    const sessionNumber = this.sessions.size + 1;
     const defaultTitle = title || this.generateSessionTitle();
     
     const session: ChatSession = {
@@ -299,40 +298,6 @@ class GeminiChatService implements ChatService {
   }
 
 
-  private generateAIResponse(userMessage: string, context: ChatContext): string {
-    const message = userMessage.toLowerCase();
-
-    // Context-aware responses based on uploaded documents
-    if (context.documentIds.length > 0) {
-      if (message.includes('explain') || message.includes('what is')) {
-        return `Based on your uploaded documents, I can explain this concept. From what I've analyzed in your materials, this topic covers several key areas. Let me break it down for you:\n\n1. **Core Concept**: The fundamental principle involves...\n2. **Key Components**: The main elements include...\n3. **Practical Applications**: You'll find this useful when...\n\nWould you like me to elaborate on any specific aspect?`;
-      }
-      
-      if (message.includes('study') || message.includes('learn')) {
-        return `I've reviewed your course materials and can help you create an effective study plan. Here's what I recommend:\n\n**Priority Topics**: Focus on these areas first based on your syllabus\n**Study Schedule**: Allocate 2-3 hours daily for these topics\n**Assessment Prep**: Practice these specific concepts for upcoming exams\n\nWould you like me to create a detailed weekly schedule for you?`;
-      }
-      
-      if (message.includes('assignment') || message.includes('project')) {
-        return `I can help you with your assignment based on the requirements in your uploaded documents. Here's a structured approach:\n\n1. **Understanding Requirements**: From your materials, the assignment asks for...\n2. **Key Components Needed**: You should include...\n3. **Suggested Approach**: I recommend starting with...\n\nWhat specific part of the assignment would you like help with?`;
-      }
-    }
-
-    // General academic assistance responses
-    if (message.includes('hello') || message.includes('hi')) {
-      return `Hello! I'm Newton 1.0, your next-generation academic AI prototype. I'm here to help you with:\n\n• Understanding course materials\n• Creating study plans\n• Assignment guidance\n• Concept explanations\n• Academic questions\n\nWhat would you like to work on today?`;
-    }
-
-    if (message.includes('help') || message.includes('stuck')) {
-      return `I'm here to help! Here are some ways I can assist you:\n\n**Explain concepts** - Ask me to clarify any topic\n**Study planning** - Get personalized study schedules\n**Assignment help** - Guidance on projects and homework\n**Question answering** - Ask specific academic questions\n**Practice problems** - Generate exercises and solutions\n\nWhat would you like to start with?`;
-    }
-
-    if (message.includes('thank')) {
-      return `You're very welcome! I'm glad I could help. Feel free to ask me anything else about your studies. I'm here 24/7 to support your academic journey.`;
-    }
-
-    // Default response for other queries
-    return `That's an interesting question! Let me help you with that.\n\nBased on my analysis, here's what I can tell you:\n\n• **Key Points**: The main aspects to consider are...\n• **Important Details**: You should pay attention to...\n• **Next Steps**: I recommend that you...\n\nIs there anything specific about this topic you'd like me to elaborate on?`;
-  }
 
   private buildDocumentContext(documentIds: string[], processedDocuments?: any[]): string {
     if (documentIds.length === 0) return '';
@@ -371,12 +336,6 @@ CRITICAL INSTRUCTIONS:
 The document content above contains all the information needed to provide comprehensive help. Use it directly.`;
   }
 
-  private getProcessedDocuments(documentIds: string[]): ProcessedDocument[] {
-    // In a real app, you'd fetch from a database or storage
-    // For now, we'll return an empty array as documents are stored in component state
-    // This will be enhanced when we integrate with the chat interface
-    return [];
-  }
 
   // Get AI provider info for debugging
   getAIProviderInfo(): string {
@@ -440,7 +399,7 @@ The document content above contains all the information needed to provide compre
     
     if (hasDocuments) {
       // Use first document for generation
-      const document = context.processedDocuments[0];
+      const document = context.processedDocuments![0];
       return {
         documentId: document.id,
         topic: topic || undefined,

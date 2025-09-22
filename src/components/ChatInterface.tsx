@@ -1,22 +1,19 @@
-import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { ChatMessage, ChatSession, ChatContext, QuickAction, QUICK_ACTIONS } from '../types/chat';
 import { chatService } from '../services/chatService';
 import { DocumentMetadata } from '../types/ai';
 import { validateFile, getFileIcon, formatFileSize } from '../utils/fileValidation';
-import { aiService } from '../services/aiService';
 import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
-import { flashcardService } from '../services/flashcardService';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
   documents?: DocumentMetadata[];
   onDocumentsChange?: (documents: DocumentMetadata[]) => void;
-  onDocumentDelete?: (documentId: string) => void;
   onNewSession?: (session: ChatSession) => void;
 }
 
@@ -36,7 +33,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const { 
     documents = [], 
     onDocumentsChange,
-    onDocumentDelete,
     onNewSession 
   } = props;
   const { isAuthenticated, user } = useAuth();
@@ -44,9 +40,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [, setSessions] = useState<ChatSession[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [showFlashcardList, setShowFlashcardList] = useState(false);
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);
   const [typingText, setTypingText] = useState('');
@@ -252,7 +247,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         }
       }
       
-      const updatedFlashcards = existingFlashcards.map(set => set.id === updatedSet.id ? updatedSet : set);
+      const updatedFlashcards = existingFlashcards.map((set: FlashcardSet) => set.id === updatedSet.id ? updatedSet : set);
       sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
       console.log('Updated flashcard set in session storage for session:', currentSession.id);
     }
@@ -397,13 +392,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
     // Create a session if one doesn't exist
     let session = currentSession;
-    let isNewSession = false;
     if (!session) {
       console.log('📝 Creating new session...');
       session = await chatService.createNewSession();
       setCurrentSession(session);
       setSessions(prev => [session!, ...prev]);
-      isNewSession = true;
       console.log('✅ New session created:', session);
       
       // Dispatch custom event to notify other components
@@ -500,20 +493,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     if (session) {
       setCurrentSession(session);
       setMessages(session.messages);
-    }
-  };
-
-  const deleteSession = async (sessionId: string) => {
-    await chatService.deleteSession(sessionId);
-    const updatedSessions = sessions.filter(s => s.id !== sessionId);
-    setSessions(updatedSessions);
-    
-    if (currentSession?.id === sessionId) {
-      if (updatedSessions.length > 0) {
-        switchSession(updatedSessions[0].id);
-      } else {
-        await createNewSession();
-      }
     }
   };
 
@@ -737,15 +716,15 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setIsDragOver(true);
+                  // Drag over state removed
                 }}
                 onDragLeave={(e) => {
                   e.preventDefault();
-                  setIsDragOver(false);
+                  // Drag over state removed
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  setIsDragOver(false);
+                  // Drag over state removed
                   handleFiles(e.dataTransfer.files);
                 }}
               />
