@@ -1324,14 +1324,15 @@
 .code-block {
   margin: 0;
   padding: 16px;
-  background: #1e293b;
-  color: #e2e8f0;
-  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
   font-size: 0.875rem;
   line-height: 1.5;
   overflow-x: auto;
   white-space: pre;
   text-align: left;
+  border-radius: 0;
 }
 
 .code-block code {
@@ -1340,6 +1341,85 @@
   padding: 0;
   border-radius: 0;
   font-family: inherit;
+}
+
+/* VS Code Dark Theme Syntax Highlighting */
+.code-block .token.comment,
+.code-block .token.prolog,
+.code-block .token.doctype,
+.code-block .token.cdata {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.code-block .token.punctuation {
+  color: #d4d4d4;
+}
+
+.code-block .token.property,
+.code-block .token.tag,
+.code-block .token.boolean,
+.code-block .token.number,
+.code-block .token.constant,
+.code-block .token.symbol,
+.code-block .token.deleted {
+  color: #b5cea8;
+}
+
+.code-block .token.selector,
+.code-block .token.attr-name,
+.code-block .token.string,
+.code-block .token.char,
+.code-block .token.builtin,
+.code-block .token.inserted {
+  color: #ce9178;
+}
+
+.code-block .token.operator,
+.code-block .token.entity,
+.code-block .token.url,
+.code-block .language-css .token.string,
+.code-block .style .token.string {
+  color: #d4d4d4;
+}
+
+.code-block .token.atrule,
+.code-block .token.attr-value,
+.code-block .token.keyword {
+  color: #569cd6;
+}
+
+.code-block .token.function,
+.code-block .token.class-name {
+  color: #dcdcaa;
+}
+
+.code-block .token.regex,
+.code-block .token.important,
+.code-block .token.variable {
+  color: #d16969;
+}
+
+.code-block .token.important,
+.code-block .token.bold {
+  font-weight: bold;
+}
+
+.code-block .token.italic {
+  font-style: italic;
+}
+
+.code-block .token.entity {
+  cursor: help;
+}
+
+/* Line numbers (optional) */
+.code-block .line-numbers .line-numbers-rows {
+  border-right: 1px solid #3e3e3e;
+}
+
+.code-block .line-numbers-rows > span:before {
+  color: #858585;
 }
 
 /* Inline Code Styles */
@@ -1432,6 +1512,8 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Code Execution Results - Removed as execution results are no longer displayed to users */
 
 /* Responsive flashcard info */
 @media (max-width: 768px) {

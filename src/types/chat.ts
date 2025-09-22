@@ -8,6 +8,7 @@ export interface ChatMessage {
   documentId?: string; // Reference to uploaded document if relevant
   isTyping?: boolean;
   flashcardSet?: any; // FlashcardSet generated from this message
+  validationResults?: any; // CodeValidationResult[] from code validation
 }
 
 export interface ChatSession {

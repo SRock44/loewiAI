@@ -9,6 +9,24 @@ import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-csharp';
+import 'prismjs/components/prism-ruby';
+import 'prismjs/components/prism-go';
+import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-tsx';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -76,7 +94,15 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       if (target.classList.contains('copy-code-btn')) {
         const codeContent = target.getAttribute('data-code-content');
         if (codeContent) {
-          navigator.clipboard.writeText(codeContent).then(() => {
+          // Decode the escaped content
+          const decodedContent = codeContent
+            .replace(/&quot;/g, '"')
+            .replace(/\\n/g, '\n')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&');
+          
+          navigator.clipboard.writeText(decodedContent).then(() => {
             // Show feedback
             const originalText = target.textContent;
             target.textContent = 'Copied!';
@@ -523,6 +549,36 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   };
 
+  // Language mapping for Prism.js
+  const getPrismLanguage = (lang: string): string => {
+    const languageMap: { [key: string]: string } = {
+      'js': 'javascript',
+      'ts': 'typescript',
+      'py': 'python',
+      'cpp': 'c', // Use C highlighting for C++ since prism-cpp has issues
+      'c++': 'c',
+      'c': 'c',
+      'cs': 'csharp',
+      'php': 'markup', // Use markup highlighting for PHP since prism-php has dependency issues
+      'rb': 'ruby',
+      'go': 'go',
+      'rs': 'rust',
+      'sql': 'sql',
+      'json': 'json',
+      'css': 'css',
+      'html': 'markup',
+      'xml': 'markup',
+      'md': 'markdown',
+      'sh': 'bash',
+      'bash': 'bash',
+      'yml': 'yaml',
+      'yaml': 'yaml',
+      'jsx': 'jsx',
+      'tsx': 'tsx'
+    };
+    return languageMap[lang.toLowerCase()] || lang.toLowerCase();
+  };
+
   const formatMessage = (message: ChatMessage) => {
     let content = message.content;
     
@@ -531,10 +587,32 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       const lang = language || 'text';
       const cleanCode = code.trim();
       const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Apply syntax highlighting using Prism.js
+      let highlightedCode = cleanCode;
+      const prismLang = getPrismLanguage(lang);
+      
+      if (lang !== 'text' && Prism && Prism.languages && Prism.languages[prismLang] && Prism.highlight) {
+        try {
+          // Additional safety check for the specific language
+          const languageDef = Prism.languages[prismLang];
+          if (languageDef && typeof languageDef === 'object') {
+            highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
+          } else {
+            console.warn(`Invalid language definition for: ${prismLang}`);
+          }
+        } catch (error) {
+          console.warn(`Failed to highlight code for language: ${prismLang}`, error);
+          highlightedCode = cleanCode;
+        }
+      } else if (lang !== 'text') {
+        console.warn(`Language not supported: ${prismLang}`);
+      }
+      
       return `<div class="code-block-container">
         <div class="code-block-header">
           <span class="code-language">${lang}</span>
-          <button class="copy-code-btn" data-code-id="${codeId}" data-code-content="${cleanCode.replace(/"/g, '&quot;')}">
+          <button class="copy-code-btn" data-code-id="${codeId}" data-code-content="${cleanCode.replace(/"/g, '&quot;').replace(/\n/g, '\\n')}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -542,7 +620,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
             Copy
           </button>
         </div>
-        <pre class="code-block" id="${codeId}"><code class="language-${lang}">${cleanCode}</code></pre>
+        <pre class="code-block" id="${codeId}"><code class="language-${prismLang}">${highlightedCode}</code></pre>
       </div>`;
     });
     
@@ -686,6 +764,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                       }}
                     />
                   </div>
+                  
                   {message.flashcardSet && (
                     <div className="flashcard-message-hint">
                       <span className="hint-text">Click to view flashcards</span>

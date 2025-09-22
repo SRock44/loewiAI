@@ -14,7 +14,7 @@ export interface AIResponse {
 
 export interface AIProvider {
   name: string;
-  generateResponse(_message: string, _context?: string): Promise<AIResponse>;
+  generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse>;
   isAvailable(): boolean;
 }
 
@@ -64,14 +64,14 @@ class GeminiProvider implements AIProvider {
     return this.genAI !== null && this.model !== null;
   }
 
-  async generateResponse(_message: string, _context?: string): Promise<AIResponse> {
+  async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     if (!this.isAvailable()) {
       throw new Error('Gemini AI is not available');
     }
 
     try {
-      // Build the prompt with academic context
-      const systemPrompt = this.buildAcademicPrompt(_context);
+      // Build the prompt with academic context and conversation history
+      const systemPrompt = this.buildAcademicPrompt(_context, _conversationHistory);
       const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
       console.log('🤖 Sending request to Gemini...');
@@ -93,7 +93,7 @@ class GeminiProvider implements AIProvider {
     }
   }
 
-  private buildAcademicPrompt(context?: string): string {
+  private buildAcademicPrompt(context?: string, conversationHistory?: string): string {
     const basePrompt = `You are Newton 1.0, an intelligent next-generation academic AI prototype designed to help students and researchers with their academic work. You provide:
 
 1. **Clear explanations** of complex academic concepts
@@ -125,6 +125,8 @@ CODE FORMATTING:
 - Include comments explaining complex logic
 - Use proper indentation and formatting
 - For algorithms, explain the approach before showing code
+- Include test cases and examples when appropriate
+- Write executable code snippets that demonstrate the concept
 
 Guidelines:
 - Be encouraging and supportive
@@ -132,7 +134,12 @@ Guidelines:
 - Provide examples when helpful
 - Ask clarifying questions when needed
 - Maintain an academic tone while being approachable
-- Focus on learning and understanding over just answers`;
+- Focus on learning and understanding over just answers
+- **Always reference previous topics when relevant** - if the user asks follow-up questions, acknowledge what was discussed before
+- **Build upon previous explanations** - don't repeat information unless asked
+- **Maintain conversation continuity** - use phrases like "As we discussed earlier..." or "Building on your previous question about..."
+- **Handle ambiguous references** - if the user says "what about X?" or "how about Y?", refer to the conversation history to understand the context
+- **Code execution requests** - if users ask to run/execute code, explain that they should use IDEs like VS Code, Cursor, or online compilers like Replit`;
 
     // Get user profile information for personalization
     const userProfileContext = UserProfileService.buildPersonalizationContext();
@@ -147,6 +154,10 @@ Guidelines:
       fullPrompt += `\n\nAdditional Context: ${context}`;
     }
     
+    if (conversationHistory) {
+      fullPrompt += conversationHistory;
+    }
+    
     return fullPrompt;
   }
 }
@@ -159,7 +170,7 @@ class MockProvider implements AIProvider {
     return true;
   }
 
-  async generateResponse(_message: string, _context?: string): Promise<AIResponse> {
+  async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     // Simulate AI processing time
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -173,8 +184,14 @@ class MockProvider implements AIProvider {
 
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
     
+    // Add conversation context awareness to mock responses
+    let contextualResponse = randomResponse;
+    if (_conversationHistory && _conversationHistory.includes('CONVERSATION HISTORY')) {
+      contextualResponse = "I can see from our previous conversation that you're building on earlier topics. " + randomResponse;
+    }
+    
     return {
-      content: randomResponse,
+      content: contextualResponse,
       model: 'mock-academic-assistant',
       provider: 'Mock'
     };
@@ -211,13 +228,13 @@ export class GeminiAIService {
     console.log(`🎯 Selected AI provider: ${this.currentProvider?.name || 'None'}`);
   }
 
-  async generateResponse(_message: string, _context?: string): Promise<AIResponse> {
+  async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     if (!this.currentProvider) {
       throw new Error('No AI provider available');
     }
 
     try {
-      return await this.currentProvider.generateResponse(_message, _context);
+      return await this.currentProvider.generateResponse(_message, _context, _conversationHistory);
     } catch (error) {
       console.error(`❌ Error with ${this.currentProvider.name}:`, error);
       
@@ -226,7 +243,7 @@ export class GeminiAIService {
         if (provider !== this.currentProvider && provider.isAvailable()) {
           console.log(`🔄 Falling back to ${provider.name}`);
           try {
-            return await provider.generateResponse(_message, _context);
+            return await provider.generateResponse(_message, _context, _conversationHistory);
           } catch (fallbackError) {
             console.error(`❌ Fallback ${provider.name} also failed:`, fallbackError);
           }

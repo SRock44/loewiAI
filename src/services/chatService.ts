@@ -4,6 +4,8 @@ import { geminiAIService, AIResponse } from './geminiService';
 import { documentProcessor } from './documentProcessor';
 import { flashcardService } from './flashcardService';
 import { FlashcardGenerationRequest } from '../types/flashcard';
+import { codeValidator, CodeValidationResult } from './codeValidator';
+import { codeExecutor, CodeExecutionResult } from './codeExecutor';
 
 // Enhanced Chat Service with Gemini AI integration
 class GeminiChatService implements ChatService {
@@ -104,16 +106,84 @@ class GeminiChatService implements ChatService {
       // Build context from uploaded documents
       const documentContext = this.buildDocumentContext(context.documentIds, context.processedDocuments);
       
+      // Check if user is asking for code execution
+      if (this.isCodeExecutionRequest(message)) {
+        const executionGuidanceMessage: ChatMessage = {
+          id: `msg_${Date.now()}_${++this.messageCounter}`,
+          role: 'assistant',
+          content: `I understand you'd like to run the code! While I can help you write and validate code, I can't execute it directly in this interface.
+
+**To run your code, you can:**
+
+🖥️ **Desktop IDEs:**
+- **VS Code** - Free, excellent for most languages
+- **Cursor** - AI-powered code editor
+- **IntelliJ IDEA** - Great for Java, Python, and more
+- **Visual Studio** - Perfect for C# and .NET
+
+🌐 **Online Compilers:**
+- **Replit** - Supports 50+ languages, collaborative
+- **CodePen** - Great for HTML/CSS/JavaScript
+- **JSFiddle** - JavaScript playground
+- **OnlineGDB** - C, C++, Python, Java, and more
+- **Programiz** - Multiple language support
+
+📱 **Quick Testing:**
+- **Python**: Use \`python filename.py\` in terminal
+- **JavaScript**: Use Node.js with \`node filename.js\`
+- **Java**: Compile with \`javac\` then run with \`java\`
+
+**Coming Soon:** Direct code execution support will be added to this AI assistant!
+
+Would you like me to help you with anything else about the code, such as explaining how it works or suggesting improvements?`,
+          timestamp: new Date().toISOString(),
+          sessionId: context.sessionId
+        };
+
+        // Add the guidance message to the session
+        if (this.sessions.has(context.sessionId)) {
+          this.sessions.get(context.sessionId)!.messages.push(executionGuidanceMessage);
+        }
+
+        return executionGuidanceMessage;
+      }
+
+      // Build conversation history context
+      const conversationContext = this.buildConversationContext(context.sessionId);
+      
       // Get AI response from Gemini
       const aiResponse: AIResponse = await geminiAIService.generateResponse(
         message, 
-        documentContext
+        documentContext,
+        conversationContext
       );
+
+      // Validate code in the AI response and silently fix if needed
+      const validationResults = codeValidator.validateCodeBlocks(aiResponse.content);
+      const hasErrors = validationResults.some(result => !result.isValid || result.errors.length > 0);
+
+      let finalContent = aiResponse.content;
+
+      // If there are code errors, attempt to fix them silently
+      if (hasErrors) {
+        console.log('Code validation found errors, attempting to fix silently...');
+        const correctedResponse = await this.attemptCodeCorrection(aiResponse.content, validationResults, documentContext);
+        if (correctedResponse) {
+          finalContent = correctedResponse;
+          console.log('Code correction successful');
+        } else {
+          console.log('Code correction failed, using original code');
+        }
+      }
+
+      // Execute code blocks silently for validation (no user display)
+      const executionResults = await codeExecutor.executeCodeBlocks(finalContent);
+      // Note: Execution results are not displayed to users, only used for internal validation
 
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_${++this.messageCounter}`,
         role: 'assistant',
-        content: aiResponse.content,
+        content: finalContent,
         timestamp: new Date()
       };
 
@@ -298,6 +368,155 @@ class GeminiChatService implements ChatService {
   }
 
 
+
+  /**
+   * Attempts to correct code errors by sending them back to the AI
+   */
+  private async attemptCodeCorrection(
+    originalContent: string, 
+    validationResults: CodeValidationResult[], 
+    documentContext: string
+  ): Promise<string | null> {
+    try {
+      const errorSummary = this.formatErrorsForAI(validationResults);
+      
+      const correctionPrompt = `I found some issues with the code I provided. Please fix these errors and provide the corrected code:
+
+${errorSummary}
+
+Original code:
+${originalContent}
+
+Please provide the corrected version with the same formatting and structure, but with all the errors fixed.`;
+
+      const correctedResponse = await geminiAIService.generateResponse(
+        correctionPrompt,
+        documentContext
+      );
+
+      // Validate the corrected code
+      const correctedValidationResults = codeValidator.validateCodeBlocks(correctedResponse.content);
+      const stillHasErrors = correctedValidationResults.some(result => !result.isValid || result.errors.length > 0);
+
+      if (stillHasErrors) {
+        console.log('Corrected code still has errors, returning original with validation results');
+        return null;
+      }
+
+      console.log('Code correction successful');
+      return correctedResponse.content;
+    } catch (error) {
+      console.error('Error during code correction:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Formats validation errors for AI correction
+   */
+  private formatErrorsForAI(validationResults: CodeValidationResult[]): string {
+    let errorSummary = 'Code validation found the following issues:\n\n';
+    
+    for (let i = 0; i < validationResults.length; i++) {
+      const result = validationResults[i];
+      if (result.errors.length === 0 && result.warnings.length === 0) {
+        continue;
+      }
+
+      errorSummary += `Code Block ${i + 1} (${result.language}):\n`;
+      
+      if (result.errors.length > 0) {
+        errorSummary += 'Errors:\n';
+        for (const error of result.errors) {
+          errorSummary += `- Line ${error.line}: ${error.message}\n`;
+        }
+      }
+
+      if (result.warnings.length > 0) {
+        errorSummary += 'Warnings:\n';
+        for (const warning of result.warnings) {
+          errorSummary += `- Line ${warning.line}: ${warning.message}\n`;
+        }
+      }
+      errorSummary += '\n';
+    }
+
+    return errorSummary;
+  }
+
+  /**
+   * Detects if user is asking for code execution
+   */
+  private isCodeExecutionRequest(message: string): boolean {
+    const executionKeywords = [
+      'run this code',
+      'execute this code',
+      'run the code',
+      'execute the code',
+      'test this code',
+      'run it',
+      'execute it',
+      'can you run',
+      'please run',
+      'how do i run',
+      'how to run',
+      'run the program',
+      'execute the program',
+      'test the program',
+      'run this program',
+      'execute this program',
+      'does this work',
+      'will this work',
+      'can you test',
+      'please test',
+      'try running',
+      'run and see',
+      'execute and see'
+    ];
+
+    const lowerMessage = message.toLowerCase();
+    return executionKeywords.some(keyword => lowerMessage.includes(keyword));
+  }
+
+  /**
+   * Builds conversation history context for better follow-up question handling
+   */
+  private buildConversationContext(sessionId: string): string {
+    if (!sessionId || !this.sessions.has(sessionId)) {
+      return '';
+    }
+
+    const session = this.sessions.get(sessionId)!;
+    const messages = session.messages;
+    
+    // Only include recent conversation history (last 10 messages to avoid token limits)
+    const recentMessages = messages.slice(-10);
+    
+    if (recentMessages.length <= 2) {
+      return ''; // No need for context if this is the first exchange
+    }
+
+    let context = '\n\nCONVERSATION HISTORY:\n';
+    context += 'The following is the recent conversation history to help you understand the context and provide better follow-up responses:\n\n';
+
+    for (let i = 0; i < recentMessages.length - 1; i++) {
+      const msg = recentMessages[i];
+      const role = msg.role === 'user' ? 'User' : 'Assistant';
+      const content = msg.content.length > 500 ? msg.content.substring(0, 500) + '...' : msg.content;
+      
+      context += `${role}: ${content}\n\n`;
+    }
+
+    context += 'CURRENT USER MESSAGE: [This is the message you are responding to]\n\n';
+    context += 'INSTRUCTIONS:\n';
+    context += '- Use the conversation history to understand the context of follow-up questions\n';
+    context += '- Reference previous topics, code, or concepts when relevant\n';
+    context += '- If the user asks about something from a previous message, acknowledge and build upon it\n';
+    context += '- Maintain continuity in the conversation flow\n';
+    context += '- If the user asks "what about X?" or "how about Y?", refer to the previous context\n';
+
+    return context;
+  }
 
   private buildDocumentContext(documentIds: string[], processedDocuments?: any[]): string {
     if (documentIds.length === 0) return '';
