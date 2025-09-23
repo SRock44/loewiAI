@@ -102,7 +102,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
           </div>
           
           <div className="flashcard-content">
-            <div className="flashcard-icon">❓</div>
             <h3 className="flashcard-title">Question</h3>
             <p className="flashcard-text">{flashcard.question}</p>
           </div>
@@ -143,7 +142,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
           </div>
           
           <div className="flashcard-content">
-            <div className="flashcard-icon">💡</div>
             <h3 className="flashcard-title">Answer</h3>
             <p className="flashcard-text">{flashcard.answer}</p>
           </div>

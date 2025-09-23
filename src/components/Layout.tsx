@@ -473,7 +473,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               <FlashcardList
                 flashcardSet={currentFlashcardSet}
                 onSetUpdate={handleFlashcardSetUpdate}
-                showFilters={true}
               />
             </div>
           </div>

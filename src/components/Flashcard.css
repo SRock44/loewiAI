@@ -1,7 +1,7 @@
 .flashcard-container {
   width: 100%;
-  max-width: 400px;
-  height: 300px;
+  max-width: 600px;
+  height: 400px;
   margin: 0 auto;
   perspective: 1000px;
 }
@@ -38,7 +38,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px 8px;
+  padding: 12px 20px 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -93,8 +93,8 @@
   padding: 20px;
   text-align: center;
   overflow-y: auto;
-  max-height: 180px;
-  min-height: 120px;
+  max-height: 250px;
+  min-height: 180px;
 }
 
 .flashcard-content .flashcard-text {
@@ -171,11 +171,11 @@
 }
 
 .flashcard-footer {
-  padding: 16px 20px;
+  padding: 8px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .flashcard-hint {
@@ -243,8 +243,8 @@
   }
   
   .flashcard-content {
-    max-height: 160px;
-    min-height: 100px;
+    max-height: 200px;
+    min-height: 140px;
   }
   
   .flashcard-icon {
@@ -272,12 +272,12 @@
   
   .flashcard-content {
     padding: 16px;
-    max-height: 140px;
-    min-height: 80px;
+    max-height: 180px;
+    min-height: 120px;
   }
   
   .flashcard-footer {
-    padding: 12px 16px;
+    padding: 8px 16px;
   }
   
   .flashcard-icon {

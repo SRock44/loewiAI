@@ -408,8 +408,8 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  max-width: 500px;
-  max-height: 85vh;
+  max-width: 800px;
+  max-height: 90vh;
   width: 90vw;
   display: flex;
   flex-direction: column;
@@ -682,6 +682,7 @@
 .flashcard-set-card-container {
   position: relative;
 }
+
 
 .delete-flashcard-btn {
   position: absolute;

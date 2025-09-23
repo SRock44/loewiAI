@@ -7,19 +7,18 @@ interface FlashcardListProps {
   flashcardSet: FlashcardSet;
   onMasteryUpdate?: (flashcardId: string, masteryLevel: number) => void;
   onSetUpdate?: (updatedSet: FlashcardSet) => void;
-  showFilters?: boolean;
 }
 
 const FlashcardList: React.FC<FlashcardListProps> = ({
   flashcardSet,
   onMasteryUpdate,
-  onSetUpdate,
-  showFilters = true
+  onSetUpdate
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
-  const [filterMastery, setFilterMastery] = useState<string>('all');
-  const [studyMode, setStudyMode] = useState<'sequential' | 'random' | 'weak'>('sequential');
+  // Filter state variables kept for future implementation
+  const [filterDifficulty] = useState<string>('all');
+  const [filterMastery] = useState<string>('all');
+  const [studyMode] = useState<'sequential' | 'random' | 'weak'>('sequential');
   const [currentCardFlipped, setCurrentCardFlipped] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -32,15 +31,16 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
   };
 
   // Filter flashcards based on selected criteria
+  // Note: Filter logic is kept for future implementation of difficulty/mastery options
   const filteredFlashcards = useMemo(() => {
     let filtered = [...flashcardSet.flashcards];
 
-    // Filter by difficulty
+    // Filter by difficulty (currently shows all, but logic preserved)
     if (filterDifficulty !== 'all') {
       filtered = filtered.filter(card => card.difficulty === filterDifficulty);
     }
 
-    // Filter by mastery level
+    // Filter by mastery level (currently shows all, but logic preserved)
     if (filterMastery !== 'all') {
       if (filterMastery === 'needs-review') {
         filtered = filtered.filter(card => card.masteryLevel === 1);
@@ -51,7 +51,7 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
       }
     }
 
-    // Sort based on study mode
+    // Sort based on study mode (currently sequential, but logic preserved)
     switch (studyMode) {
       case 'random':
         return filtered.sort(() => Math.random() - 0.5);
@@ -124,13 +124,14 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
 
 
 
+
   if (filteredFlashcards.length === 0) {
     return (
       <div className="flashcard-list-container">
         <div className="no-cards-message">
           <div className="no-cards-icon">📚</div>
-          <h3>No flashcards match your filters</h3>
-          <p>Try adjusting your filter settings above to see more cards.</p>
+          <h3>No flashcards available</h3>
+          <p>No flashcards in this set.</p>
         </div>
       </div>
     );
@@ -138,47 +139,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
 
   return (
     <div className="flashcard-list-container">
-      {showFilters && (
-        <div className="flashcard-filters">
-          <div className="filter-group">
-            <label>Difficulty:</label>
-            <select 
-              value={filterDifficulty} 
-              onChange={(e) => setFilterDifficulty(e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Mastery:</label>
-            <select 
-              value={filterMastery} 
-              onChange={(e) => setFilterMastery(e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="needs-review">Needs Review</option>
-              <option value="needs-improvement">Needs Improvement</option>
-              <option value="understand">Understand</option>
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Study Mode:</label>
-            <select 
-              value={studyMode} 
-              onChange={(e) => setStudyMode(e.target.value as any)}
-            >
-              <option value="sequential">Sequential</option>
-              <option value="random">Random</option>
-              <option value="weak">Focus on Weak</option>
-            </select>
-          </div>
-        </div>
-      )}
 
 
       <div className="flashcard-display">
