@@ -284,6 +284,7 @@
   transition: all 0.2s ease;
   overflow: hidden;
   cursor: pointer;
+  position: relative;
 }
 
 .profile-icon-only:hover {
@@ -309,6 +310,9 @@
   font-weight: bold;
   font-size: 16px;
   color: white;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .google-icon {
