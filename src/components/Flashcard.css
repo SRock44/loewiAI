@@ -216,6 +216,10 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.1);
   color: white;
+  font-weight: bold;
+  font-size: 16px;
+  position: relative;
+  z-index: 10;
 }
 
 .mastery-btn:hover {

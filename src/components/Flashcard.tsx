@@ -21,7 +21,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
   onFlipChange
 }) => {
   const [internalIsFlipped, setInternalIsFlipped] = useState(false);
-  const [masteryLevel, setMasteryLevel] = useState(flashcard.masteryLevel);
   
   // Use external flip state if provided, otherwise use internal state
   const isFlipped = externalIsFlipped !== undefined ? externalIsFlipped : internalIsFlipped;
@@ -36,7 +35,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
   };
 
   const handleMasteryUpdate = (level: number) => {
-    setMasteryLevel(level);
     if (onMasteryUpdate) {
       onMasteryUpdate(flashcard.id, level);
     }
@@ -93,12 +91,12 @@ const Flashcard: React.FC<FlashcardProps> = ({
               <div 
                 className="mastery-indicator"
                 style={{ 
-                  backgroundColor: getMasteryColor(masteryLevel),
-                  color: masteryLevel === 0 ? '#666' : 'white',
-                  border: masteryLevel === 0 ? '1px solid #ddd' : 'none'
+                  backgroundColor: getMasteryColor(flashcard.masteryLevel),
+                  color: flashcard.masteryLevel === 0 ? '#666' : 'white',
+                  border: flashcard.masteryLevel === 0 ? '1px solid #ddd' : 'none'
                 }}
               >
-                {getMasteryLabel(masteryLevel)}
+                {getMasteryLabel(flashcard.masteryLevel)}
               </div>
             </div>
           </div>
@@ -134,12 +132,12 @@ const Flashcard: React.FC<FlashcardProps> = ({
               <div 
                 className="mastery-indicator"
                 style={{ 
-                  backgroundColor: getMasteryColor(masteryLevel),
-                  color: masteryLevel === 0 ? '#666' : 'white',
-                  border: masteryLevel === 0 ? '1px solid #ddd' : 'none'
+                  backgroundColor: getMasteryColor(flashcard.masteryLevel),
+                  color: flashcard.masteryLevel === 0 ? '#666' : 'white',
+                  border: flashcard.masteryLevel === 0 ? '1px solid #ddd' : 'none'
                 }}
               >
-                {getMasteryLabel(masteryLevel)}
+                {getMasteryLabel(flashcard.masteryLevel)}
               </div>
             </div>
           </div>
@@ -162,15 +160,15 @@ const Flashcard: React.FC<FlashcardProps> = ({
                   ].map(({ level, color }) => (
                     <button
                       key={level}
-                      className={`mastery-btn ${masteryLevel === level ? 'active' : ''}`}
+                      className={`mastery-btn ${flashcard.masteryLevel === level ? 'active' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleMasteryUpdate(level);
                       }}
                       style={{ 
                         backgroundColor: color,
-                        opacity: masteryLevel === level ? 1 : 0.6,
-                        border: masteryLevel === level ? '2px solid #333' : '2px solid transparent'
+                        opacity: flashcard.masteryLevel === level ? 1 : 0.6,
+                        border: flashcard.masteryLevel === level ? '2px solid #333' : '2px solid transparent'
                       }}
                       title={getMasteryLabel(level)}
                     >

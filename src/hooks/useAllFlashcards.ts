@@ -82,8 +82,8 @@ export const useAllFlashcards = () => {
   // Update an existing flashcard set
   const updateFlashcardSet = useCallback((updatedSet: FlashcardSet) => {
     try {
-      // Update in global storage
-      flashcardService.updateFlashcardMastery(updatedSet.id, 0); // This might need to be updated
+      // Save the updated set to global storage
+      flashcardService.saveFlashcardSet(updatedSet);
       
       // Update in session storage if it exists there
       for (let i = 0; i < sessionStorage.length; i++) {

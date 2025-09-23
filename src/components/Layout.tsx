@@ -130,6 +130,17 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const { flashcardSets, updateFlashcardSet, removeFlashcardSet } = useAllFlashcards();
   
+  // Wrapper function to update both global flashcard sets and current flashcard set
+  const handleFlashcardSetUpdate = (updatedSet: any) => {
+    // Update the global flashcard sets
+    updateFlashcardSet(updatedSet);
+    
+    // Update the current flashcard set if it's the same set
+    if (currentFlashcardSet && currentFlashcardSet.id === updatedSet.id) {
+      setCurrentFlashcardSet(updatedSet);
+    }
+  };
+  
   // Load chat sessions
   useEffect(() => {
     if (isAuthenticated) {
@@ -461,7 +472,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
             <div className="flashcard-list-content">
               <FlashcardList
                 flashcardSet={currentFlashcardSet}
-                onSetUpdate={updateFlashcardSet}
+                onSetUpdate={handleFlashcardSetUpdate}
                 showFilters={true}
               />
             </div>
