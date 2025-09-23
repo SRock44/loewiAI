@@ -1,26 +1,18 @@
 # Academic AI Assistant - TODO List
 
-## ✅ Completed Features
+# NEED TO BE ADDED
 
-### Document Processing
-- **PDF, DOCX, PPTX support** - Text extraction using PDF.js, Mammoth.js, and PPTX Parser
-- **AI Integration** - Document content sent to Gemini API for context-aware responses
-- **User Authentication** - Google OAuth integration with protected chat functionality
-- **Multiple Chat Sessions** - Create and manage separate conversation threads
+# THERE NEEDS TO BE MULTIPLE MODEL SUPPORT
+    - OPENAI API
+    - OLLAMA CUSTOM AI MODEL
+    - OPUS 4.1 OR SONNET
+OR, WE CAN IMPLEMENT MCP (MODEL CONTEXT PROTOCOL) WHEN A TASK IS ASSIGNED. WE MUST CONSIDER THE API USAGE FOR THIS THOUGH, AS IT WOULD LIKELY DOUBLE OR TRIPLE OUR REQUESTS SENT/RECEIVED. 
 
-### Technical Implementation
-- **Client-side processing** - Secure document handling in browser
-- **Error handling** - Graceful fallback when extraction fails
-- **Performance optimization** - Document chunking for large files
-- **Responsive design** - Mobile and desktop optimized interface
-
-## 🎯 Current Status
-
-All core features are implemented and functional. The platform supports:
-- Document upload and analysis
-- AI-powered chat with document context
-- User authentication and session management
-- Multiple file format support (PDF, DOCX, PPTX, DOC, PPT)
+# PREMIUM FEATURES
+    - ACCESS TO BETTER MODELS 
+    - MORE THAN 10 FLASHCARDS
+    - UNLIMITED OR HEAVILY INCREASED FILE UPLOAD SIZE AND QUANTITY
+    - 
 
 ---
 

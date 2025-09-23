@@ -583,7 +583,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     let content = message.content;
     
     // First, handle code blocks (triple backticks) - must be done before other replacements
-    content = content.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, language, code) => {
+    content = content.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, language, code) => {
       const lang = language || 'text';
       const cleanCode = code.trim();
       const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -967,7 +967,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               <FlashcardList
                 flashcardSet={currentFlashcardSet}
                 onSetUpdate={handleFlashcardSetUpdate}
-                showFilters={true}
               />
             </div>
           </div>

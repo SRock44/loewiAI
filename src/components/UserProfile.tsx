@@ -3,53 +3,25 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight } from 'solar-icons';
 import './UserProfile.css';
 
-// Helper component for profile images with error handling
-const ProfileImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-
-  const handleImageError = () => {
-    console.warn('Failed to load profile image:', src);
-    setImageError(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
-
-  if (imageError) {
-    return (
-      <div className={`avatar-placeholder ${className || ''}`}>
-        {alt.charAt(0).toUpperCase()}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {!imageLoaded && (
-        <div className={`avatar-placeholder ${className || ''}`}>
-          {alt.charAt(0).toUpperCase()}
-        </div>
-      )}
-      <img 
-        src={src} 
-        alt={alt}
-        className={className}
-        crossOrigin="anonymous"
-        referrerPolicy="no-referrer"
-        onError={handleImageError}
-        onLoad={handleImageLoad}
-        style={{ 
-          display: imageLoaded ? 'block' : 'none',
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover'
-        }}
-      />
-    </>
-  );
-};
+// User Plus SVG Icon Component
+const ProfileIcon: React.FC<{ size?: number; className?: string }> = ({ size = 24, className }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <line x1="19" y1="8" x2="19" y2="14"/>
+    <line x1="22" y1="11" x2="16" y2="11"/>
+  </svg>
+);
 
 const UserProfile: React.FC = () => {
   const { user, signOut, isAuthenticated } = useAuth();
@@ -72,15 +44,9 @@ const UserProfile: React.FC = () => {
         aria-label="User profile"
       >
         <div className="profile-avatar">
-          {user.picture ? (
-            <ProfileImage src={user.picture} alt={user.name} />
-          ) : (
-            <div className="avatar-placeholder">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <ProfileIcon size={20} />
         </div>
-        <span className="profile-name">{user.name}</span>
+        <span className="profile-name">{user.name || 'User'}</span>
         <ArrowRight 
           className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}
           size={12}
@@ -92,13 +58,9 @@ const UserProfile: React.FC = () => {
           <div className="dropdown-header">
             <div className="user-info">
               <div className="user-avatar">
-                {user.picture ? (
-                  <ProfileImage src={user.picture} alt={user.name} />
-                ) : (
-                  <div className="avatar-placeholder">
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <div className="avatar-icon-large">
+                  <ProfileIcon size={32} />
+                </div>
               </div>
               <div className="user-details">
                 <h4>{user.name}</h4>

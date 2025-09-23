@@ -334,26 +334,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               onClick={() => setShowSettings(true)}
               title="User Settings"
             >
-              {user?.picture ? (
-                <img 
-                  src={user.picture} 
-                  alt="User Profile" 
-                  className="user-profile-image"
-                  onError={(e) => {
-                    // Hide the image and show placeholder on CORS error
-                    e.currentTarget.style.display = 'none';
-                    const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                    if (placeholder) {
-                      placeholder.style.display = 'flex';
-                    }
-                  }}
-                />
-              ) : null}
-              <div 
-                className="user-profile-placeholder"
-                style={{ display: user?.picture ? 'none' : 'flex' }}
-              >
-                {user?.name?.charAt(0) || 'U'}
+              <div className="user-profile-icon">
               </div>
             </button>
           ) : (
