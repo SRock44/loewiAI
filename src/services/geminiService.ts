@@ -69,28 +69,45 @@ class GeminiProvider implements AIProvider {
       throw new Error('Gemini AI is not available');
     }
 
-    try {
-      // Build the prompt with academic context and conversation history
-      const systemPrompt = this.buildAcademicPrompt(_context, _conversationHistory);
-      const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Build the prompt with academic context and conversation history
+        const systemPrompt = this.buildAcademicPrompt(_context, _conversationHistory);
+        const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
-      console.log('🤖 Sending request to Gemini...');
-      
-      const result = await this.model!.generateContent(fullPrompt);
-      const response = await result.response;
-      const content = response.text();
+        console.log(`🤖 Sending request to Gemini... (attempt ${attempt}/${maxRetries})`);
+        
+        const result = await this.model!.generateContent(fullPrompt);
+        const response = await result.response;
+        const content = response.text();
 
-      console.log('✅ Gemini response received');
+        console.log('✅ Gemini response received');
 
-      return {
-        content: content,
-        model: 'gemini-1.5-flash',
-        provider: 'Google Gemini'
-      };
-    } catch (error) {
-      console.error('❌ Gemini API error:', error);
-      throw new Error(`Gemini API error: ${error}`);
+        return {
+          content: content,
+          model: 'gemini-1.5-flash',
+          provider: 'Google Gemini'
+        };
+      } catch (error) {
+        console.error(`❌ Gemini API error (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Check if this is a 503 error (service overloaded)
+        if (error instanceof Error && error.message.includes('503') && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(`⏳ Retrying in ${delay}ms due to service overload...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // If it's not a 503 error or we've exhausted retries, throw the error
+        throw new Error(`Gemini API error: ${error}`);
+      }
     }
+    
+    throw new Error('Gemini API failed after all retry attempts');
   }
 
   private buildAcademicPrompt(context?: string, conversationHistory?: string): string {
@@ -173,6 +190,33 @@ class MockProvider implements AIProvider {
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     // Simulate AI processing time
     await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Check if this is a flashcard generation request
+    const isFlashcardRequest = _message.toLowerCase().includes('flashcard') || 
+                              _message.toLowerCase().includes('generate') ||
+                              _message.toLowerCase().includes('create') ||
+                              _message.toLowerCase().includes('json');
+
+    if (isFlashcardRequest) {
+      // Return a proper JSON response for flashcard requests
+      const flashcardResponse = {
+        "flashcards": [
+          {
+            "question": "What is the main concept being discussed?",
+            "answer": "The AI service is currently unavailable. Please try again in a few minutes when the service is restored.",
+            "category": "General",
+            "difficulty": "medium",
+            "tags": ["service-unavailable"]
+          }
+        ]
+      };
+      
+      return {
+        content: JSON.stringify(flashcardResponse),
+        model: 'mock-academic-assistant',
+        provider: 'Mock'
+      };
+    }
 
     const responses = [
       "That's an excellent academic question! Let me help you understand this concept step by step.",

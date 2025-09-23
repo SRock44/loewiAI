@@ -11,6 +11,102 @@ import './Layout.css';
 
 // Remove the custom ChatHistoryItem interface - we'll use ChatSession directly
 
+// Topic detection utility function
+const detectTopicFromFlashcards = (flashcards: any[]): string => {
+  if (!flashcards || flashcards.length === 0) {
+    return 'General';
+  }
+
+  // Collect all categories and tags
+  const categories = new Set<string>();
+  const tags = new Set<string>();
+  const allText = new Set<string>();
+
+  flashcards.forEach((card) => {
+    if (card.category) {
+      categories.add(card.category.toLowerCase());
+    }
+    if (card.tags && Array.isArray(card.tags)) {
+      card.tags.forEach((tag: string) => tags.add(tag.toLowerCase()));
+    }
+    // Also analyze question and answer text for keywords
+    const questionWords = card.question?.toLowerCase().split(/\s+/) || [];
+    const answerWords = card.answer?.toLowerCase().split(/\s+/) || [];
+    [...questionWords, ...answerWords].forEach(word => {
+      if (word.length > 3) { // Only consider words longer than 3 characters
+        allText.add(word);
+      }
+    });
+  });
+
+  // Topic mapping based on keywords - ordered by specificity (most specific first)
+  const topicKeywords = {
+    'Calculus': ['derivative', 'integral', 'limit', 'calculus', 'differentiation', 'integration', 'chain rule', 'product rule', 'quotient rule', 'trigonometric', 'exponential', 'logarithmic', 'antiderivative', 'definite', 'indefinite', 'continuity', 'asymptote', 'critical point', 'optimization', 'related rates', 'calculus 1', 'calculus 2', 'calculus 3', 'multivariable', 'partial derivative', 'double integral', 'triple integral', 'line integral', 'surface integral', 'gradient', 'divergence', 'curl', 'taylor series', 'power series', 'convergence', 'divergence test', 'ratio test', 'root test', 'comparison test', 'limit comparison test', 'alternating series test', 'integral test', 'p-series test', 'geometric series', 'harmonic series', 'telescoping series', 'radius of convergence', 'interval of convergence', 'absolute convergence', 'conditional convergence', 'parametric equations', 'polar coordinates', 'cylindrical coordinates', 'spherical coordinates', 'jacobian', 'change of variables', 'green theorem', 'stokes theorem', 'divergence theorem', 'fundamental theorem of calculus', 'mean value theorem', 'intermediate value theorem', 'extreme value theorem', 'rolle theorem', 'lhopital rule', 'squeeze theorem', 'epsilon delta', 'riemann sum', 'trapezoidal rule', 'simpson rule', 'midpoint rule', 'left endpoint rule', 'right endpoint rule', 'improper integral', 'infinite series', 'sequence', 'convergent', 'divergent', 'bounded', 'monotonic', 'increasing', 'decreasing', 'concave up', 'concave down', 'inflection point', 'local maximum', 'local minimum', 'global maximum', 'global minimum', 'saddle point', 'critical number', 'first derivative test', 'second derivative test', 'newton method', 'bisection method', 'secant method', 'fixed point iteration', 'euler method', 'runge kutta', 'differential equation', 'separable', 'linear', 'homogeneous', 'nonhomogeneous', 'exact', 'integrating factor', 'bernoulli', 'riccati', 'clairaut', 'lagrange', 'cauchy euler', 'variation of parameters', 'undetermined coefficients', 'laplace transform', 'inverse laplace transform', 'convolution', 'heaviside function', 'dirac delta', 'fourier transform', 'inverse fourier transform', 'discrete fourier transform', 'fast fourier transform', 'z transform', 'inverse z transform', 'partial differential equation', 'heat equation', 'wave equation', 'laplace equation', 'poisson equation', 'helmholtz equation', 'schrodinger equation', 'maxwell equations', 'navier stokes', 'euler equations', 'bernoulli equation', 'continuity equation', 'conservation law', 'boundary condition', 'initial condition', 'dirichlet', 'neumann', 'robin', 'mixed boundary', 'periodic boundary', 'free boundary', 'moving boundary', 'interface', 'shock wave', 'rarefaction wave', 'contact discontinuity', 'entropy condition', 'rankine hugoniot', 'method of characteristics', 'separation of variables', 'eigenvalue', 'eigenfunction', 'sturm liouville', 'orthogonal', 'orthonormal', 'fourier series', 'fourier coefficients', 'parseval theorem', 'bessel function', 'legendre polynomial', 'chebyshev polynomial', 'hermite polynomial', 'laguerre polynomial', 'gamma function', 'beta function', 'zeta function', 'riemann zeta', 'dirichlet eta', 'euler constant', 'euler maclaurin', 'stirling formula', 'wallis formula', 'leibniz formula', 'newton leibniz'],
+    'Biology': ['photosynthesis', 'cell', 'dna', 'rna', 'protein', 'enzyme', 'mitosis', 'meiosis', 'evolution', 'genetics', 'organism', 'tissue', 'organ', 'ecosystem', 'biome', 'species', 'taxonomy', 'chloroplast', 'mitochondria', 'nucleus', 'chromosome', 'allele', 'phenotype', 'genotype'],
+    'Chemistry': ['molecule', 'atom', 'element', 'compound', 'reaction', 'bond', 'acid', 'base', 'ph', 'oxidation', 'reduction', 'catalyst', 'synthesis', 'decomposition', 'stoichiometry', 'ionic', 'covalent', 'periodic table', 'valence', 'electronegativity', 'molarity'],
+    'Physics': ['force', 'energy', 'momentum', 'velocity', 'acceleration', 'gravity', 'electricity', 'magnetism', 'wave', 'quantum', 'thermodynamics', 'mechanics', 'optics', 'relativity', 'newton', 'einstein', 'electromagnetic', 'kinetic', 'potential', 'friction', 'inertia'],
+    'Mathematics': ['algebra', 'geometry', 'trigonometry', 'statistics', 'probability', 'matrix', 'vector', 'equation', 'theorem', 'proof', 'fraction', 'decimal', 'percentage', 'polynomial', 'quadratic', 'linear', 'slope', 'intercept', 'parabola', 'hypotenuse'],
+    'Computer Science': ['algorithm', 'programming', 'code', 'variable', 'loop', 'array', 'object', 'class', 'method', 'database', 'network', 'software', 'hardware', 'python', 'javascript', 'java', 'c++', 'html', 'css', 'sql', 'api', 'debugging', 'compiler'],
+    'History': ['war', 'battle', 'revolution', 'empire', 'kingdom', 'civilization', 'ancient', 'medieval', 'renaissance', 'industrial', 'world war', 'treaty', 'constitution', 'monarchy', 'democracy', 'republic', 'colony', 'independence', 'reformation'],
+    'Literature': ['novel', 'poem', 'poetry', 'author', 'character', 'theme', 'symbolism', 'metaphor', 'alliteration', 'rhyme', 'stanza', 'narrative', 'plot', 'shakespeare', 'drama', 'fiction', 'protagonist', 'antagonist', 'setting', 'conflict'],
+    'Psychology': ['behavior', 'cognitive', 'memory', 'learning', 'emotion', 'personality', 'consciousness', 'unconscious', 'therapy', 'mental', 'brain', 'neuron', 'psychology', 'behavioral', 'developmental', 'conditioning', 'reinforcement', 'stimulus'],
+    'Economics': ['supply', 'demand', 'market', 'price', 'inflation', 'gdp', 'unemployment', 'monetary', 'fiscal', 'trade', 'investment', 'capital', 'profit', 'macroeconomics', 'microeconomics', 'economy', 'recession', 'depression', 'monopoly']
+  };
+
+  // Score-based topic detection to avoid conflicts
+  const topicScores: { [key: string]: number } = {};
+
+  // Check categories first (highest weight)
+  for (const category of categories) {
+    for (const [topic, keywords] of Object.entries(topicKeywords)) {
+      for (const keyword of keywords) {
+        if (category.includes(keyword)) {
+          topicScores[topic] = (topicScores[topic] || 0) + 10; // High weight for categories
+        }
+      }
+    }
+  }
+
+  // Check tags (medium weight)
+  for (const tag of tags) {
+    for (const [topic, keywords] of Object.entries(topicKeywords)) {
+      for (const keyword of keywords) {
+        if (tag.includes(keyword)) {
+          topicScores[topic] = (topicScores[topic] || 0) + 5; // Medium weight for tags
+        }
+      }
+    }
+  }
+
+  // Check text content (lower weight)
+  for (const text of allText) {
+    for (const [topic, keywords] of Object.entries(topicKeywords)) {
+      for (const keyword of keywords) {
+        if (text.includes(keyword)) {
+          topicScores[topic] = (topicScores[topic] || 0) + 1; // Lower weight for text
+        }
+      }
+    }
+  }
+
+  // Return the topic with the highest score
+  const sortedTopics = Object.entries(topicScores).sort((a, b) => b[1] - a[1]);
+  if (sortedTopics.length > 0 && sortedTopics[0][1] > 0) {
+    const winningTopic = sortedTopics[0][0];
+    return winningTopic;
+  }
+
+  // If no specific topic found, try to infer from categories
+  if (categories.size > 0) {
+    const categoryArray = Array.from(categories);
+    // Capitalize first letter of the first category
+    const inferredTopic = categoryArray[0].charAt(0).toUpperCase() + categoryArray[0].slice(1);
+    return inferredTopic;
+  }
+
+  return 'General';
+};
+
 interface LayoutProps {
   children: React.ReactNode;
   onCreateNewChat?: () => void;
@@ -320,11 +416,9 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                             setShowIndividualFlashcard(true);
                           }}
                         >
-                          <h4>{set.title}</h4>
-                          <p>{set.description}</p>
                           <div className="set-stats">
                             <span>{set.flashcards.length} cards</span>
-                            <span>{new Date(set.createdAt).toLocaleDateString()}</span>
+                            <span>{detectTopicFromFlashcards(set.flashcards)}</span>
                           </div>
                         </button>
                         <button

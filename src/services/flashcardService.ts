@@ -41,24 +41,43 @@ class RealFlashcardService implements FlashcardService {
     
     try {
       const prompt = this.buildFlashcardPrompt(request, document);
-      const response = await geminiAIService.generateResponse(prompt);
+      let response = await geminiAIService.generateResponse(prompt);
       
-      // Parse the AI response to extract flashcards
-      const flashcards = this.parseFlashcardResponse(response.content, request);
-      
-      const setTitle = this.generateSetTitle(document.fileName, request.topic);
-      const setDescription = this.generateSetDescription(document, request);
+      // Try to parse the response
+      let flashcards: Flashcard[];
+      try {
+        flashcards = this.parseFlashcardResponse(response.content, request);
+      } catch (parseError) {
+        console.warn('⚠️ First attempt failed, retrying with more explicit prompt...');
+        // Retry with a more explicit prompt
+        const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
+${prompt}`;
+        response = await geminiAIService.generateResponse(retryPrompt);
+        flashcards = this.parseFlashcardResponse(response.content, request);
+      }
+      
       console.log('✅ Generated flashcards:', flashcards.length);
 
       return {
         flashcards,
-        setTitle,
-        setDescription,
+        setTitle: '',
+        setDescription: '',
         sourceDocumentId: document.id
       };
     } catch (error) {
       console.error('❌ Error generating flashcards:', error);
+      
+      // Check if this is an API overload error (503)
+      if (error instanceof Error && error.message.includes('503')) {
+        throw new Error('The AI service is currently overloaded. Please try again in a few minutes.');
+      }
+      
+      // Check if this is a fallback response that's not JSON
+      if (error instanceof Error && error.message.includes('No JSON found in response')) {
+        throw new Error('Unable to generate flashcards at this time. The AI service is experiencing issues. Please try again later.');
+      }
+      
       throw new Error(`Failed to generate flashcards: ${error}`);
     }
   }
@@ -72,24 +91,43 @@ class RealFlashcardService implements FlashcardService {
     
     try {
       const prompt = this.buildTextFlashcardPrompt(request);
-      const response = await geminiAIService.generateResponse(prompt);
+      let response = await geminiAIService.generateResponse(prompt);
       
-      // Parse the AI response to extract flashcards
-      const flashcards = this.parseFlashcardResponse(response.content, request);
-      
-      const setTitle = this.generateTextSetTitle(request.topic);
-      const setDescription = this.generateTextSetDescription(request);
+      // Try to parse the response
+      let flashcards: Flashcard[];
+      try {
+        flashcards = this.parseFlashcardResponse(response.content, request);
+      } catch (parseError) {
+        console.warn('⚠️ First attempt failed, retrying with more explicit prompt...');
+        // Retry with a more explicit prompt
+        const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
+${prompt}`;
+        response = await geminiAIService.generateResponse(retryPrompt);
+        flashcards = this.parseFlashcardResponse(response.content, request);
+      }
+      
       console.log('✅ Generated flashcards from text:', flashcards.length);
 
       return {
         flashcards,
-        setTitle,
-        setDescription,
+        setTitle: '',
+        setDescription: '',
         sourceText: request.textContent
       };
     } catch (error) {
       console.error('❌ Error generating flashcards from text:', error);
+      
+      // Check if this is an API overload error (503)
+      if (error instanceof Error && error.message.includes('503')) {
+        throw new Error('The AI service is currently overloaded. Please try again in a few minutes.');
+      }
+      
+      // Check if this is a fallback response that's not JSON
+      if (error instanceof Error && error.message.includes('No JSON found in response')) {
+        throw new Error('Unable to generate flashcards at this time. The AI service is experiencing issues. Please try again later.');
+      }
+      
       throw new Error(`Failed to generate flashcards from text: ${error}`);
     }
   }
@@ -116,30 +154,37 @@ Requirements:
 - For answers with lists, use proper spacing and formatting
 - Use line breaks and bullet points for better readability
 
-IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON. Use this exact structure:
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
+- You MUST respond with ONLY valid JSON - absolutely no other text
+- Do NOT include explanatory text, code examples, or any other content
+- Do NOT use markdown formatting like \`\`\`json\`\`\`
+- Do NOT include "Here are the flashcards:" or similar introductory text
+- Categories and tags must reflect the ACTUAL subject matter of the content, not user preferences
+- Your response must start with { and end with }
 
+REQUIRED JSON FORMAT (copy this exactly):
 {
   "flashcards": [
     {
       "question": "Clear, specific question",
       "answer": "Comprehensive, educational answer",
-      "category": "Topic category",
+      "category": "Topic category based on actual content",
       "difficulty": "${difficulty}",
       "tags": ["tag1", "tag2"]
     }
   ]
 }
 
-CRITICAL: 
-- No markdown formatting (no \`\`\`json\`\`\`)
-- No explanatory text before or after
-- No trailing commas
-- Valid JSON syntax only
-- Each flashcard must have all required fields`;
+FINAL REMINDER:
+- Your entire response must be valid JSON only
+- No explanatory text, no code blocks, no markdown
+- Start with { and end with }
+- Each flashcard must have all required fields
+- Categories and tags must reflect the actual subject matter, not user preferences`;
 
-    // Add user profile context if available
+    // Add user profile context if available (for personalization, not categorization)
     if (userProfileContext) {
-      prompt += `\n\n${userProfileContext}`;
+      prompt += `\n\nPERSONALIZATION CONTEXT (use for explanation style, not for categories/tags):\n${userProfileContext}`;
     }
 
     return prompt;
@@ -147,18 +192,24 @@ CRITICAL:
 
   private parseFlashcardResponse(response: string, request: FlashcardGenerationRequest): Flashcard[] {
     try {
+      console.log('🔍 Parsing flashcard response:', response.substring(0, 200) + '...');
+      
       // Try to extract JSON from the response
       let jsonString = response.trim();
       
-      // Try to find JSON block between ```json and ``` or just ``` and ```
+      // First, try to find JSON block between ```json and ``` or just ``` and ```
       const codeBlockMatch = jsonString.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (codeBlockMatch) {
         jsonString = codeBlockMatch[1];
+        console.log('✅ Found JSON in code block');
       } else {
-        // Try to find JSON object
-        const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonString = jsonMatch[0];
+        // Try to find JSON object - look for the first { and last }
+        const firstBrace = jsonString.indexOf('{');
+        const lastBrace = jsonString.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+          console.log('✅ Found JSON object in response');
         } else {
           throw new Error('No JSON found in response');
         }
@@ -172,13 +223,15 @@ CRITICAL:
         .replace(/\s+/g, ' ')    // Normalize whitespace
         .trim();
 
-      console.log('Cleaned JSON string:', jsonString);
+      console.log('🧹 Cleaned JSON string:', jsonString.substring(0, 100) + '...');
 
       const parsed = JSON.parse(jsonString);
       
       if (!parsed.flashcards || !Array.isArray(parsed.flashcards)) {
-        throw new Error('Invalid flashcard format');
+        throw new Error('Invalid flashcard format - missing flashcards array');
       }
+
+      console.log(`✅ Successfully parsed ${parsed.flashcards.length} flashcards`);
 
       return parsed.flashcards.map((card: any, index: number) => ({
         id: `flashcard_${Date.now()}_${index}`,
@@ -270,10 +323,6 @@ CRITICAL:
     return flashcards;
   }
 
-  private generateSetTitle(fileName: string, topic?: string): string {
-    const baseName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension
-    return topic ? `${baseName} - ${topic}` : `${baseName} Flashcards`;
-  }
 
   private buildTextFlashcardPrompt(request: FlashcardGenerationRequest): string {
     const { count = 10, difficulty = 'medium', format = 'q&a', topic, textContent } = request;
@@ -296,49 +345,42 @@ Requirements:
 - For answers with lists, use proper spacing and formatting
 - Use line breaks and bullet points for better readability
 
-IMPORTANT: You must respond with ONLY valid JSON. Do not include any text before or after the JSON. Use this exact structure:
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
+- You MUST respond with ONLY valid JSON - absolutely no other text
+- Do NOT include explanatory text, code examples, or any other content
+- Do NOT use markdown formatting like \`\`\`json\`\`\`
+- Do NOT include "Here are the flashcards:" or similar introductory text
+- Categories and tags must reflect the ACTUAL subject matter of the content, not user preferences
+- Your response must start with { and end with }
 
+REQUIRED JSON FORMAT (copy this exactly):
 {
   "flashcards": [
     {
       "question": "Clear, specific question",
       "answer": "Comprehensive, educational answer",
-      "category": "Topic category",
+      "category": "Topic category based on actual content",
       "difficulty": "${difficulty}",
       "tags": ["tag1", "tag2"]
     }
   ]
 }
 
-CRITICAL: 
-- No markdown formatting (no \`\`\`json\`\`\`)
-- No explanatory text before or after
-- No trailing commas
-- Valid JSON syntax only
-- Each flashcard must have all required fields`;
+FINAL REMINDER:
+- Your entire response must be valid JSON only
+- No explanatory text, no code blocks, no markdown
+- Start with { and end with }
+- Each flashcard must have all required fields
+- Categories and tags must reflect the actual subject matter, not user preferences`;
 
-    // Add user profile context if available
+    // Add user profile context if available (for personalization, not categorization)
     if (userProfileContext) {
-      prompt += `\n\n${userProfileContext}`;
+      prompt += `\n\nPERSONALIZATION CONTEXT (use for explanation style, not for categories/tags):\n${userProfileContext}`;
     }
 
     return prompt;
   }
 
-  private generateSetDescription(document: ProcessedDocument, request: FlashcardGenerationRequest): string {
-    const topicText = request.topic ? ` focusing on ${request.topic}` : '';
-    return `Flashcards generated from ${document.fileName}${topicText}. ${document.summary || 'Study these key concepts to master the material.'}`;
-  }
-
-  private generateTextSetTitle(topic?: string): string {
-    return topic ? `${topic} Flashcards` : 'Text-Based Flashcards';
-  }
-
-  private generateTextSetDescription(request: FlashcardGenerationRequest): string {
-    const topicText = request.topic ? ` focusing on ${request.topic}` : '';
-    const textPreview = request.textContent ? request.textContent.substring(0, 100) + '...' : '';
-    return `Flashcards generated from text content${topicText}. ${textPreview}`;
-  }
 
   createFlashcardSet(
     title: string, 

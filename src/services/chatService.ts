@@ -136,8 +136,7 @@ class GeminiChatService implements ChatService {
 **Coming Soon:** Direct code execution support will be added to this AI assistant!
 
 Would you like me to help you with anything else about the code, such as explaining how it works or suggesting improvements?`,
-          timestamp: new Date().toISOString(),
-          sessionId: context.sessionId
+          timestamp: new Date()
         };
 
         // Add the guidance message to the session
@@ -582,7 +581,12 @@ The document content above contains all the information needed to provide compre
       'flashcards for',
       'flashcards about',
       'study cards',
-      'quiz cards'
+      'quiz cards',
+      'flashcard',
+      'study set',
+      'quiz set',
+      'learning cards',
+      'memory cards'
     ];
     
     const hasFlashcardKeyword = flashcardKeywords.some(keyword => lowerMessage.includes(keyword));
@@ -662,8 +666,8 @@ The document content above contains all the information needed to provide compre
       
       // Create flashcard set
       const flashcardSet = flashcardService.createFlashcardSet(
-        response.setTitle,
-        response.setDescription,
+        '',
+        '',
         response.flashcards,
         response.sourceDocumentId ? [response.sourceDocumentId] : undefined
       );
@@ -675,9 +679,6 @@ The document content above contains all the information needed to provide compre
         id: `msg_${Date.now()}_${++this.messageCounter}`,
         role: 'assistant',
         content: `I've successfully created ${response.flashcards.length} flashcards for you.
-
-**Set Title:** ${response.setTitle}
-**Description:** ${response.setDescription}
 
 Your flashcards are now ready for study. You can view them by clicking the "View Flashcards" button in the header, or simply ask me to "show my flashcards" to study them directly in the chat.`,
         timestamp: new Date(),
@@ -696,10 +697,41 @@ Your flashcards are now ready for study. You can view them by clicking the "View
     } catch (error) {
       console.error('❌ Error generating flashcards:', error);
       
+      let errorContent = '';
+      if (error instanceof Error) {
+        if (error.message.includes('overloaded')) {
+          errorContent = `🚫 **Service Temporarily Unavailable**
+
+The AI service is currently experiencing high demand and is temporarily overloaded. This is a common issue that usually resolves within a few minutes.
+
+**What you can do:**
+- Wait 2-3 minutes and try again
+- The service will automatically retry your request
+- Your request has been queued and will be processed when capacity is available
+
+This is not an issue with your request - it's just high server load. Please try again in a few minutes!`;
+        } else if (error.message.includes('experiencing issues')) {
+          errorContent = `⚠️ **Temporary Service Issue**
+
+I'm having trouble generating flashcards right now due to a temporary service issue. This usually resolves quickly.
+
+**Please try:**
+- Waiting a moment and trying again
+- Using a simpler request like "create flashcards about [topic]"
+- Checking back in a few minutes
+
+Your request was valid - this is just a temporary technical issue.`;
+        } else {
+          errorContent = `I apologize, but I had trouble generating flashcards for you. Please try again with a more specific request, like "create flashcards about photosynthesis" or "generate flashcards for my uploaded document".`;
+        }
+      } else {
+        errorContent = `I apologize, but I had trouble generating flashcards for you. Please try again with a more specific request, like "create flashcards about photosynthesis" or "generate flashcards for my uploaded document".`;
+      }
+      
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}_${++this.messageCounter}`,
         role: 'assistant',
-        content: `I apologize, but I had trouble generating flashcards for you. Please try again with a more specific request, like "create flashcards about photosynthesis" or "generate flashcards for my uploaded document".`,
+        content: errorContent,
         timestamp: new Date()
       };
 

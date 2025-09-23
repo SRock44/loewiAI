@@ -768,7 +768,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   {message.flashcardSet && (
                     <div className="flashcard-message-hint">
                       <span className="hint-text">Click to view flashcards</span>
-                      <span className="hint-icon">👆</span>
                     </div>
                   )}
                   <div className="message-time">
