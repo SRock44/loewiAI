@@ -3,6 +3,54 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight } from 'solar-icons';
 import './UserProfile.css';
 
+// Helper component for profile images with error handling
+const ProfileImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const handleImageError = () => {
+    console.warn('Failed to load profile image:', src);
+    setImageError(true);
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
+  if (imageError) {
+    return (
+      <div className={`avatar-placeholder ${className || ''}`}>
+        {alt.charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {!imageLoaded && (
+        <div className={`avatar-placeholder ${className || ''}`}>
+          {alt.charAt(0).toUpperCase()}
+        </div>
+      )}
+      <img 
+        src={src} 
+        alt={alt}
+        className={className}
+        crossOrigin="anonymous"
+        referrerPolicy="no-referrer"
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        style={{ 
+          display: imageLoaded ? 'block' : 'none',
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover'
+        }}
+      />
+    </>
+  );
+};
+
 const UserProfile: React.FC = () => {
   const { user, signOut, isAuthenticated } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -25,7 +73,7 @@ const UserProfile: React.FC = () => {
       >
         <div className="profile-avatar">
           {user.picture ? (
-            <img src={user.picture} alt={user.name} />
+            <ProfileImage src={user.picture} alt={user.name} />
           ) : (
             <div className="avatar-placeholder">
               {user.name.charAt(0).toUpperCase()}
@@ -45,7 +93,7 @@ const UserProfile: React.FC = () => {
             <div className="user-info">
               <div className="user-avatar">
                 {user.picture ? (
-                  <img src={user.picture} alt={user.name} />
+                  <ProfileImage src={user.picture} alt={user.name} />
                 ) : (
                   <div className="avatar-placeholder">
                     {user.name.charAt(0).toUpperCase()}
