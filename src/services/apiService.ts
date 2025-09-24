@@ -19,7 +19,7 @@ class ApiService {
 
   constructor() {
     // In production, this would come from environment variables
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   }
 
   // Document upload endpoint

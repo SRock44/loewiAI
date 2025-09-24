@@ -104,7 +104,7 @@ export class CodeExecutor {
       return {
         success: false,
         output: '',
-        error: `Execution error: ${error.message}`,
+        error: `Execution error: ${error instanceof Error ? error.message : String(error)}`,
         executionTime: Date.now() - startTime,
         language
       };
@@ -126,11 +126,12 @@ export class CodeExecutor {
         });
       }, this.executionTimeout);
 
+      // Capture console output
+      const originalLog = console.log;
+      const originalError = console.error;
+      const originalWarn = console.warn;
+
       try {
-        // Capture console output
-        const originalLog = console.log;
-        const originalError = console.error;
-        const originalWarn = console.warn;
         
         let output = '';
         
@@ -186,7 +187,7 @@ export class CodeExecutor {
         resolve({
           success: false,
           output: '',
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           executionTime: Date.now() - startTime,
           language: 'javascript'
         });
@@ -204,7 +205,7 @@ export class CodeExecutor {
     try {
       // Basic Python syntax validation
       const lines = code.split('\n');
-      let indentLevel = 0;
+      // let indentLevel = 0;
       let inString = false;
       let stringChar = '';
       
@@ -253,7 +254,7 @@ export class CodeExecutor {
       return {
         success: false,
         output: '',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         executionTime: Date.now() - startTime,
         language: 'python'
       };
@@ -279,7 +280,7 @@ export class CodeExecutor {
       return {
         success: false,
         output: '',
-        error: `JSON parsing error: ${error.message}`,
+        error: `JSON parsing error: ${error instanceof Error ? error.message : String(error)}`,
         executionTime: Date.now() - startTime,
         language: 'json'
       };

@@ -17,6 +17,7 @@ export interface ChatSession {
   messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
+  lastActivityAt?: Date; // Track last activity for cleanup
   documentIds: string[]; // Documents available in this chat context
 }
 

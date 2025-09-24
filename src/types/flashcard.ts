@@ -19,6 +19,8 @@ export interface FlashcardSet {
   flashcards: Flashcard[];
   createdAt: Date;
   updatedAt: Date;
+  lastActivityAt?: Date; // Track last activity for cleanup
+  expiresAt?: Date; // 24-hour expiration for flashcard sets
   sourceDocumentIds?: string[];
   tags?: string[];
 }

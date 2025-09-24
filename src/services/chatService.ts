@@ -1,11 +1,13 @@
 import { ChatMessage, ChatSession, ChatContext, ChatService } from '../types/chat';
-import { authService } from './authService';
-import { geminiAIService, AIResponse } from './geminiService';
+import { firebaseAuthService } from './firebaseAuthService';
+import { firebaseAILogicService, AIResponse } from './firebaseAILogicService';
 import { documentProcessor } from './documentProcessor';
 import { flashcardService } from './flashcardService';
 import { FlashcardGenerationRequest } from '../types/flashcard';
 import { codeValidator, CodeValidationResult } from './codeValidator';
-import { codeExecutor, CodeExecutionResult } from './codeExecutor';
+import { codeExecutor } from './codeExecutor';
+import { firebaseService } from './firebaseService';
+import { automaticCleanupService } from './automaticCleanupService';
 
 // Enhanced Chat Service with Gemini AI integration
 class GeminiChatService implements ChatService {
@@ -14,14 +16,131 @@ class GeminiChatService implements ChatService {
   private storageKey = 'academic-ai-chat-sessions';
 
   constructor() {
-    console.log('🏗️ ChatService constructor called');
     this.loadFromStorage();
+    this.cleanupEmptySessions();
+    this.syncWithFirebase();
+    this.setupRealtimeSync();
+    this.setupAuthStateListener();
+    
+    // Start automatic cleanup service
+    automaticCleanupService.startAutomaticCleanup();
+  }
+
+  // Sync with Firebase
+  private async syncWithFirebase() {
+    const user = firebaseAuthService.getCurrentUser();
+    if (!user) return;
+
+    try {
+      const firebaseSessions = await firebaseService.getChatSessions(user.id);
+      
+      // Merge Firebase sessions with local sessions, but only if they have valid conversations
+      firebaseSessions.forEach(session => {
+        if (this.hasValidConversation(session)) {
+          this.sessions.set(session.id, session);
+        }
+      });
+      
+      // Only save local sessions to Firebase if they don't already exist in Firebase
+      // This prevents duplicate sessions from being created
+      for (const [, session] of this.sessions) {
+        if (this.hasValidConversation(session) && !session.id.startsWith('firebase_')) {
+          try {
+            await firebaseService.saveChatSession(session, user.id);
+          } catch (error) {
+            // Error saving session to Firebase
+          }
+        }
+      }
+      
+      // Clean up any duplicate sessions that may exist
+      try {
+        const duplicatesRemoved = await firebaseService.cleanupDuplicateSessions(user.id);
+        if (duplicatesRemoved > 0) {
+          // Reload sessions after cleanup
+          const cleanSessions = await firebaseService.getChatSessions(user.id);
+          this.sessions.clear();
+          cleanSessions.forEach(session => {
+            if (this.hasValidConversation(session)) {
+              this.sessions.set(session.id, session);
+            }
+          });
+        }
+      } catch (error) {
+        // Error cleaning up duplicates
+      }
+      
+      // Firebase sync completed
+    } catch (error) {
+      // Firebase sync failed silently
+    }
+  }
+
+  // Setup real-time synchronization with Firebase
+  private setupRealtimeSync() {
+    const user = firebaseAuthService.getCurrentUser();
+    if (!user) return;
+
+    try {
+      
+      // Subscribe to real-time chat session updates
+      const unsubscribe = firebaseService.subscribeToChatSessions(user.id, (sessions) => {
+        
+        // Update local sessions with Firebase data, but only if they have valid conversations
+        sessions.forEach(session => {
+          if (this.hasValidConversation(session)) {
+            this.sessions.set(session.id, session);
+          }
+        });
+        
+        // Save to local storage for offline access
+        this.saveToStorage();
+      });
+
+      // Store unsubscribe function for cleanup
+      (this as any).unsubscribeFirebase = unsubscribe;
+      
+      // Real-time Firebase sync enabled
+    } catch (error) {
+      // Failed to setup real-time sync
+    }
+  }
+
+  // Setup authentication state listener for cross-device sync
+  private setupAuthStateListener() {
+    try {
+      
+      // Listen for authentication state changes
+      const unsubscribeAuth = firebaseAuthService.onAuthStateChange((user) => {
+        if (user) {
+          // User signed in, sync with Firebase
+          this.syncWithFirebase();
+          this.setupRealtimeSync();
+        } else {
+          // User signed out, clear local sessions
+          this.sessions.clear();
+          this.saveToStorage();
+          
+          // Cleanup Firebase listeners
+          if ((this as any).unsubscribeFirebase) {
+            (this as any).unsubscribeFirebase();
+            (this as any).unsubscribeFirebase = null;
+          }
+        }
+      });
+
+      // Store auth unsubscribe function for cleanup
+      (this as any).unsubscribeAuth = unsubscribeAuth;
+      
+      // Auth state listener enabled
+    } catch (error) {
+      // Failed to setup auth state listener
+    }
   }
 
   private loadFromStorage() {
-    const user = authService.getCurrentUser();
+    const user = firebaseAuthService.getCurrentUser();
     if (!user) {
-      console.log('⚠️ Not loading chat history - user not authenticated');
       // Clear sessions for unauthenticated users
       this.sessions.clear();
       this.messageCounter = 0;
@@ -30,15 +149,13 @@ class GeminiChatService implements ChatService {
 
     try {
       const stored = localStorage.getItem(this.storageKey);
-      console.log('📂 Loading chat sessions from storage for user:', user.email);
       
       if (stored) {
         const data = JSON.parse(stored);
-        console.log('📊 Found stored data:', data);
         
         // Only load sessions if they belong to the current user
         if (data.userId === user.id) {
-          this.sessions = new Map(data.sessions.map((s: any) => [s.id, {
+          const loadedSessions = data.sessions.map((s: any) => ({
             ...s,
             createdAt: new Date(s.createdAt),
             updatedAt: new Date(s.updatedAt),
@@ -46,9 +163,16 @@ class GeminiChatService implements ChatService {
               ...m,
               timestamp: new Date(m.timestamp)
             }))
-          }]));
+          }));
+          
+          // Filter out empty sessions and only keep valid conversations
+          const validSessions = loadedSessions.filter((session: ChatSession) => 
+            this.hasValidConversation(session)
+          );
+          
+          this.sessions = new Map(validSessions.map((s: ChatSession) => [s.id, s]));
           this.messageCounter = data.messageCounter || 0;
-          console.log('✅ Loaded', this.sessions.size, 'sessions for user:', user.email);
+          // Loaded sessions for user
         } else {
           console.log('⚠️ Stored sessions belong to different user, clearing');
           // Clear sessions if they belong to a different user
@@ -67,7 +191,7 @@ class GeminiChatService implements ChatService {
 
   private saveToStorage() {
     // Only save chat history if user is authenticated
-    const user = authService.getCurrentUser();
+    const user = firebaseAuthService.getCurrentUser();
     if (!user) {
       console.log('⚠️ Not saving chat history - user not authenticated');
       return; // Don't save chat history for unauthenticated users
@@ -80,10 +204,9 @@ class GeminiChatService implements ChatService {
         userId: user.id // Associate sessions with user
       };
       localStorage.setItem(this.storageKey, JSON.stringify(data));
-      console.log('✅ Saved chat sessions to storage for user:', user.email);
-      console.log('📊 Sessions saved:', this.sessions.size);
+      // Sessions saved to storage
     } catch (error) {
-      console.error('❌ Error saving chat sessions to storage:', error);
+      // Error saving chat sessions to storage
     }
   }
 
@@ -150,8 +273,8 @@ Would you like me to help you with anything else about the code, such as explain
       // Build conversation history context
       const conversationContext = this.buildConversationContext(context.sessionId);
       
-      // Get AI response from Gemini
-      const aiResponse: AIResponse = await geminiAIService.generateResponse(
+      // Get AI response from Firebase AI Logic Service
+      const aiResponse: AIResponse = await firebaseAILogicService.generateResponse(
         message, 
         documentContext,
         conversationContext
@@ -176,7 +299,7 @@ Would you like me to help you with anything else about the code, such as explain
       }
 
       // Execute code blocks silently for validation (no user display)
-      const executionResults = await codeExecutor.executeCodeBlocks(finalContent);
+      await codeExecutor.executeCodeBlocks(finalContent);
       // Note: Execution results are not displayed to users, only used for internal validation
 
       const assistantMessage: ChatMessage = {
@@ -196,6 +319,43 @@ Would you like me to help you with anything else about the code, such as explain
         this.updateSessionTitleIfNeeded(session, message);
         
         this.saveToStorage();
+        
+        // Save messages to Firebase for cross-device sync
+        const user = firebaseAuthService.getCurrentUser();
+        if (user) {
+          try {
+            // Check if this is the first message in the session
+            const isFirstMessage = session.messages.length === 2; // user + assistant message
+            
+            if (isFirstMessage) {
+              // Save the entire session to Firebase for the first time
+              const firebaseSessionId = await firebaseService.saveChatSession(session, user.id);
+              
+              // Update local session with Firebase ID for consistency
+              session.id = firebaseSessionId;
+              this.sessions.set(firebaseSessionId, session);
+              this.sessions.delete(context.sessionId); // Remove old local ID
+              
+              // Update the context session ID for future messages
+              context.sessionId = firebaseSessionId;
+            } else {
+              // Save individual messages to existing Firebase session
+              await firebaseService.saveMessage(context.sessionId, userMessage);
+              await firebaseService.saveMessage(context.sessionId, assistantMessage);
+              
+              // Update session timestamp in Firebase for cleanup tracking
+              await firebaseService.updateChatSession(context.sessionId, { 
+                updatedAt: new Date(),
+                lastActivityAt: new Date(), // Track last activity for cleanup
+                messages: session.messages // Update the full messages array
+              });
+            }
+            
+            // Messages saved to Firebase for cross-device sync
+          } catch (error) {
+            // Continue execution even if Firebase save fails
+          }
+        }
       }
 
       return assistantMessage;
@@ -227,6 +387,25 @@ Would you like me to help you with anything else about the code, such as explain
   }
 
   async createNewSession(title?: string): Promise<ChatSession> {
+    // Check if there's already an empty session that we can reuse
+    const existingEmptySession = Array.from(this.sessions.values()).find(session => 
+      !this.hasValidConversation(session)
+    );
+    
+    if (existingEmptySession) {
+      // Return the existing empty session instead of creating a new one
+      return existingEmptySession;
+    }
+    
+    // Double-check: if we already have an empty session, don't create another one
+    const allSessions = Array.from(this.sessions.values());
+    const emptySessions = allSessions.filter(session => !this.hasValidConversation(session));
+    
+    if (emptySessions.length > 0) {
+      // Return the first empty session
+      return emptySessions[0];
+    }
+    
     const sessionId = `session_${Date.now()}`;
     const defaultTitle = title || this.generateSessionTitle();
     
@@ -241,7 +420,10 @@ Would you like me to help you with anything else about the code, such as explain
 
     this.sessions.set(sessionId, session);
     this.saveToStorage();
-    console.log('✅ Created new session:', session);
+    
+    // Note: We do NOT save empty sessions to Firebase
+    // Sessions will only be saved to Firebase when the first message is sent
+    
     return session;
   }
 
@@ -314,8 +496,31 @@ Would you like me to help you with anything else about the code, such as explain
   }
 
   async deleteSession(sessionId: string): Promise<void> {
+    console.log('🗑️ Deleting session:', sessionId);
+    
+    // Delete from local storage
     this.sessions.delete(sessionId);
     this.saveToStorage();
+    console.log('✅ Deleted from local storage');
+    
+    // Delete from Firebase
+    const user = firebaseAuthService.getCurrentUser();
+    if (user) {
+      try {
+        console.log('🔥 Deleting from Firebase...');
+        await firebaseService.deleteChatSession(sessionId);
+        console.log('✅ Deleted chat session from Firebase');
+        
+        // Also delete associated messages
+        await firebaseService.deleteSessionMessages(sessionId);
+        console.log('✅ Deleted session messages from Firebase');
+      } catch (error) {
+        console.error('❌ Firebase deletion failed:', error);
+        // Continue execution even if Firebase delete fails
+      }
+    } else {
+      console.log('⚠️ No user authenticated, skipping Firebase deletion');
+    }
   }
 
   async updateContext(sessionId: string, context: Partial<ChatContext>): Promise<void> {
@@ -330,9 +535,42 @@ Would you like me to help you with anything else about the code, such as explain
   }
 
   getSessions(): ChatSession[] {
-    return Array.from(this.sessions.values()).sort((a, b) => 
-      b.updatedAt.getTime() - a.updatedAt.getTime()
+    return Array.from(this.sessions.values())
+      .filter(session => this.hasValidConversation(session))
+      .sort((a, b) => {
+        const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : new Date(a.updatedAt).getTime();
+        const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : new Date(b.updatedAt).getTime();
+        return bTime - aTime;
+      });
+  }
+
+  // Check if a session has valid conversation content
+  private hasValidConversation(session: ChatSession): boolean {
+    if (!session.messages || session.messages.length === 0) {
+      return false;
+    }
+
+    // Check if there's at least one user message and one assistant response
+    const hasUserMessage = session.messages.some(msg => msg.role === 'user' && msg.content && msg.content.trim().length > 0);
+    const hasAssistantMessage = session.messages.some(msg => msg.role === 'assistant' && msg.content && msg.content.trim().length > 0);
+    
+    return hasUserMessage && hasAssistantMessage;
+  }
+
+  // Clean up empty sessions to prevent accumulation
+  private cleanupEmptySessions(): void {
+    const emptySessions = Array.from(this.sessions.entries()).filter(([_, session]) => 
+      !this.hasValidConversation(session)
     );
+    
+    // Keep only one empty session if any exist
+    if (emptySessions.length > 1) {
+      // Remove all but the first empty session
+      for (let i = 1; i < emptySessions.length; i++) {
+        this.sessions.delete(emptySessions[i][0]);
+      }
+      this.saveToStorage();
+    }
   }
 
   // Clear all chat data (called when user signs out)
@@ -363,7 +601,7 @@ Would you like me to help you with anything else about the code, such as explain
       }
     }
     console.log('Current sessions in memory:', this.sessions.size);
-    console.log('Current user:', authService.getCurrentUser());
+    console.log('Current user:', firebaseAuthService.getCurrentUser());
   }
 
 
@@ -388,7 +626,7 @@ ${originalContent}
 
 Please provide the corrected version with the same formatting and structure, but with all the errors fixed.`;
 
-      const correctedResponse = await geminiAIService.generateResponse(
+      const correctedResponse = await firebaseAILogicService.generateResponse(
         correctionPrompt,
         documentContext
       );
@@ -434,8 +672,7 @@ Please provide the corrected version with the same formatting and structure, but
       if (result.warnings.length > 0) {
         errorSummary += 'Warnings:\n';
         for (const warning of result.warnings) {
-          errorSummary += `- Line ${warning.line}: ${warning.message}\n`;
-        }
+          errorSummary += `- Line ${warning.line}: ${warning.message}\n`;        }
       }
       errorSummary += '\n';
     }
@@ -557,16 +794,16 @@ The document content above contains all the information needed to provide compre
 
   // Get AI provider info for debugging
   getAIProviderInfo(): string {
-    return geminiAIService.getCurrentProvider();
+    return firebaseAILogicService.getCurrentProvider();
   }
 
   getAvailableAIProviders(): string[] {
-    return geminiAIService.getAvailableProviders();
+    return firebaseAILogicService.getAvailableProviders();
   }
 
   // Test Gemini connection
   async testGeminiConnection(): Promise<boolean> {
-    return await geminiAIService.testConnection();
+    return await firebaseAILogicService.testConnection();
   }
 
   // Flashcard generation methods

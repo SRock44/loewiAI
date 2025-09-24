@@ -1,36 +1,49 @@
+import { firebaseService } from './firebaseService';
+import { firebaseAuthService } from './firebaseAuthService';
+
 export interface UserProfile {
   educationLevel: string;
   major: string;
 }
 
 export class UserProfileService {
-  private static readonly STORAGE_KEY = 'userProfile';
+  private static currentProfile: UserProfile | null = null;
+  private static currentUserId: string | null = null;
 
-  static getUserProfile(): UserProfile {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (stored) {
-        const profile = JSON.parse(stored);
-        return {
-          educationLevel: profile.educationLevel || '',
-          major: profile.major || ''
-        };
-      }
-    } catch (error) {
-      console.error('Error loading user profile:', error);
+  static async getUserProfile(): Promise<UserProfile> {
+    const user = firebaseAuthService.getCurrentUser();
+    if (!user) {
+      return { educationLevel: '', major: '' };
     }
-    
-    return {
-      educationLevel: '',
-      major: ''
-    };
+
+    // Return cached profile if available and user hasn't changed
+    if (this.currentProfile && this.currentUserId === user.id) {
+      return this.currentProfile;
+    }
+
+    try {
+      const settings = await firebaseService.getUserSettings(user.id);
+      this.currentProfile = settings;
+      this.currentUserId = user.id;
+      return settings;
+    } catch (error) {
+      // Error loading user profile
+      return { educationLevel: '', major: '' };
+    }
   }
 
-  static saveUserProfile(profile: UserProfile): void {
+  static async saveUserProfile(profile: UserProfile): Promise<void> {
+    const user = firebaseAuthService.getCurrentUser();
+    if (!user) {
+      throw new Error('User must be authenticated to save profile');
+    }
+
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(profile));
+      await firebaseService.saveUserSettings(user.id, profile);
+      this.currentProfile = profile;
+      this.currentUserId = user.id;
     } catch (error) {
-      console.error('Error saving user profile:', error);
+      throw new Error('Failed to save user profile');
     }
   }
 
@@ -47,8 +60,8 @@ export class UserProfileService {
     return levelMap[level] || level;
   }
 
-  static buildPersonalizationContext(): string {
-    const profile = this.getUserProfile();
+  static async buildPersonalizationContext(): Promise<string> {
+    const profile = await this.getUserProfile();
     
     if (!profile.educationLevel && !profile.major) {
       return '';

@@ -1,4 +1,4 @@
-import { geminiAIService } from './geminiService';
+import { firebaseAILogicService } from './firebaseAILogicService';
 import { 
   Flashcard, 
   FlashcardSet, 
@@ -7,22 +7,59 @@ import {
 } from '../types/flashcard';
 import { ProcessedDocument } from './documentProcessor';
 import { UserProfileService } from './userProfileService';
+import { firebaseService } from './firebaseService';
+import { firebaseAuthService } from './firebaseAuthService';
 
 export interface FlashcardService {
   generateFlashcards(request: FlashcardGenerationRequest, document?: ProcessedDocument): Promise<FlashcardGenerationResponse>;
   generateFlashcardsFromText(request: FlashcardGenerationRequest): Promise<FlashcardGenerationResponse>;
   createFlashcardSet(title: string, description: string, flashcards: Flashcard[], sourceDocumentIds?: string[]): FlashcardSet;
-  updateFlashcardMastery(flashcardId: string, masteryLevel: number): void;
+  updateFlashcardMastery(flashcardId: string, masteryLevel: number): Promise<void>;
   getFlashcardSets(): FlashcardSet[];
-  saveFlashcardSet(flashcardSet: FlashcardSet): void;
-  deleteFlashcardSet(setId: string): void;
+  saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void>;
+  deleteFlashcardSet(setId: string): Promise<void>;
 }
 
 class RealFlashcardService implements FlashcardService {
   private flashcardSets: FlashcardSet[] = [];
+  private currentUserId: string | null = null;
 
   constructor() {
-    this.loadFlashcardSets();
+    this.setupAuthListener();
+  }
+
+  private setupAuthListener() {
+    // Listen for auth state changes
+    const checkAuth = () => {
+      const user = firebaseAuthService.getCurrentUser();
+      if (user && user.id !== this.currentUserId) {
+        this.currentUserId = user.id;
+        this.loadFlashcardSets();
+      } else if (!user && this.currentUserId) {
+        this.currentUserId = null;
+        this.flashcardSets = [];
+      }
+    };
+
+    // Check auth state immediately
+    checkAuth();
+    
+    // Listen for auth state changes
+    setInterval(checkAuth, 1000);
+  }
+
+  private async loadFlashcardSets() {
+    if (!this.currentUserId) {
+      this.flashcardSets = [];
+      return;
+    }
+
+    try {
+      this.flashcardSets = await firebaseService.getFlashcardSets(this.currentUserId);
+    } catch (error) {
+      // Error loading flashcard sets from Firebase
+      this.flashcardSets = [];
+    }
   }
 
   async generateFlashcards(
@@ -37,11 +74,10 @@ class RealFlashcardService implements FlashcardService {
       throw new Error('Document is required for document-based flashcard generation');
     }
     
-    console.log('🎴 Generating flashcards for document:', document.fileName);
     
     try {
-      const prompt = this.buildFlashcardPrompt(request, document);
-      let response = await geminiAIService.generateResponse(prompt);
+      const prompt = await this.buildFlashcardPrompt(request, document);
+      let response = await firebaseAILogicService.generateResponse(prompt);
       
       // Try to parse the response
       let flashcards: Flashcard[];
@@ -53,11 +89,11 @@ class RealFlashcardService implements FlashcardService {
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
 ${prompt}`;
-        response = await geminiAIService.generateResponse(retryPrompt);
+        response = await firebaseAILogicService.generateResponse(retryPrompt);
         flashcards = this.parseFlashcardResponse(response.content, request);
       }
       
-      console.log('✅ Generated flashcards:', flashcards.length);
+      // Generated flashcards
 
       return {
         flashcards,
@@ -66,7 +102,7 @@ ${prompt}`;
         sourceDocumentId: document.id
       };
     } catch (error) {
-      console.error('❌ Error generating flashcards:', error);
+      // Error generating flashcards
       
       // Check if this is an API overload error (503)
       if (error instanceof Error && error.message.includes('503')) {
@@ -87,11 +123,10 @@ ${prompt}`;
       throw new Error('Text content is required for text-based flashcard generation');
     }
     
-    console.log('🎴 Generating flashcards from text content');
     
     try {
-      const prompt = this.buildTextFlashcardPrompt(request);
-      let response = await geminiAIService.generateResponse(prompt);
+      const prompt = await this.buildTextFlashcardPrompt(request);
+      let response = await firebaseAILogicService.generateResponse(prompt);
       
       // Try to parse the response
       let flashcards: Flashcard[];
@@ -103,11 +138,11 @@ ${prompt}`;
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
 ${prompt}`;
-        response = await geminiAIService.generateResponse(retryPrompt);
+        response = await firebaseAILogicService.generateResponse(retryPrompt);
         flashcards = this.parseFlashcardResponse(response.content, request);
       }
       
-      console.log('✅ Generated flashcards from text:', flashcards.length);
+      // Generated flashcards from text
 
       return {
         flashcards,
@@ -116,7 +151,7 @@ ${prompt}`;
         sourceText: request.textContent
       };
     } catch (error) {
-      console.error('❌ Error generating flashcards from text:', error);
+      // Error generating flashcards from text
       
       // Check if this is an API overload error (503)
       if (error instanceof Error && error.message.includes('503')) {
@@ -132,11 +167,11 @@ ${prompt}`;
     }
   }
 
-  private buildFlashcardPrompt(request: FlashcardGenerationRequest, document: ProcessedDocument): string {
+  private async buildFlashcardPrompt(request: FlashcardGenerationRequest, document: ProcessedDocument): Promise<string> {
     const { count = 10, difficulty = 'medium', format = 'q&a', topic } = request;
     
     // Get user profile context for personalization
-    const userProfileContext = UserProfileService.buildPersonalizationContext();
+    const userProfileContext = await UserProfileService.buildPersonalizationContext();
     
     let prompt = `You are an expert educational content creator. Generate ${count} high-quality flashcards based on the following document content.
 
@@ -192,7 +227,6 @@ FINAL REMINDER:
 
   private parseFlashcardResponse(response: string, request: FlashcardGenerationRequest): Flashcard[] {
     try {
-      console.log('🔍 Parsing flashcard response:', response.substring(0, 200) + '...');
       
       // Try to extract JSON from the response
       let jsonString = response.trim();
@@ -201,7 +235,7 @@ FINAL REMINDER:
       const codeBlockMatch = jsonString.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (codeBlockMatch) {
         jsonString = codeBlockMatch[1];
-        console.log('✅ Found JSON in code block');
+        // Found JSON in code block
       } else {
         // Try to find JSON object - look for the first { and last }
         const firstBrace = jsonString.indexOf('{');
@@ -209,7 +243,7 @@ FINAL REMINDER:
         
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
           jsonString = jsonString.substring(firstBrace, lastBrace + 1);
-          console.log('✅ Found JSON object in response');
+          // Found JSON object in response
         } else {
           throw new Error('No JSON found in response');
         }
@@ -223,7 +257,6 @@ FINAL REMINDER:
         .replace(/\s+/g, ' ')    // Normalize whitespace
         .trim();
 
-      console.log('🧹 Cleaned JSON string:', jsonString.substring(0, 100) + '...');
 
       const parsed = JSON.parse(jsonString);
       
@@ -231,7 +264,7 @@ FINAL REMINDER:
         throw new Error('Invalid flashcard format - missing flashcards array');
       }
 
-      console.log(`✅ Successfully parsed ${parsed.flashcards.length} flashcards`);
+      // Successfully parsed flashcards
 
       return parsed.flashcards.map((card: any, index: number) => ({
         id: `flashcard_${Date.now()}_${index}`,
@@ -246,7 +279,7 @@ FINAL REMINDER:
         sourceDocumentId: request.documentId
       }));
     } catch (error) {
-      console.error('❌ Error parsing flashcard response:', error);
+      // Error parsing flashcard response
       
       // Fallback: create simple flashcards from the response
       return this.createFallbackFlashcards(response, request);
@@ -254,7 +287,6 @@ FINAL REMINDER:
   }
 
   private createFallbackFlashcards(response: string, request: FlashcardGenerationRequest): Flashcard[] {
-    console.log('Creating fallback flashcards from response:', response);
     
     // Try to extract questions and answers from the response
     const flashcards: Flashcard[] = [];
@@ -324,11 +356,11 @@ FINAL REMINDER:
   }
 
 
-  private buildTextFlashcardPrompt(request: FlashcardGenerationRequest): string {
+  private async buildTextFlashcardPrompt(request: FlashcardGenerationRequest): Promise<string> {
     const { count = 10, difficulty = 'medium', format = 'q&a', topic, textContent } = request;
     
     // Get user profile context for personalization
-    const userProfileContext = UserProfileService.buildPersonalizationContext();
+    const userProfileContext = await UserProfileService.buildPersonalizationContext();
     
     let prompt = `You are an expert educational content creator. Generate ${count} high-quality flashcards based on the following text content.
 
@@ -400,8 +432,9 @@ FINAL REMINDER:
     };
   }
 
-  updateFlashcardMastery(flashcardId: string, masteryLevel: number): void {
+  async updateFlashcardMastery(flashcardId: string, masteryLevel: number): Promise<void> {
     // Find and update the flashcard in all sets
+    let updatedSet: FlashcardSet | undefined;
     this.flashcardSets.forEach(set => {
       const flashcard = set.flashcards.find(card => card.id === flashcardId);
       if (flashcard) {
@@ -409,64 +442,57 @@ FINAL REMINDER:
         flashcard.lastReviewed = new Date();
         flashcard.reviewCount += 1;
         set.updatedAt = new Date();
+        updatedSet = set;
       }
     });
     
-    this.saveFlashcardSets();
+    // Save to Firebase if we found an updated set
+    if (updatedSet && this.currentUserId) {
+      try {
+        await firebaseService.updateFlashcardSet(updatedSet.id, updatedSet);
+      } catch (error) {
+        // Failed to update flashcard set in Firebase
+      }
+    }
   }
 
   getFlashcardSets(): FlashcardSet[] {
     return [...this.flashcardSets];
   }
 
-  saveFlashcardSet(flashcardSet: FlashcardSet): void {
-    const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
-    
-    if (existingIndex >= 0) {
-      this.flashcardSets[existingIndex] = flashcardSet;
-    } else {
-      this.flashcardSets.push(flashcardSet);
+  async saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void> {
+    if (!this.currentUserId) {
+      throw new Error('User must be authenticated to save flashcard sets');
     }
-    
-    this.saveFlashcardSets();
-  }
 
-  deleteFlashcardSet(setId: string): void {
-    this.flashcardSets = this.flashcardSets.filter(set => set.id !== setId);
-    this.saveFlashcardSets();
-  }
-
-  private loadFlashcardSets(): void {
     try {
-      const saved = localStorage.getItem('flashcard_sets');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        this.flashcardSets = parsed.map((set: any) => ({
-          ...set,
-          createdAt: new Date(set.createdAt),
-          updatedAt: new Date(set.updatedAt),
-          flashcards: set.flashcards.map((card: any) => ({
-            ...card,
-            createdAt: new Date(card.createdAt),
-            lastReviewed: card.lastReviewed ? new Date(card.lastReviewed) : undefined
-          }))
-        }));
-        console.log('📚 Loaded flashcard sets:', this.flashcardSets.length);
+      await firebaseService.saveFlashcardSet(flashcardSet, this.currentUserId);
+      
+      // Update local cache
+      const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
+      if (existingIndex >= 0) {
+        this.flashcardSets[existingIndex] = flashcardSet;
+      } else {
+        this.flashcardSets.push(flashcardSet);
       }
     } catch (error) {
-      console.error('❌ Error loading flashcard sets:', error);
-      this.flashcardSets = [];
+      throw new Error('Failed to save flashcard set');
     }
   }
 
-  private saveFlashcardSets(): void {
+  async deleteFlashcardSet(setId: string): Promise<void> {
+    if (!this.currentUserId) {
+      throw new Error('User must be authenticated to delete flashcard sets');
+    }
+
     try {
-      localStorage.setItem('flashcard_sets', JSON.stringify(this.flashcardSets));
-      console.log('💾 Saved flashcard sets:', this.flashcardSets.length);
+      await firebaseService.deleteFlashcardSet(setId, this.currentUserId);
+      this.flashcardSets = this.flashcardSets.filter(set => set.id !== setId);
     } catch (error) {
-      console.error('❌ Error saving flashcard sets:', error);
+      throw new Error('Failed to delete flashcard set');
     }
   }
+
 }
 
 // Export singleton instance

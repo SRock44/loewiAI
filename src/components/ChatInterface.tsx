@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
-import { Card, Lightbulb, Calendar, Document, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
+import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
@@ -53,7 +53,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     onDocumentsChange,
     onNewSession 
   } = props;
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +66,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
 
   // Example prompts to cycle through
@@ -111,8 +111,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               target.textContent = originalText;
               target.style.color = '';
             }, 2000);
-          }).catch(err => {
-            console.error('Failed to copy code:', err);
+          }).catch(() => {
+            // Failed to copy code
           });
         }
       }
@@ -217,15 +217,23 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   }, [isAuthenticated]);
 
+  // Notify parent component when documents are uploaded
+  useEffect(() => {
+    if (onDocumentsChange && uploadedFiles.length > 0) {
+      const completedDocs = uploadedFiles.filter(f => f.uploadStatus === 'completed');
+      if (completedDocs.length > 0) {
+        onDocumentsChange(completedDocs);
+      }
+    }
+  }, [uploadedFiles, onDocumentsChange]);
+
   const loadSessions = () => {
     if (!isAuthenticated) {
       return;
     }
 
-    console.log('📂 Loading sessions for authenticated user:', user?.email);
     chatService.reloadForUser();
     const existingSessions = chatService.getSessions();
-    console.log('📊 Found existing sessions:', existingSessions.length);
     setSessions(existingSessions);
     
     if (existingSessions.length > 0) {
@@ -268,7 +276,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         try {
           existingFlashcards = JSON.parse(sessionFlashcards);
         } catch (error) {
-          console.error('Error parsing existing session flashcards:', error);
+          // Error parsing existing session flashcards
         }
       }
       
@@ -296,13 +304,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         try {
           existingFlashcards = JSON.parse(sessionFlashcards);
         } catch (error) {
-          console.error('Error parsing existing session flashcards:', error);
+          // Error parsing existing session flashcards
         }
       }
       
       const updatedFlashcards = existingFlashcards.map((set: FlashcardSet) => set.id === updatedSet.id ? updatedSet : set);
       sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
-      console.log('Updated flashcard set in session storage for session:', currentSession.id);
     }
   };
 
@@ -368,18 +375,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         // Use documentProcessor directly to get full ProcessedDocument
         const processedDocument = await documentProcessor.processDocument(file);
         
-        console.log('📄 Processed document result:', {
-          id: processedDocument.id,
-          fileName: processedDocument.fileName,
-          summary: processedDocument.summary,
-          keyTopics: processedDocument.keyTopics,
-          contentLength: processedDocument.extractedContent.length,
-          contentPreview: processedDocument.extractedContent.substring(0, 200)
-        });
+        // Store processed document data for use in chat context
         
         // Update with processed data
         setUploadedFiles(prev => {
-          const updated = prev.map(f => 
+          return prev.map(f => 
             f.id === uploadedFile.id 
               ? { 
                   ...f, 
@@ -390,20 +390,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 }
               : f
           );
-          
-          return updated;
         });
-        
-        // Notify parent component of completed documents (outside setState)
-        setTimeout(() => {
-          setUploadedFiles(current => {
-            const completedDocs = current.filter(f => f.uploadStatus === 'completed');
-            if (completedDocs.length > 0 && onDocumentsChange) {
-              onDocumentsChange(completedDocs);
-            }
-            return current;
-          });
-        }, 0);
 
         // Show success message
         const successMessage: ChatMessage = {
@@ -439,18 +426,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
-    console.log('🚀 Attempting to send message:', content);
-    console.log('📊 Current session:', currentSession);
-    console.log('🔐 Is authenticated:', isAuthenticated);
 
     // Create a session if one doesn't exist
     let session = currentSession;
     if (!session) {
-      console.log('📝 Creating new session...');
       session = await chatService.createNewSession();
       setCurrentSession(session);
       setSessions(prev => [session!, ...prev]);
-      console.log('✅ New session created:', session);
       
       // Dispatch custom event to notify other components
       window.dispatchEvent(new CustomEvent('sessionUpdated'));
@@ -479,17 +461,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         currentTopic: 'general',
         processedDocuments: processedDocs
       };
-
-      console.log('📤 Sending to chat service with context:', context);
-      console.log('📄 Processed documents available:', processedDocs.length);
-      console.log('📄 Processed documents details:', processedDocs.map(doc => ({
-        id: doc.id,
-        fileName: doc.fileName,
-        contentLength: doc.extractedContent.length,
-        contentPreview: doc.extractedContent.substring(0, 200)
-      })));
       const response = await chatService.sendMessage(content.trim(), context);
-      console.log('📥 Received response:', response);
       setMessages(prev => [...prev, response]);
       
       // Chat sessions are automatically managed by the chat service
@@ -506,7 +478,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         setSessions(updatedSessions);
       }
     } catch (error) {
-      console.error('❌ Error sending message:', error);
+      // Error sending message
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}`,
         role: 'assistant',
@@ -521,8 +493,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('📝 Form submitted with input:', inputValue);
-    console.log('⏳ Is loading:', isLoading);
     sendMessage(inputValue);
   };
 
@@ -599,14 +569,14 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           if (languageDef && typeof languageDef === 'object') {
             highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
           } else {
-            console.warn(`Invalid language definition for: ${prismLang}`);
+            // Invalid language definition
           }
         } catch (error) {
-          console.warn(`Failed to highlight code for language: ${prismLang}`, error);
+          // Failed to highlight code
           highlightedCode = cleanCode;
         }
       } else if (lang !== 'text') {
-        console.warn(`Language not supported: ${prismLang}`);
+        // Language not supported
       }
       
       return `<div class="code-block-container">
@@ -659,7 +629,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       case 'Calendar':
         return <Calendar {...iconProps} />;
       case 'Document':
-        return <Document {...iconProps} />;
+        return <DocumentIcon {...iconProps} />;
       case 'Edit':
         return <Pen {...iconProps} />;
       case 'QuestionCircle':
@@ -671,7 +641,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       case 'Card':
         return <Card {...iconProps} />;
       default:
-        return <Document {...iconProps} />;
+        return <DocumentIcon {...iconProps} />;
     }
   };
 
@@ -771,7 +741,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                     </div>
                   )}
                   <div className="message-time">
-                    {message.timestamp.toLocaleTimeString()}
+                    {message.timestamp instanceof Date 
+                      ? message.timestamp.toLocaleTimeString()
+                      : new Date(message.timestamp).toLocaleTimeString()
+                    }
                   </div>
                 </div>
               </div>
@@ -886,7 +859,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}
                   className="send-btn"
-                  onClick={() => console.log('🔘 Send button clicked')}
+                  onClick={() => {}}
                 >
                   {isLoading ? (
                     <div className="loading-spinner"></div>

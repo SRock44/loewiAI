@@ -11,7 +11,7 @@ export interface DashboardRef {
 }
 
 const Dashboard = forwardRef<DashboardRef>((_, ref) => {
-  const { } = useAuth();
+  useAuth(); // Authentication context
   const [uploadedDocuments, setUploadedDocuments] = useState<DocumentMetadata[]>([]);
   const chatInterfaceRef = useRef<ChatInterfaceRef>(null);
 

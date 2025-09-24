@@ -24,6 +24,13 @@ function App() {
     }
   };
 
+  const handleChatDelete = (chatId: string) => {
+    // If the deleted chat was the current chat, clear the current chat
+    if (currentChatId === chatId) {
+      setCurrentChatId(undefined);
+    }
+  };
+
   // No need for handleAddChatToHistory - we use the actual chat service
 
   return (
@@ -33,6 +40,7 @@ function App() {
           <Layout 
             onCreateNewChat={handleCreateNewChat}
             onChatSelect={handleChatSelect}
+            onChatDelete={handleChatDelete}
             currentChatId={currentChatId}
           >
             <Routes>

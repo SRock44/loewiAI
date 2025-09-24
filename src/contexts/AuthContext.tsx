@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { AuthState, AuthContextType } from '../types/auth';
-import { authService } from '../services/authService';
+import { firebaseAuthService } from '../services/firebaseAuthService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -18,44 +18,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     initializeAuth();
+    
+    // Listen for Firebase Auth state changes
+    const unsubscribe = firebaseAuthService.onAuthStateChange((user) => {
+      setAuthState({
+        user,
+        isLoading: false,
+        isAuthenticated: user !== null,
+        error: null
+      });
+    });
+
+    // Cleanup listener on unmount
+    return unsubscribe;
   }, []);
 
   const initializeAuth = async () => {
-    try {
-      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      const user = authService.getCurrentUser();
-      
-      if (user && authService.isTokenValid()) {
-        setAuthState({
-          user,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null
-        });
-      } else {
-        setAuthState({
-          user: null,
-          isLoading: false,
-          isAuthenticated: false,
-          error: null
-        });
-      }
-    } catch (error) {
-      setAuthState({
-        user: null,
-        isLoading: false,
-        isAuthenticated: false,
-        error: error instanceof Error ? error.message : 'Authentication failed'
-      });
-    }
+    // Firebase Auth handles initialization automatically
+    // We just need to listen for state changes
+    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
   };
 
   const signInWithGoogle = async () => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      const user = await authService.signInWithGoogle();
+      const user = await firebaseAuthService.signInWithGoogle();
       
       setAuthState({
         user,
@@ -76,7 +64,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
       
-      await authService.signOut();
+      await firebaseAuthService.signOut();
       
       setAuthState({
         user: null,
@@ -95,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const user = authService.getCurrentUser();
+      const user = await firebaseAuthService.getCurrentUser();
       
       if (user) {
         setAuthState(prev => ({

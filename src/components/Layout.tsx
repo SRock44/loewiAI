@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import UserSettings from './UserSettings';
-import { Home, ChatSquare, AddSquare, Card, Document } from 'solar-icons';
+import { Home, ChatSquare, AddSquare, Card, Document as DocumentIcon } from 'solar-icons';
 import FlashcardList from './FlashcardList';
 import { useAllFlashcards } from '../hooks/useAllFlashcards';
 import { chatService } from '../services/chatService';
@@ -111,12 +111,13 @@ interface LayoutProps {
   children: React.ReactNode;
   onCreateNewChat?: () => void;
   onChatSelect?: (chatId: string) => void;
+  onChatDelete?: (chatId: string) => void;
   currentChatId?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect, currentChatId }) => {
+const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect, onChatDelete, currentChatId }) => {
   const location = useLocation();
-  const { isAuthenticated, user, signInWithGoogle, signOut, isLoading } = useAuth();
+  const { isAuthenticated, signInWithGoogle, signOut, isLoading } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showFlashcardList, setShowFlashcardList] = useState(false);
   const [showIndividualFlashcard, setShowIndividualFlashcard] = useState(false);
@@ -199,6 +200,21 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const handleChatSelect = (chatId: string) => {
     if (onChatSelect) {
       onChatSelect(chatId);
+    }
+  };
+
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      await chatService.deleteSession(chatId);
+      // Refresh chat sessions
+      setChatSessions(chatService.getSessions());
+      // Notify parent component that a chat was deleted
+      if (onChatDelete) {
+        onChatDelete(chatId);
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      alert('Failed to delete chat. Please try again.');
     }
   };
 
@@ -296,16 +312,27 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                 const summary = firstMessage ? `Chat about: ${firstMessage.content.substring(0, 100)}${firstMessage.content.length > 100 ? '...' : ''}` : 'New conversation';
                 
                 return (
-                  <button
-                    key={session.id}
-                    className={`nav-item chat-history-item ${currentChatId === session.id ? 'active' : ''}`}
-                    onClick={() => handleChatSelect(session.id)}
-                    title={summary}
-                  >
-                    <span className="nav-icon chat-number">
-                      {index + 1}
-                    </span>
-                  </button>
+                  <div key={session.id} className="chat-history-item-container">
+                    <button
+                      className={`nav-item chat-history-item ${currentChatId === session.id ? 'active' : ''}`}
+                      onClick={() => handleChatSelect(session.id)}
+                      title={summary}
+                    >
+                      <span className="nav-icon chat-number">
+                        {index + 1}
+                      </span>
+                    </button>
+                    <button
+                      className="delete-chat-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChat(session.id);
+                      }}
+                      title="Delete chat"
+                    >
+                      ×
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -320,7 +347,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                 title={flashcardSets.length > 0 ? `View your flashcard sets (${flashcardSets.length})` : "No flashcards yet - click to create some"}
               >
                 <span className="nav-icon">
-                  {flashcardSets.length > 0 ? <Card size={16} /> : <Document size={16} />}
+                  {flashcardSets.length > 0 ? <Card size={16} /> : <DocumentIcon size={16} />}
                 </span>
               </button>
             </div>

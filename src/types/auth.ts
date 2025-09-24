@@ -41,7 +41,7 @@ export const AUTH_STORAGE_KEY = 'academic-ai-auth';
 export const USER_STORAGE_KEY = 'academic-ai-user';
 
 // Google OAuth Configuration
-export const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 export const GOOGLE_SCOPES = [
   'openid',
   'profile',

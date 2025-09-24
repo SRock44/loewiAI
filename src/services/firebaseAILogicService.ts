@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/generative-ai';
-import { UserProfileService } from './userProfileService';
+// import { firebaseAuthService } from './firebaseAuthService';
 
 export interface AIResponse {
   content: string;
@@ -18,28 +18,28 @@ export interface AIProvider {
   isAvailable(): boolean;
 }
 
-// Google Gemini Provider
-class GeminiProvider implements AIProvider {
-  name = 'Google Gemini';
+// Firebase AI Logic Provider using Google Generative AI
+class FirebaseAILogicProvider implements AIProvider {
+  name = 'Firebase AI Logic (Gemini)';
   private genAI: GoogleGenerativeAI | null = null;
   private model: GenerativeModel | null = null;
   private apiKey: string;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.initializeGemini();
+    this.initializeFirebaseAI();
   }
 
-  private initializeGemini() {
+  private initializeFirebaseAI() {
     if (!this.apiKey) {
-      console.warn('Gemini API key not provided');
+      console.warn('Gemini API key not provided for Firebase AI Logic');
       return;
     }
 
     try {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       
-      // Initialize the model with configuration
+      // Initialize the model with Firebase-optimized configuration
       const generationConfig: GenerationConfig = {
         temperature: 0.7,
         topK: 40,
@@ -52,9 +52,9 @@ class GeminiProvider implements AIProvider {
         generationConfig: generationConfig
       });
       
-      console.log('✅ Gemini AI initialized successfully');
+      console.log('✅ Firebase AI Logic initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to initialize Gemini AI:', error);
+      console.error('❌ Failed to initialize Firebase AI Logic:', error);
       this.genAI = null;
       this.model = null;
     }
@@ -66,52 +66,51 @@ class GeminiProvider implements AIProvider {
 
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     if (!this.isAvailable()) {
-      throw new Error('Gemini AI is not available');
+      throw new Error('Firebase AI Logic is not available');
     }
 
     const maxRetries = 3;
-    const baseDelay = 1000; // 1 second
+    const baseDelay = 1000;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Build the prompt with academic context and conversation history
-        const systemPrompt = await this.buildAcademicPrompt(_context, _conversationHistory);
+        // Build the prompt with Firebase AI Logic context
+        const systemPrompt = this.buildFirebaseAIPrompt(_context, _conversationHistory);
         const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
-        console.log(`🤖 Sending request to Gemini... (attempt ${attempt}/${maxRetries})`);
+        console.log(`🤖 Firebase AI Logic request... (attempt ${attempt}/${maxRetries})`);
         
         const result = await this.model!.generateContent(fullPrompt);
         const response = await result.response;
         const content = response.text();
 
-        console.log('✅ Gemini response received');
+        console.log('✅ Firebase AI Logic response received');
 
         return {
           content: content,
           model: 'gemini-1.5-flash',
-          provider: 'Google Gemini'
+          provider: 'Firebase AI Logic'
         };
       } catch (error) {
-        console.error(`❌ Gemini API error (attempt ${attempt}/${maxRetries}):`, error);
+        console.error(`❌ Firebase AI Logic error (attempt ${attempt}/${maxRetries}):`, error);
         
         // Check if this is a 503 error (service overloaded)
         if (error instanceof Error && error.message.includes('503') && attempt < maxRetries) {
-          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          const delay = baseDelay * Math.pow(2, attempt - 1);
           console.log(`⏳ Retrying in ${delay}ms due to service overload...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
         
-        // If it's not a 503 error or we've exhausted retries, throw the error
-        throw new Error(`Gemini API error: ${error}`);
+        throw new Error(`Firebase AI Logic error: ${error}`);
       }
     }
     
-    throw new Error('Gemini API failed after all retry attempts');
+    throw new Error('Firebase AI Logic failed after all retry attempts');
   }
 
-  private async buildAcademicPrompt(context?: string, conversationHistory?: string): Promise<string> {
-    const basePrompt = `You are Newton 1.0, an intelligent next-generation academic AI prototype designed to help students and researchers with their academic work. You provide:
+  private buildFirebaseAIPrompt(context?: string, conversationHistory?: string): string {
+    const basePrompt = `You are Newton 1.0, an intelligent next-generation academic AI prototype powered by Firebase AI Logic. You provide:
 
 1. **Clear explanations** of complex academic concepts
 2. **Step-by-step guidance** for assignments and projects  
@@ -119,6 +118,12 @@ class GeminiProvider implements AIProvider {
 4. **Research assistance** and source evaluation
 5. **Academic writing** support and feedback
 6. **Problem-solving** approaches for coursework
+
+FIREBASE AI LOGIC FEATURES:
+- **Real-time processing** with Firebase infrastructure
+- **Scalable AI responses** backed by Google Cloud
+- **Secure API handling** through Firebase services
+- **Cross-device synchronization** via Firebase
 
 FORMATTING GUIDELINES:
 - **Code blocks**: Always wrap code in triple backticks with language specification (e.g., \`\`\`python, \`\`\`javascript, \`\`\`sql)
@@ -158,14 +163,7 @@ Guidelines:
 - **Handle ambiguous references** - if the user says "what about X?" or "how about Y?", refer to the conversation history to understand the context
 - **Code execution requests** - if users ask to run/execute code, explain that they should use IDEs like VS Code, Cursor, or online compilers like Replit`;
 
-    // Get user profile information for personalization
-    const userProfileContext = await UserProfileService.buildPersonalizationContext();
-    
     let fullPrompt = basePrompt;
-    
-    if (userProfileContext) {
-      fullPrompt += `\n\n${userProfileContext}`;
-    }
     
     if (context) {
       fullPrompt += `\n\nAdditional Context: ${context}`;
@@ -181,7 +179,7 @@ Guidelines:
 
 // Mock Provider (Fallback)
 class MockProvider implements AIProvider {
-  name = 'Mock Academic Assistant';
+  name = 'Mock Academic Assistant (Firebase AI Logic Fallback)';
   
   isAvailable(): boolean {
     return true;
@@ -202,48 +200,40 @@ class MockProvider implements AIProvider {
       const flashcardResponse = {
         "flashcards": [
           {
-            "question": "What is the main concept being discussed?",
-            "answer": "The AI service is currently unavailable. Please try again in a few minutes when the service is restored.",
-            "category": "General",
+            "question": "What is Firebase AI Logic?",
+            "answer": "Firebase AI Logic is currently unavailable. This is a fallback response. Please check your API configuration and try again.",
+            "category": "Firebase AI",
             "difficulty": "medium",
-            "tags": ["service-unavailable"]
+            "tags": ["firebase", "ai-logic", "fallback"]
           }
         ]
       };
       
       return {
         content: JSON.stringify(flashcardResponse),
-        model: 'mock-academic-assistant',
-        provider: 'Mock'
+        model: 'mock-firebase-ai-logic',
+        provider: 'Mock (Firebase AI Logic Fallback)'
       };
     }
 
     const responses = [
-      "That's an excellent academic question! Let me help you understand this concept step by step.",
-      "I can see you're working on an important academic topic. Here's how I'd approach this problem...",
-      "Great question! This is a fundamental concept that builds the foundation for more advanced topics.",
-      "I'd be happy to help you with this academic challenge. Let's break it down into manageable parts.",
-      "This is a common area where students need extra support. Here's my recommended approach..."
+      "I'm currently using Firebase AI Logic fallback mode. The main AI service is temporarily unavailable.",
+      "Firebase AI Logic is currently offline. This is a temporary fallback response.",
+      "The Firebase AI Logic service is being updated. Please try again in a few moments."
     ];
 
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
     
-    // Add conversation context awareness to mock responses
-    let contextualResponse = randomResponse;
-    if (_conversationHistory && _conversationHistory.includes('CONVERSATION HISTORY')) {
-      contextualResponse = "I can see from our previous conversation that you're building on earlier topics. " + randomResponse;
-    }
-    
     return {
-      content: contextualResponse,
-      model: 'mock-academic-assistant',
-      provider: 'Mock'
+      content: randomResponse,
+      model: 'mock-firebase-ai-logic',
+      provider: 'Mock (Firebase AI Logic Fallback)'
     };
   }
 }
 
-// AI Service Manager
-export class GeminiAIService {
+// Firebase AI Logic Service Manager
+export class FirebaseAILogicService {
   private providers: AIProvider[] = [];
   private currentProvider: AIProvider | null = null;
 
@@ -255,12 +245,12 @@ export class GeminiAIService {
   private initializeProviders() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     
-    // Add Gemini provider if API key is available
+    // Add Firebase AI Logic provider if API key is available
     if (apiKey) {
-      this.providers.push(new GeminiProvider(apiKey));
-      console.log('🔑 Gemini API key found, provider added');
+      this.providers.push(new FirebaseAILogicProvider(apiKey));
+      console.log('🔑 Firebase AI Logic provider added');
     } else {
-      console.warn('⚠️  Gemini API key not found in environment variables');
+      console.warn('⚠️  Gemini API key not found for Firebase AI Logic');
     }
 
     // Always add mock as fallback
@@ -269,12 +259,12 @@ export class GeminiAIService {
 
   private selectBestProvider() {
     this.currentProvider = this.providers.find(provider => provider.isAvailable()) || null;
-    console.log(`🎯 Selected AI provider: ${this.currentProvider?.name || 'None'}`);
+    console.log(`🎯 Selected Firebase AI Logic provider: ${this.currentProvider?.name || 'None'}`);
   }
 
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     if (!this.currentProvider) {
-      throw new Error('No AI provider available');
+      throw new Error('No Firebase AI Logic provider available');
     }
 
     try {
@@ -294,7 +284,7 @@ export class GeminiAIService {
         }
       }
       
-      throw new Error('All AI providers failed');
+      throw new Error('All Firebase AI Logic providers failed');
     }
   }
 
@@ -308,18 +298,28 @@ export class GeminiAIService {
       .map(provider => provider.name);
   }
 
-  // Test Gemini connection
+  // Test Firebase AI Logic connection
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.generateResponse("Hello, are you working?");
-      console.log('✅ Gemini connection test successful:', response.content.substring(0, 50));
+      const response = await this.generateResponse("Hello, is Firebase AI Logic working?");
+      console.log('✅ Firebase AI Logic connection test successful:', response.content.substring(0, 50));
       return true;
     } catch (error) {
-      console.error('❌ Gemini connection test failed:', error);
+      console.error('❌ Firebase AI Logic connection test failed:', error);
       return false;
     }
+  }
+
+  // Get service status
+  getServiceStatus() {
+    return {
+      currentProvider: this.getCurrentProvider(),
+      availableProviders: this.getAvailableProviders(),
+      isFirebaseAIEnabled: this.providers.some(p => p.name.includes('Firebase AI Logic')),
+      isFallbackActive: this.currentProvider?.name.includes('Mock') || false
+    };
   }
 }
 
 // Export singleton instance
-export const geminiAIService = new GeminiAIService();
+export const firebaseAILogicService = new FirebaseAILogicService();

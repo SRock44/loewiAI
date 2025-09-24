@@ -58,7 +58,7 @@ export class CodeValidator {
     const codeBlocks: CodeBlock[] = [];
     const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
     let match;
-    let lineNumber = 1;
+    // let lineNumber = 1;
 
     while ((match = codeBlockRegex.exec(content)) !== null) {
       const language = match[1] || 'text';
@@ -143,7 +143,7 @@ export class CodeValidator {
       result.errors.push({
         line: 1,
         column: 1,
-        message: `JavaScript syntax error: ${error.message}`,
+        message: `JavaScript syntax error: ${error instanceof Error ? error.message : String(error)}`,
         severity: 'error'
       });
     }
@@ -374,7 +374,7 @@ export class CodeValidator {
       result.errors.push({
         line: 1,
         column: 1,
-        message: `JSON syntax error: ${error.message}`,
+        message: `JSON syntax error: ${error instanceof Error ? error.message : String(error)}`,
         severity: 'error'
       });
     }
@@ -429,7 +429,7 @@ export class CodeValidator {
   /**
    * Check for common issues across all languages
    */
-  private checkCommonIssues(code: string, result: CodeValidationResult, language: string): void {
+  private checkCommonIssues(code: string, result: CodeValidationResult, _language: string): void {
     const lines = code.split('\n');
     
     for (let i = 0; i < lines.length; i++) {

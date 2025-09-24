@@ -131,6 +131,11 @@
   padding-top: 0.5rem;
 }
 
+.chat-history-item-container {
+  position: relative;
+  margin-bottom: 4px;
+}
+
 .chat-history-item {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -172,6 +177,36 @@
   text-overflow: ellipsis;
   z-index: 1000;
   pointer-events: none;
+}
+
+.delete-chat-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e53e3e;
+  color: white;
+  border: none;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.chat-history-item-container:hover .delete-chat-btn {
+  opacity: 1;
+}
+
+.delete-chat-btn:hover {
+  background: #c53030;
+  transform: scale(1.1);
 }
 
 /* Flashcard Button */

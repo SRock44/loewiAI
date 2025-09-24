@@ -11,21 +11,41 @@ interface UserSettingsProps {
 const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose, onSignOut }) => {
   const [educationLevel, setEducationLevel] = useState<string>('');
   const [major, setMajor] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // Load saved settings using the service
-    const profile = UserProfileService.getUserProfile();
-    setEducationLevel(profile.educationLevel);
-    setMajor(profile.major);
-  }, []);
+    if (isOpen) {
+      loadUserProfile();
+    }
+  }, [isOpen]);
 
-  const handleSave = () => {
-    // Save settings using the service
-    UserProfileService.saveUserProfile({
-      educationLevel,
-      major
-    });
-    onClose();
+  const loadUserProfile = async () => {
+    setIsLoading(true);
+    try {
+      const profile = await UserProfileService.getUserProfile();
+      setEducationLevel(profile.educationLevel);
+      setMajor(profile.major);
+    } catch (error) {
+      // Error loading user profile
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await UserProfileService.saveUserProfile({
+        educationLevel,
+        major
+      });
+      onClose();
+    } catch (error) {
+      // Error saving user profile
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSignOut = () => {
@@ -46,41 +66,52 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose, onSignOut 
         </div>
         
         <div className="settings-content">
-          <div className="setting-group">
-            <label htmlFor="education-level">Education Level</label>
-            <select
-              id="education-level"
-              value={educationLevel}
-              onChange={(e) => setEducationLevel(e.target.value)}
-            >
-              <option value="">Select your education level</option>
-              <option value="high-school">High School</option>
-              <option value="associates">Associate's Degree</option>
-              <option value="bachelors">Bachelor's Degree</option>
-              <option value="masters">Master's Degree</option>
-              <option value="phd">PhD/Doctorate</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
+          {isLoading ? (
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <p>Loading your settings...</p>
+            </div>
+          ) : (
+            <>
+              <div className="setting-group">
+                <label htmlFor="education-level">Education Level</label>
+                <select
+                  id="education-level"
+                  value={educationLevel}
+                  onChange={(e) => setEducationLevel(e.target.value)}
+                  disabled={isSaving}
+                >
+                  <option value="">Select your education level</option>
+                  <option value="high-school">High School</option>
+                  <option value="associates">Associate's Degree</option>
+                  <option value="bachelors">Bachelor's Degree</option>
+                  <option value="masters">Master's Degree</option>
+                  <option value="phd">PhD/Doctorate</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
 
-          <div className="setting-group">
-            <label htmlFor="major">Major/Field of Study (Optional)</label>
-            <input
-              id="major"
-              type="text"
-              value={major}
-              onChange={(e) => setMajor(e.target.value)}
-              placeholder="e.g., Computer Science, Biology, Business..."
-            />
-          </div>
+              <div className="setting-group">
+                <label htmlFor="major">Major/Field of Study (Optional)</label>
+                <input
+                  id="major"
+                  type="text"
+                  value={major}
+                  onChange={(e) => setMajor(e.target.value)}
+                  placeholder="e.g., Computer Science, Biology, Business..."
+                  disabled={isSaving}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="settings-footer">
-          <button className="sign-out-btn" onClick={handleSignOut}>
+          <button className="sign-out-btn" onClick={handleSignOut} disabled={isSaving}>
             Sign Out
           </button>
-          <button className="save-btn" onClick={handleSave}>
-            Save Settings
+          <button className="save-btn" onClick={handleSave} disabled={isSaving || isLoading}>
+            {isSaving ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </div>

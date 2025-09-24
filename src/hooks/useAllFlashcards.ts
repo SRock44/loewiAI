@@ -16,58 +16,29 @@ export const useAllFlashcards = () => {
   const [flashcardSets, setFlashcardSets] = useState<FlashcardSet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load flashcards from both localStorage (global) and sessionStorage (per session)
+  // Load flashcards from Firebase (user-specific)
   const loadAllFlashcards = useCallback(() => {
     setIsLoading(true);
     try {
-      // Get global flashcard sets from localStorage
-      const globalSets = flashcardService.getFlashcardSets();
-      
-      // Get session-based flashcard sets from all sessions
-      const sessionSets: FlashcardSet[] = [];
-      
-      // Iterate through all sessionStorage keys to find flashcard data
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && key.startsWith('flashcards_')) {
-          try {
-            const sessionData = sessionStorage.getItem(key);
-            if (sessionData) {
-              const parsed = JSON.parse(sessionData);
-              if (Array.isArray(parsed)) {
-                sessionSets.push(...parsed);
-              }
-            }
-          } catch (error) {
-            console.error('Error parsing session flashcard data:', error);
-          }
-        }
-      }
-      
-      // Combine and deduplicate flashcard sets
-      const allSets = [...globalSets, ...sessionSets];
-      const uniqueSets = allSets.filter((set, index, self) => 
-        index === self.findIndex(s => s.id === set.id)
-      );
+      // Get flashcard sets from Firebase (user-specific)
+      const sets = flashcardService.getFlashcardSets();
       
       // Sort by creation date (newest first)
-      uniqueSets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      sets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      setFlashcardSets(uniqueSets);
-      console.log('📚 Loaded all flashcard sets:', uniqueSets.length, '(Global:', globalSets.length, 'Session:', sessionSets.length, ')');
+      setFlashcardSets(sets);
     } catch (error) {
-      console.error('Error loading all flashcards:', error);
+      // Error loading flashcards
       setFlashcardSets([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Save flashcards to appropriate storage
-  const saveFlashcardSet = useCallback((flashcardSet: FlashcardSet) => {
+  // Save flashcards to Firebase
+  const saveFlashcardSet = useCallback(async (flashcardSet: FlashcardSet) => {
     try {
-      // Save to global storage
-      flashcardService.saveFlashcardSet(flashcardSet);
+      await flashcardService.saveFlashcardSet(flashcardSet);
       
       // Reload all flashcards to get updated list
       loadAllFlashcards();
@@ -75,36 +46,14 @@ export const useAllFlashcards = () => {
       // Dispatch event to notify other components
       allFlashcardEventTarget.dispatchEvent(new FlashcardUpdateEvent(flashcardSets));
     } catch (error) {
-      console.error('Error saving flashcard set:', error);
+      // Error saving flashcard set
     }
   }, [flashcardSets, loadAllFlashcards]);
 
   // Update an existing flashcard set
-  const updateFlashcardSet = useCallback((updatedSet: FlashcardSet) => {
+  const updateFlashcardSet = useCallback(async (updatedSet: FlashcardSet) => {
     try {
-      // Save the updated set to global storage
-      flashcardService.saveFlashcardSet(updatedSet);
-      
-      // Update in session storage if it exists there
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && key.startsWith('flashcards_')) {
-          try {
-            const sessionData = sessionStorage.getItem(key);
-            if (sessionData) {
-              const parsed = JSON.parse(sessionData);
-              if (Array.isArray(parsed)) {
-                const updatedSessionData = parsed.map((set: FlashcardSet) => 
-                  set.id === updatedSet.id ? updatedSet : set
-                );
-                sessionStorage.setItem(key, JSON.stringify(updatedSessionData));
-              }
-            }
-          } catch (error) {
-            console.error('Error updating session flashcard data:', error);
-          }
-        }
-      }
+      await flashcardService.saveFlashcardSet(updatedSet);
       
       // Reload all flashcards
       loadAllFlashcards();
@@ -112,34 +61,14 @@ export const useAllFlashcards = () => {
       // Dispatch event
       allFlashcardEventTarget.dispatchEvent(new FlashcardUpdateEvent(flashcardSets));
     } catch (error) {
-      console.error('Error updating flashcard set:', error);
+      // Error updating flashcard set
     }
   }, [flashcardSets, loadAllFlashcards]);
 
   // Remove a flashcard set
-  const removeFlashcardSet = useCallback((setId: string) => {
+  const removeFlashcardSet = useCallback(async (setId: string) => {
     try {
-      // Remove from global storage
-      flashcardService.deleteFlashcardSet(setId);
-      
-      // Remove from session storage
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && key.startsWith('flashcards_')) {
-          try {
-            const sessionData = sessionStorage.getItem(key);
-            if (sessionData) {
-              const parsed = JSON.parse(sessionData);
-              if (Array.isArray(parsed)) {
-                const filteredSessionData = parsed.filter((set: FlashcardSet) => set.id !== setId);
-                sessionStorage.setItem(key, JSON.stringify(filteredSessionData));
-              }
-            }
-          } catch (error) {
-            console.error('Error removing from session flashcard data:', error);
-          }
-        }
-      }
+      await flashcardService.deleteFlashcardSet(setId);
       
       // Reload all flashcards
       loadAllFlashcards();
@@ -147,7 +76,7 @@ export const useAllFlashcards = () => {
       // Dispatch event
       allFlashcardEventTarget.dispatchEvent(new FlashcardUpdateEvent(flashcardSets));
     } catch (error) {
-      console.error('Error removing flashcard set:', error);
+      // Error removing flashcard set
     }
   }, [flashcardSets, loadAllFlashcards]);
 

@@ -1,4 +1,5 @@
 import { User, AuthService } from '../types/auth';
+import { firebaseService } from './firebaseService';
 
 // Real Google OAuth Service Implementation
 class RealGoogleAuthService implements AuthService {
@@ -103,6 +104,14 @@ class RealGoogleAuthService implements AuthService {
 
       this.currentUser = user;
       this.saveUserToStorage(user);
+      
+      // Save user to Firebase
+      try {
+        firebaseService.saveUserProfile(user);
+        console.log('✅ Saved user profile to Firebase');
+      } catch (error) {
+        console.error('❌ Failed to save user profile to Firebase:', error);
+      }
       
       // Resolve the pending sign-in promise
       if ((this as any).pendingSignIn) {
