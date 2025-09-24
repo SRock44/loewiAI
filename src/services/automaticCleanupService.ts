@@ -4,20 +4,20 @@ class AutomaticCleanupService {
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
 
-  // Start automatic cleanup (runs every hour)
+  // Start automatic cleanup (runs every hour for 24-hour deletion)
   startAutomaticCleanup(): void {
     if (this.isRunning) {
       console.log('🧹 Automatic cleanup is already running');
       return;
     }
 
-    console.log('🚀 Starting automatic cleanup service...');
+    console.log('🚀 Starting automatic cleanup service (24-hour deletion for chats/flashcards)...');
     this.isRunning = true;
 
     // Run cleanup immediately
     this.runCleanup();
 
-    // Then run every hour
+    // Then run every hour to ensure timely 24-hour deletion
     this.cleanupInterval = setInterval(() => {
       this.runCleanup();
     }, 60 * 60 * 1000); // 1 hour = 60 * 60 * 1000 ms
@@ -36,14 +36,15 @@ class AutomaticCleanupService {
   // Run cleanup manually
   async runCleanup(): Promise<void> {
     try {
-      console.log('🧹 Running automatic cleanup...');
+      console.log('🧹 Running automatic cleanup (24-hour deletion)...');
       const results = await firebaseService.runAutomaticCleanup();
       
       const total = results.expiredSessions + results.expiredFlashcards + results.duplicatesRemoved;
       if (total > 0) {
-        console.log(`✅ Cleanup completed: ${results.expiredSessions} expired sessions, ${results.expiredFlashcards} expired flashcards, ${results.duplicatesRemoved} duplicates removed`);
+        console.log(`✅ Cleanup completed: ${results.expiredSessions} expired sessions (24+ hours), ${results.expiredFlashcards} expired flashcards (24+ hours), ${results.duplicatesRemoved} duplicates removed`);
+        console.log('📝 Note: User settings are preserved for optimal user experience');
       } else {
-        console.log('✅ Cleanup completed: No expired data found');
+        console.log('✅ Cleanup completed: No expired data found (24+ hours old)');
       }
     } catch (error) {
       console.error('❌ Automatic cleanup failed:', error);

@@ -1,5 +1,16 @@
 // Chat Interface Types
 
+import { FlashcardSet } from './flashcard';
+import { ProcessedDocument } from '../services/documentProcessor';
+
+// Define missing types
+export interface CodeValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  suggestions: string[];
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -7,8 +18,8 @@ export interface ChatMessage {
   timestamp: Date;
   documentId?: string; // Reference to uploaded document if relevant
   isTyping?: boolean;
-  flashcardSet?: any; // FlashcardSet generated from this message
-  validationResults?: any; // CodeValidationResult[] from code validation
+  flashcardSet?: FlashcardSet; // FlashcardSet generated from this message
+  validationResults?: CodeValidationResult[]; // CodeValidationResult[] from code validation
 }
 
 export interface ChatSession {
@@ -25,7 +36,7 @@ export interface ChatContext {
   sessionId: string;
   documentIds: string[];
   currentTopic?: string;
-  processedDocuments?: any[]; // Will be ProcessedDocument[] but avoiding circular import
+  processedDocuments?: ProcessedDocument[]; // Processed documents in this chat context
   userPreferences?: {
     responseStyle: 'concise' | 'detailed' | 'conversational';
     expertiseLevel: 'beginner' | 'intermediate' | 'advanced';

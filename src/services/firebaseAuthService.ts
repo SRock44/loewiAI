@@ -53,9 +53,9 @@ class FirebaseAuthService implements AuthService {
       
       // Firebase Google sign-in successful
       return user;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Firebase Google sign-in failed
-      throw new Error(`Sign-in failed: ${error.message}`);
+      throw new Error(`Sign-in failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -64,9 +64,9 @@ class FirebaseAuthService implements AuthService {
       // Signing out
       await signOut(auth);
       // Sign-out successful
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Sign-out failed
-      throw new Error(`Sign-out failed: ${error.message}`);
+      throw new Error(`Sign-out failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

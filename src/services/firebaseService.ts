@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase-config';
 import { ChatSession, ChatMessage } from '../types/chat';
-import { FlashcardSet } from '../types/flashcard';
+import { FlashcardSet, Flashcard } from '../types/flashcard';
 import { User } from '../types/auth';
 
 export class FirebaseService {
@@ -112,7 +112,7 @@ export class FirebaseService {
     }
   }
 
-  private areMessagesSimilar(messages1: any[], messages2: any[]): boolean {
+  private areMessagesSimilar(messages1: ChatMessage[], messages2: ChatMessage[]): boolean {
     if (messages1.length !== messages2.length) return false;
     
     // Check first 3 messages for similarity
@@ -189,7 +189,7 @@ export class FirebaseService {
       const sessionRef = doc(db, 'chatSessions', sessionId);
       
       // Filter out invalid dates and convert valid dates to serverTimestamp
-      const cleanUpdates: any = {};
+      const cleanUpdates: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(updates)) {
         if (value instanceof Date && !isNaN(value.getTime())) {
           // Valid date - convert to serverTimestamp
@@ -386,7 +386,7 @@ export class FirebaseService {
     }
   }
 
-  private areFlashcardsSimilar(flashcards1: any[], flashcards2: any[]): boolean {
+  private areFlashcardsSimilar(flashcards1: Flashcard[], flashcards2: Flashcard[]): boolean {
     if (flashcards1.length !== flashcards2.length) return false;
     
     // Check first 3 flashcards for similarity
@@ -484,14 +484,14 @@ export class FirebaseService {
       // Get all sessions from all users
       const sessionsQuery = query(collection(db, 'chatSessions'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(sessionsQuery);
-      const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession & { id: string; userId: string }));
       
       console.log(`📊 Found ${sessions.length} total sessions`);
       
       // Group by user
-      const userSessions = new Map<string, any[]>();
+      const userSessions = new Map<string, (ChatSession & { id: string; userId: string })[]>();
       sessions.forEach(session => {
-        const userId = session.userId;
+        const userId = (session as any).userId;
         if (!userSessions.has(userId)) {
           userSessions.set(userId, []);
         }
@@ -503,7 +503,7 @@ export class FirebaseService {
       
       // Process each user
       for (const [, userSessionList] of userSessions) {
-        const duplicates = new Map<string, any[]>();
+        const duplicates = new Map<string, (ChatSession & { id: string })[]>();
         const toDelete: string[] = [];
         
         // Group sessions by title and message count
@@ -520,9 +520,9 @@ export class FirebaseService {
           if (group.length > 1) {
             // Sort by createdAt, keep newest
             group.sort((a, b) => {
-              const aTime = a.createdAt?.toDate?.() || new Date(0);
-              const bTime = b.createdAt?.toDate?.() || new Date(0);
-              return bTime.getTime() - aTime.getTime();
+              const aTime = (a.createdAt as any)?.toDate?.() || a.createdAt || new Date(0);
+              const bTime = (b.createdAt as any)?.toDate?.() || b.createdAt || new Date(0);
+              return new Date(bTime).getTime() - new Date(aTime).getTime();
             });
             
             // Mark for deletion
@@ -564,12 +564,13 @@ export class FirebaseService {
     }
   }
 
-  // Automatic cleanup methods
+  // Automatic cleanup methods - 24 hour deletion for chats and flashcards
   async cleanupExpiredSessions(): Promise<number> {
     try {
       const twentyFourHoursAgo = new Date();
       twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
       
+      // Clean up sessions older than 24 hours based on lastActivityAt
       const sessionsQuery = query(
         collection(db, 'chatSessions'),
         where('lastActivityAt', '<', twentyFourHoursAgo)
@@ -581,7 +582,12 @@ export class FirebaseService {
       let deletedCount = 0;
       for (const sessionDoc of expiredSessions) {
         try {
+          // Delete the session
           await deleteDoc(doc(db, 'chatSessions', sessionDoc.id));
+          
+          // Also delete associated messages
+          await this.deleteSessionMessages(sessionDoc.id);
+          
           deletedCount++;
         } catch (error) {
           console.error(`Error deleting expired session ${sessionDoc.id}:`, error);
@@ -589,7 +595,7 @@ export class FirebaseService {
       }
       
       if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} expired chat sessions`);
+        console.log(`🧹 Cleaned up ${deletedCount} expired chat sessions (24+ hours old)`);
       }
       
       return deletedCount;
@@ -602,18 +608,19 @@ export class FirebaseService {
   async cleanupExpiredFlashcards(): Promise<number> {
     try {
       const now = new Date();
+      const twentyFourHoursAgo = new Date();
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
       
-      // Clean up flashcards that have expired (expiresAt < now)
+      let deletedCount = 0;
+      
+      // Clean up flashcards that have expired (expiresAt < now) - 24 hour expiration
       const expiredFlashcardsQuery = query(
         collection(db, 'flashcardSets'),
         where('expiresAt', '<', now)
       );
       
-      const snapshot = await getDocs(expiredFlashcardsQuery);
-      const expiredFlashcards = snapshot.docs;
-      
-      let deletedCount = 0;
-      for (const flashcardDoc of expiredFlashcards) {
+      const expiredSnapshot = await getDocs(expiredFlashcardsQuery);
+      for (const flashcardDoc of expiredSnapshot.docs) {
         try {
           await deleteDoc(doc(db, 'flashcardSets', flashcardDoc.id));
           deletedCount++;
@@ -623,9 +630,7 @@ export class FirebaseService {
       }
       
       // Also clean up old flashcards without expiresAt field (backward compatibility)
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-      
+      // Delete any flashcard sets older than 24 hours based on createdAt
       const oldFlashcardsQuery = query(
         collection(db, 'flashcardSets'),
         where('createdAt', '<', twentyFourHoursAgo)
@@ -634,7 +639,7 @@ export class FirebaseService {
       const oldSnapshot = await getDocs(oldFlashcardsQuery);
       for (const flashcardDoc of oldSnapshot.docs) {
         const data = flashcardDoc.data();
-        // Only delete if it doesn't have an expiresAt field
+        // Only delete if it doesn't have an expiresAt field (backward compatibility)
         if (!data.expiresAt) {
           try {
             await deleteDoc(doc(db, 'flashcardSets', flashcardDoc.id));
@@ -646,7 +651,7 @@ export class FirebaseService {
       }
       
       if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} expired flashcard sets`);
+        console.log(`🧹 Cleaned up ${deletedCount} expired flashcard sets (24+ hours old)`);
       }
       
       return deletedCount;
@@ -706,9 +711,9 @@ export class FirebaseService {
       );
       
       const snapshot = await getDocs(sessionsQuery);
-      const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession & { id: string; userId: string }));
       
-      const duplicates = new Map<string, any[]>();
+      const duplicates = new Map<string, (ChatSession & { id: string; userId: string })[]>();
       const toDelete: string[] = [];
       
       // Group sessions by title and message content
@@ -724,7 +729,11 @@ export class FirebaseService {
       duplicates.forEach(group => {
         if (group.length > 1) {
           // Sort by createdAt, keep the newest
-          group.sort((a, b) => b.createdAt?.toDate?.() - a.createdAt?.toDate?.());
+          group.sort((a, b) => {
+            const aTime = (a.createdAt as any)?.toDate?.() || a.createdAt || new Date(0);
+            const bTime = (b.createdAt as any)?.toDate?.() || b.createdAt || new Date(0);
+            return new Date(bTime).getTime() - new Date(aTime).getTime();
+          });
           // Mark all but the first (newest) for deletion
           group.slice(1).forEach(session => {
             toDelete.push(session.id);
@@ -761,7 +770,7 @@ export class FirebaseService {
         where('userId', '==', userId)
       );
       const sessionsSnapshot = await getDocs(sessionsQuery);
-      const sessions = sessionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const sessions = sessionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession & { id: string }));
       
       // Count messages
       let totalMessages = 0;
@@ -784,7 +793,7 @@ export class FirebaseService {
       });
       
       // Check for duplicates
-      const duplicates = new Map<string, any[]>();
+      const duplicates = new Map<string, (ChatSession & { id: string })[]>();
       sessions.forEach(session => {
         const key = `${session.title}_${session.messages?.length || 0}`;
         if (!duplicates.has(key)) {

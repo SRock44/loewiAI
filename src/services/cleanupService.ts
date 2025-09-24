@@ -10,8 +10,8 @@ import {
 import { db } from '../firebase-config';
 
 export class CleanupService {
-  private readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
-  private readonly EXPIRY_TIME = 48 * 60 * 60 * 1000; // 48 hours
+  private readonly CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour - run cleanup every hour
+  private readonly EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 hours - delete data after 24 hours
   private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -23,7 +23,7 @@ export class CleanupService {
     // Run cleanup immediately on startup
     this.runCleanup();
     
-    // Set up periodic cleanup every 24 hours
+    // Set up periodic cleanup every hour to ensure timely deletion
     this.cleanupTimer = setInterval(() => {
       this.runCleanup();
     }, this.CLEANUP_INTERVAL);
@@ -83,19 +83,19 @@ export class CleanupService {
     }
   }
 
-  // Cleanup old flashcard sets
+  // Cleanup old flashcard sets - 24 hour deletion
   private async cleanupFlashcardSets(cutoffTime: Date): Promise<number> {
     try {
       const flashcardSetsRef = collection(db, 'flashcardSets');
       const now = new Date();
       
-      // Clean up old flashcard sets (48 hours)
+      // Clean up old flashcard sets (24 hours based on lastActivityAt)
       const oldSetsQuery = query(
         flashcardSetsRef,
         where('lastActivityAt', '<', Timestamp.fromDate(cutoffTime))
       );
       
-      // Clean up expired flashcard sets (24 hours)
+      // Clean up expired flashcard sets (24 hours based on expiresAt)
       const expiredSetsQuery = query(
         flashcardSetsRef,
         where('expiresAt', '<', Timestamp.fromDate(now))
@@ -108,13 +108,13 @@ export class CleanupService {
       
       let deletedCount = 0;
       
-      // Delete old sets
+      // Delete old sets (24+ hours old)
       for (const docSnapshot of oldSnapshot.docs) {
         await deleteDoc(doc(db, 'flashcardSets', docSnapshot.id));
         deletedCount++;
       }
       
-      // Delete expired sets
+      // Delete expired sets (24+ hours old)
       for (const docSnapshot of expiredSnapshot.docs) {
         await deleteDoc(doc(db, 'flashcardSets', docSnapshot.id));
         deletedCount++;
@@ -165,10 +165,10 @@ export class CleanupService {
     }
   }
 
-  // Manual cleanup for specific user (admin function)
+  // Manual cleanup for specific user (admin function) - preserves user settings
   public async cleanupUserData(userId: string): Promise<void> {
     try {
-      // Delete all chat sessions for user
+      // Delete all chat sessions for user (but preserve user settings)
       const chatSessionsRef = collection(db, 'chatSessions');
       const chatQuery = query(chatSessionsRef, where('userId', '==', userId));
       const chatSnapshot = await getDocs(chatQuery);
@@ -178,7 +178,7 @@ export class CleanupService {
         await this.deleteSessionMessages(docSnapshot.id);
       }
       
-      // Delete all flashcard sets for user
+      // Delete all flashcard sets for user (but preserve user settings)
       const flashcardSetsRef = collection(db, 'flashcardSets');
       const flashcardQuery = query(flashcardSetsRef, where('userId', '==', userId));
       const flashcardSnapshot = await getDocs(flashcardQuery);
@@ -186,6 +186,8 @@ export class CleanupService {
       for (const docSnapshot of flashcardSnapshot.docs) {
         await deleteDoc(doc(db, 'flashcardSets', docSnapshot.id));
       }
+      
+      // NOTE: User settings in 'users' collection are preserved for good UX
       
     } catch (error) {
       // Silent error handling
