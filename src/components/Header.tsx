@@ -32,7 +32,6 @@ const Header: React.FC = () => {
               <button
                 className="login-btn"
                 onClick={() => {
-                  console.log('Sign in button clicked');
                   signInWithGoogle().catch(error => {
                     console.error('Sign in error:', error);
                   });

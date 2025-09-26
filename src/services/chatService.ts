@@ -47,7 +47,6 @@ class GeminiChatService implements ChatService {
     }
 
     try {
-      console.log('🔄 Loading chat sessions from Firebase for user:', this.currentUserId);
       const firebaseSessions = await firebaseService.getChatSessions(this.currentUserId);
       
       // Sort sessions by updatedAt (newest first) and limit to 6
@@ -62,7 +61,6 @@ class GeminiChatService implements ChatService {
         this.sessions.set(session.id, session);
       });
       
-      console.log('✅ Loaded', this.sessions.size, 'chat sessions from Firebase (limited to 6)');
     } catch (error) {
       console.error('❌ Error loading chat sessions from Firebase:', error);
       this.sessions.clear();
@@ -151,13 +149,10 @@ Would you like me to help you with anything else about the code, such as explain
 
       // If there are code errors, attempt to fix them silently
       if (hasErrors) {
-        console.log('Code validation found errors, attempting to fix silently...');
         const correctedResponse = await this.attemptCodeCorrection(aiResponse.content, validationResults, documentContext);
         if (correctedResponse) {
           finalContent = correctedResponse;
-          console.log('Code correction successful');
         } else {
-          console.log('Code correction failed, using original code');
         }
       }
 
@@ -185,7 +180,6 @@ Would you like me to help you with anything else about the code, such as explain
         if (this.currentUserId) {
           try {
             await firebaseService.saveChatSession(session, this.currentUserId);
-            console.log('✅ Saved session to Firebase:', session.id);
             
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
@@ -252,7 +246,6 @@ Would you like me to help you with anything else about the code, such as explain
         if (this.currentUserId) {
           try {
             await firebaseService.saveChatSession(session, this.currentUserId);
-            console.log('✅ Saved session to Firebase:', session.id);
             
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
@@ -309,7 +302,6 @@ Would you like me to help you with anything else about the code, such as explain
     if (this.currentUserId) {
       try {
         const firebaseSessionId = await firebaseService.saveChatSession(session, this.currentUserId);
-        console.log('✅ Saved session to Firebase:', firebaseSessionId);
         
         // Update session with Firebase ID
         session.id = firebaseSessionId;
@@ -394,32 +386,26 @@ Would you like me to help you with anything else about the code, such as explain
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    console.log('🗑️ Deleting session:', sessionId);
     
     // Remove from memory
     this.sessions.delete(sessionId);
-    console.log('🗑️ Removed session from memory, current sessions count:', this.sessions.size);
     
     // Delete from Firebase
     if (this.currentUserId) {
       try {
-        console.log('🔥 Deleting from Firebase...');
         
         // Extract the actual Firebase document ID (remove firebase_ prefix if present)
         const firebaseDocId = sessionId.startsWith('firebase_') ? sessionId.replace('firebase_', '') : sessionId;
         
         await firebaseService.deleteChatSession(firebaseDocId);
-        console.log('✅ Deleted chat session from Firebase');
         
         // Also delete associated messages
         await firebaseService.deleteSessionMessages(firebaseDocId);
-        console.log('✅ Deleted session messages from Firebase');
       } catch (error) {
         console.error('❌ Firebase deletion failed:', error);
         throw error; // Re-throw error so UI can handle it
       }
     } else {
-      console.log('⚠️ No user authenticated, cannot delete from Firebase');
       throw new Error('User not authenticated');
     }
   }
@@ -435,7 +421,6 @@ Would you like me to help you with anything else about the code, such as explain
     if (this.currentUserId) {
       try {
         await firebaseService.saveChatSession(session, this.currentUserId);
-        console.log('✅ Saved session to Firebase:', session.id);
       } catch (error) {
         console.error('❌ Failed to save session to Firebase:', error);
       }
@@ -470,7 +455,6 @@ Would you like me to help you with anything else about the code, such as explain
 
   // Reload sessions when user authentication changes
   reloadForUser(): void {
-    console.log('🔄 Reloading chat service for user');
     this.loadSessionsFromFirebase();
   }
 
@@ -490,14 +474,12 @@ Would you like me to help you with anything else about the code, such as explain
       const sessionsToDelete = sortedSessions.slice(6); // Sessions beyond the limit
       
       if (sessionsToDelete.length > 0) {
-        console.log(`🧹 Cleaning up ${sessionsToDelete.length} old sessions`);
         
         // Delete old sessions from Firebase
         for (const session of sessionsToDelete) {
           const firebaseDocId = session.id.startsWith('firebase_') ? session.id.replace('firebase_', '') : session.id;
           await firebaseService.deleteChatSession(firebaseDocId);
           await firebaseService.deleteSessionMessages(firebaseDocId);
-          console.log(`🗑️ Deleted old session: ${session.title}`);
         }
         
         // Reload sessions to update local cache
@@ -540,11 +522,9 @@ Please provide the corrected version with the same formatting and structure, but
       const stillHasErrors = correctedValidationResults.some(result => !result.isValid || result.errors.length > 0);
 
       if (stillHasErrors) {
-        console.log('Corrected code still has errors, returning original with validation results');
         return null;
       }
 
-      console.log('Code correction successful');
       return correctedResponse.content;
     } catch (error) {
       console.error('Error during code correction:', error);
@@ -670,10 +650,6 @@ Please provide the corrected version with the same formatting and structure, but
     const documentSummaries = documentProcessor.getDocumentSummaries(processedDocuments);
     const documentContent = documentProcessor.getDocumentContent(processedDocuments, 3000);
 
-    console.log('📄 Document summaries:', documentSummaries);
-    console.log('📄 Document content length:', documentContent.length);
-    console.log('📄 Document content preview:', documentContent.substring(0, 300));
-    console.log('📄 Full document context being sent to Gemini:', documentContent);
 
     return `The user has uploaded ${processedDocuments.length} document(s) with the following content:
 
@@ -791,7 +767,6 @@ The document content above contains all the information needed to provide compre
     userMessage: ChatMessage
   ): Promise<ChatMessage> {
     try {
-      console.log('🎴 Generating flashcards from chat request:', request);
       
       let response;
       if (request.sourceType === 'document' && request.documentId) {
@@ -817,16 +792,13 @@ The document content above contains all the information needed to provide compre
       await flashcardService.saveFlashcardSet(flashcardSet);
       
       // Force reload of flashcard sets in the service
-      console.log('🔄 Forcing reload of flashcard sets...');
       await flashcardService.loadFlashcardSets();
       
       // Notify the flashcard system that new flashcards have been saved
       // This will trigger the useAllFlashcards hook to reload the data
-      console.log('📤 Dispatching flashcardUpdate event...');
       allFlashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate'));
       
       // Also dispatch a test event to verify the event system is working
-      console.log('🧪 Dispatching test event...');
       allFlashcardEventTarget.dispatchEvent(new CustomEvent('testEvent'));
       
       const assistantMessage: ChatMessage = {
@@ -848,7 +820,6 @@ Your flashcards are now ready for study. You can view them by clicking the "View
         if (this.currentUserId) {
           try {
             await firebaseService.saveChatSession(session, this.currentUserId);
-            console.log('✅ Saved session to Firebase:', session.id);
             
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
@@ -909,7 +880,6 @@ Your request was valid - this is just a temporary technical issue.`;
         if (this.currentUserId) {
           try {
             await firebaseService.saveChatSession(session, this.currentUserId);
-            console.log('✅ Saved session to Firebase:', session.id);
             
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));

@@ -62,7 +62,6 @@ export class FirebaseService {
       // Aggressive duplicate prevention - check for ANY similar session
       const existingSession = await this.findDuplicateSession(session, userId);
       if (existingSession) {
-        console.log(`🔄 Found duplicate session, updating existing instead of creating new one`);
         // Update existing session instead of creating duplicate
         const sessionRef = doc(db, 'chatSessions', existingSession.id);
         await updateDoc(sessionRef, {
@@ -77,7 +76,6 @@ export class FirebaseService {
       // Additional check: Look for sessions with same title and recent activity
       const recentDuplicate = await this.findRecentDuplicateSession(session, userId);
       if (recentDuplicate) {
-        console.log(`🔄 Found recent duplicate session, updating existing instead of creating new one`);
         const sessionRef = doc(db, 'chatSessions', recentDuplicate.id);
         await updateDoc(sessionRef, {
           ...session,
@@ -89,7 +87,6 @@ export class FirebaseService {
       }
 
       // Create new session only if no duplicates found
-      console.log(`✅ Creating new session: ${session.title}`);
       const docRef = await addDoc(collection(db, 'chatSessions'), {
         ...session,
         userId,
@@ -261,7 +258,6 @@ export class FirebaseService {
       );
       
       await Promise.all(deletePromises);
-      console.log('✅ Firebase: Session messages deleted successfully');
     } catch (error) {
       console.error('❌ Firebase: Error deleting session messages:', error);
       throw error;

@@ -518,7 +518,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setMessages(session.messages);
     } else {
       // Session was deleted, create a new blank chat
-      console.log('🔄 Session was deleted, creating new blank chat');
       createNewSession();
     }
   };

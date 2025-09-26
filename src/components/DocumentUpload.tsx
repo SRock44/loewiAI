@@ -274,8 +274,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <DocumentList 
         documents={uploadedFiles.filter(f => f.uploadStatus === 'completed')}
         onDocumentDelete={removeFile}
-        onDocumentSelect={(doc) => {
-          console.log('Document selected:', doc);
+        onDocumentSelect={() => {
           // TODO: Navigate to document analysis page
         }}
       />

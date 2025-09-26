@@ -131,8 +131,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const { flashcardSets, updateFlashcardSet, removeFlashcardSet } = useAllFlashcards();
   
-  // Debug flashcard sets
-  console.log('🎯 Layout component flashcard sets:', flashcardSets.length, flashcardSets);
   
   // Wrapper function to update both global flashcard sets and current flashcard set
   const handleFlashcardSetUpdate = (updatedSet: any) => {
@@ -266,7 +264,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               <button
                 className="sidebar-sign-in-btn"
                 onClick={() => {
-                  console.log('Sign in button clicked');
                   signInWithGoogle().catch(error => {
                     console.error('Sign in error:', error);
                   });
