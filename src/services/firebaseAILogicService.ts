@@ -69,7 +69,6 @@ class FirebaseAILogicProvider implements AIProvider {
             generationConfig: generationConfig
           });
           this.currentModelName = modelName;
-          console.log(`✅ Firebase AI Logic initialized with model: ${modelName}`);
           modelInitialized = true;
           break;
         } catch (modelError) {
@@ -105,13 +104,11 @@ class FirebaseAILogicProvider implements AIProvider {
         const systemPrompt = this.buildFirebaseAIPrompt(_context, _conversationHistory);
         const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
-        console.log(`🤖 Firebase AI Logic request... (attempt ${attempt}/${maxRetries})`);
         
         const result = await this.model!.generateContent(fullPrompt);
         const response = await result.response;
         const content = response.text();
 
-        console.log('✅ Firebase AI Logic response received');
 
         return {
           content: content,
@@ -282,7 +279,6 @@ export class FirebaseAILogicService {
     // Add Firebase AI Logic provider if API key is available
     if (apiKey) {
       this.providers.push(new FirebaseAILogicProvider(apiKey));
-      console.log('🔑 Firebase AI Logic provider added');
     } else {
       console.warn('⚠️  Gemini API key not found for Firebase AI Logic');
     }
@@ -293,7 +289,6 @@ export class FirebaseAILogicService {
 
   private selectBestProvider() {
     this.currentProvider = this.providers.find(provider => provider.isAvailable()) || null;
-    console.log(`🎯 Selected Firebase AI Logic provider: ${this.currentProvider?.name || 'None'}`);
   }
 
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
@@ -335,8 +330,7 @@ export class FirebaseAILogicService {
   // Test Firebase AI Logic connection
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.generateResponse("Hello, is Firebase AI Logic working?");
-      console.log('✅ Firebase AI Logic connection test successful:', response.content.substring(0, 50));
+      await this.generateResponse("Hello, is Firebase AI Logic working?");
       return true;
     } catch (error) {
       console.error('❌ Firebase AI Logic connection test failed:', error);

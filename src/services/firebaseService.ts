@@ -500,14 +500,12 @@ export class FirebaseService {
     usersProcessed: number;
   }> {
     try {
-      console.log('🔍 Starting aggressive duplicate cleanup...');
       
       // Get all sessions from all users
       const sessionsQuery = query(collection(db, 'chatSessions'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(sessionsQuery);
       const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession & { id: string; userId: string }));
       
-      console.log(`📊 Found ${sessions.length} total sessions`);
       
       // Group by user
       const userSessions = new Map<string, (ChatSession & { id: string; userId: string })[]>();
@@ -564,10 +562,6 @@ export class FirebaseService {
         }
       }
       
-      console.log(`✅ Aggressive cleanup complete!`);
-      console.log(`📊 Users processed: ${usersProcessed}`);
-      console.log(`📊 Duplicates removed: ${totalDuplicates}`);
-      console.log(`📊 Remaining sessions: ${sessions.length - totalDuplicates}`);
       
       return {
         totalSessions: sessions.length,
@@ -689,7 +683,6 @@ export class FirebaseService {
     duplicatesRemoved: number;
   }> {
     try {
-      console.log('🧹 Starting automatic cleanup...');
       
       // Run cleanup operations in parallel
       const [expiredSessions, expiredFlashcards, duplicatesRemoved] = await Promise.all([
@@ -700,7 +693,6 @@ export class FirebaseService {
       
       const total = expiredSessions + expiredFlashcards + duplicatesRemoved;
       if (total > 0) {
-        console.log(`✅ Automatic cleanup completed: ${expiredSessions} expired sessions, ${expiredFlashcards} expired flashcards, ${duplicatesRemoved} duplicates removed`);
       }
       
       return {

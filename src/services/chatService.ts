@@ -205,7 +205,6 @@ class GeminiChatService implements ChatService {
     // Only save chat history if user is authenticated
     const user = firebaseAuthService.getCurrentUser();
     if (!user) {
-      console.log('⚠️ Not saving chat history - user not authenticated');
       return; // Don't save chat history for unauthenticated users
     }
 
@@ -460,7 +459,6 @@ Would you like me to help you with anything else about the code, such as explain
       // Only update if the new title is significantly different and more descriptive
       if (newTitle !== session.title && !newTitle.startsWith('Chat ')) {
         session.title = newTitle;
-        console.log('📝 Updated session title from', session.title, 'to', newTitle);
       }
     }
   }

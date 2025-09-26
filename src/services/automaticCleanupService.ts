@@ -7,11 +7,9 @@ class AutomaticCleanupService {
   // Start automatic cleanup (runs every hour for 24-hour deletion)
   startAutomaticCleanup(): void {
     if (this.isRunning) {
-      console.log('🧹 Automatic cleanup is already running');
       return;
     }
 
-    console.log('🚀 Starting automatic cleanup service (24-hour deletion for chats/flashcards)...');
     this.isRunning = true;
 
     // Run cleanup immediately
@@ -30,21 +28,16 @@ class AutomaticCleanupService {
       this.cleanupInterval = null;
     }
     this.isRunning = false;
-    console.log('🛑 Automatic cleanup service stopped');
   }
 
   // Run cleanup manually
   async runCleanup(): Promise<void> {
     try {
-      console.log('🧹 Running automatic cleanup (24-hour deletion)...');
       const results = await firebaseService.runAutomaticCleanup();
       
       const total = results.expiredSessions + results.expiredFlashcards + results.duplicatesRemoved;
       if (total > 0) {
-        console.log(`✅ Cleanup completed: ${results.expiredSessions} expired sessions (24+ hours), ${results.expiredFlashcards} expired flashcards (24+ hours), ${results.duplicatesRemoved} duplicates removed`);
-        console.log('📝 Note: User settings are preserved for optimal user experience');
       } else {
-        console.log('✅ Cleanup completed: No expired data found (24+ hours old)');
       }
     } catch (error) {
       console.error('❌ Automatic cleanup failed:', error);
