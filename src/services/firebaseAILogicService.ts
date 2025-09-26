@@ -24,13 +24,21 @@ class FirebaseAILogicProvider implements AIProvider {
   private genAI: GoogleGenerativeAI | null = null;
   private model: GenerativeModel | null = null;
   private apiKey: string;
+  private currentModelName: string = '';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.initializeFirebaseAI();
+    this.initializeFirebaseAIAsync();
   }
 
-  private initializeFirebaseAI() {
+  private initializeFirebaseAIAsync() {
+    // Initialize asynchronously without blocking the constructor
+    this.initializeFirebaseAI().catch(error => {
+      console.error('❌ Async Firebase AI Logic initialization failed:', error);
+    });
+  }
+
+  private async initializeFirebaseAI() {
     if (!this.apiKey) {
       console.warn('Gemini API key not provided for Firebase AI Logic');
       return;
@@ -47,12 +55,31 @@ class FirebaseAILogicProvider implements AIProvider {
         maxOutputTokens: 2048,
       };
 
-      this.model = this.genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        generationConfig: generationConfig
-      });
-      
-      console.log('✅ Firebase AI Logic initialized successfully');
+      // Try known working models in order of preference
+      const modelNames = [
+        'gemini-2.0-flash-001',
+        'gemini-2.0-flash-lite-001'
+      ];
+
+      let modelInitialized = false;
+      for (const modelName of modelNames) {
+        try {
+          this.model = this.genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: generationConfig
+          });
+          this.currentModelName = modelName;
+          console.log(`✅ Firebase AI Logic initialized with model: ${modelName}`);
+          modelInitialized = true;
+          break;
+        } catch (modelError) {
+          console.warn(`⚠️ Failed to initialize Firebase AI Logic model ${modelName}:`, modelError);
+        }
+      }
+
+      if (!modelInitialized) {
+        throw new Error('All Firebase AI Logic models failed to initialize');
+      }
     } catch (error) {
       console.error('❌ Failed to initialize Firebase AI Logic:', error);
       this.genAI = null;
@@ -88,16 +115,16 @@ class FirebaseAILogicProvider implements AIProvider {
 
         return {
           content: content,
-          model: 'gemini-1.5-flash',
+          model: this.currentModelName || 'gemini-1.5-flash',
           provider: 'Firebase AI Logic'
         };
       } catch (error) {
         console.error(`❌ Firebase AI Logic error (attempt ${attempt}/${maxRetries}):`, error);
         
-        // Check if this is a 503 error (service overloaded)
-        if (error instanceof Error && error.message.includes('503') && attempt < maxRetries) {
+        // Check if this is a 503 error (service overloaded) or 429 error (quota exceeded)
+        if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
-          console.log(`⏳ Retrying in ${delay}ms due to service overload...`);
+          console.log(`⏳ Retrying in ${delay}ms due to service overload or quota limit...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -200,11 +227,18 @@ class MockProvider implements AIProvider {
       const flashcardResponse = {
         "flashcards": [
           {
-            "question": "What is Firebase AI Logic?",
-            "answer": "Firebase AI Logic is currently unavailable. This is a fallback response. Please check your API configuration and try again.",
-            "category": "Firebase AI",
-            "difficulty": "medium",
-            "tags": ["firebase", "ai-logic", "fallback"]
+            "question": "What is the current status of the AI service?",
+            "answer": "The AI service is temporarily unavailable due to quota limits or high demand. This is a fallback response. Please try again in a few minutes when the service is restored.",
+            "category": "System Status",
+            "difficulty": "easy",
+            "tags": ["service-status", "fallback", "ai-unavailable"]
+          },
+          {
+            "question": "What should I do if I see this fallback message?",
+            "answer": "This indicates the AI service has hit its quota limits or is experiencing high demand. Wait a few minutes and try again, or contact support if the issue persists.",
+            "category": "Troubleshooting",
+            "difficulty": "easy",
+            "tags": ["troubleshooting", "support", "quota-limits"]
           }
         ]
       };
@@ -217,9 +251,9 @@ class MockProvider implements AIProvider {
     }
 
     const responses = [
-      "I'm currently using Firebase AI Logic fallback mode. The main AI service is temporarily unavailable.",
-      "Firebase AI Logic is currently offline. This is a temporary fallback response.",
-      "The Firebase AI Logic service is being updated. Please try again in a few moments."
+      "I'm currently in fallback mode due to AI service quota limits. The main AI service is temporarily unavailable.",
+      "The AI service has hit its quota limits and is currently unavailable. This is a temporary fallback response.",
+      "The AI service is experiencing high demand and quota limits. Please try again in a few minutes when the service is restored."
     ];
 
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];

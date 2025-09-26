@@ -104,9 +104,9 @@ ${prompt}`;
     } catch (error) {
       // Error generating flashcards
       
-      // Check if this is an API overload error (503)
-      if (error instanceof Error && error.message.includes('503')) {
-        throw new Error('The AI service is currently overloaded. Please try again in a few minutes.');
+      // Check if this is an API overload error (503) or quota error (429)
+      if (error instanceof Error && (error.message.includes('503') || error.message.includes('429'))) {
+        throw new Error('The AI service is currently unavailable due to high demand or quota limits. Please try again in a few minutes.');
       }
       
       // Check if this is a fallback response that's not JSON
@@ -153,9 +153,9 @@ ${prompt}`;
     } catch (error) {
       // Error generating flashcards from text
       
-      // Check if this is an API overload error (503)
-      if (error instanceof Error && error.message.includes('503')) {
-        throw new Error('The AI service is currently overloaded. Please try again in a few minutes.');
+      // Check if this is an API overload error (503) or quota error (429)
+      if (error instanceof Error && (error.message.includes('503') || error.message.includes('429'))) {
+        throw new Error('The AI service is currently unavailable due to high demand or quota limits. Please try again in a few minutes.');
       }
       
       // Check if this is a fallback response that's not JSON
@@ -227,6 +227,7 @@ FINAL REMINDER:
 
   private parseFlashcardResponse(response: string, request: FlashcardGenerationRequest): Flashcard[] {
     try {
+      console.log('🔍 Raw AI response:', response);
       
       // Try to extract JSON from the response
       let jsonString = response.trim();
@@ -259,12 +260,14 @@ FINAL REMINDER:
 
 
       const parsed = JSON.parse(jsonString);
+      console.log('📋 Parsed JSON:', parsed);
       
       if (!parsed.flashcards || !Array.isArray(parsed.flashcards)) {
         throw new Error('Invalid flashcard format - missing flashcards array');
       }
 
       // Successfully parsed flashcards
+      console.log('✅ Successfully parsed flashcards:', parsed.flashcards);
 
       return parsed.flashcards.map((card: any, index: number) => ({
         id: `flashcard_${Date.now()}_${index}`,
@@ -272,7 +275,7 @@ FINAL REMINDER:
         answer: card.answer || 'No answer provided',
         category: card.category || 'General',
         difficulty: card.difficulty || request.difficulty || 'medium',
-        tags: card.tags || [],
+        tags: Array.isArray(card.tags) ? card.tags : [],
         createdAt: new Date(),
         reviewCount: 0,
         masteryLevel: 0,
@@ -423,11 +426,11 @@ FINAL REMINDER:
     return {
       id: `set_${Date.now()}`,
       title,
-      description,
+      description: description || '',
       flashcards,
       createdAt: new Date(),
       updatedAt: new Date(),
-      sourceDocumentIds,
+      sourceDocumentIds: sourceDocumentIds || [],
       tags: []
     };
   }

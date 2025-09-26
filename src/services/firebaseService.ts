@@ -20,6 +20,29 @@ import { FlashcardSet, Flashcard } from '../types/flashcard';
 import { User } from '../types/auth';
 
 export class FirebaseService {
+  // Utility method to deep clean objects and remove undefined values
+  private deepCleanObject(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.deepCleanObject(item)).filter(item => item !== undefined);
+    }
+    
+    if (typeof obj === 'object' && obj.constructor === Object) {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.deepCleanObject(value);
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
+  }
+
   // Chat Sessions
   async saveChatSession(session: ChatSession, userId: string): Promise<string> {
     try {
@@ -316,10 +339,8 @@ export class FirebaseService {
   // Flashcards
   async saveFlashcardSet(flashcardSet: FlashcardSet, userId: string): Promise<string> {
     try {
-      // Filter out undefined values to prevent Firebase errors
-      const cleanFlashcardSet = Object.fromEntries(
-        Object.entries(flashcardSet).filter(([_, value]) => value !== undefined)
-      );
+      // Deep clean the flashcard set to remove undefined values
+      const cleanFlashcardSet = this.deepCleanObject(flashcardSet);
       
       // Check for duplicate flashcard sets to prevent duplicates
       const existingSet = await this.findDuplicateFlashcardSet(flashcardSet, userId);

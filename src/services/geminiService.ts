@@ -24,13 +24,21 @@ class GeminiProvider implements AIProvider {
   private genAI: GoogleGenerativeAI | null = null;
   private model: GenerativeModel | null = null;
   private apiKey: string;
+  private currentModelName: string = '';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.initializeGemini();
+    this.initializeGeminiAsync();
   }
 
-  private initializeGemini() {
+  private initializeGeminiAsync() {
+    // Initialize asynchronously without blocking the constructor
+    this.initializeGemini().catch(error => {
+      console.error('❌ Async Gemini initialization failed:', error);
+    });
+  }
+
+  private async initializeGemini() {
     if (!this.apiKey) {
       console.warn('Gemini API key not provided');
       return;
@@ -47,12 +55,31 @@ class GeminiProvider implements AIProvider {
         maxOutputTokens: 2048,
       };
 
-      this.model = this.genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        generationConfig: generationConfig
-      });
-      
-      console.log('✅ Gemini AI initialized successfully');
+      // Try known working models in order of preference
+      const modelNames = [
+        'gemini-2.0-flash-001',
+        'gemini-2.0-flash-lite-001'
+      ];
+
+      let modelInitialized = false;
+      for (const modelName of modelNames) {
+        try {
+          this.model = this.genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: generationConfig
+          });
+          this.currentModelName = modelName;
+          console.log(`✅ Gemini AI initialized with model: ${modelName}`);
+          modelInitialized = true;
+          break;
+        } catch (modelError) {
+          console.warn(`⚠️ Failed to initialize model ${modelName}:`, modelError);
+        }
+      }
+
+      if (!modelInitialized) {
+        throw new Error('All Gemini models failed to initialize');
+      }
     } catch (error) {
       console.error('❌ Failed to initialize Gemini AI:', error);
       this.genAI = null;
@@ -88,16 +115,16 @@ class GeminiProvider implements AIProvider {
 
         return {
           content: content,
-          model: 'gemini-1.5-flash',
+          model: this.currentModelName || 'gemini-1.5-flash',
           provider: 'Google Gemini'
         };
       } catch (error) {
         console.error(`❌ Gemini API error (attempt ${attempt}/${maxRetries}):`, error);
         
-        // Check if this is a 503 error (service overloaded)
-        if (error instanceof Error && error.message.includes('503') && attempt < maxRetries) {
+        // Check if this is a 503 error (service overloaded) or 429 error (quota exceeded)
+        if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
-          console.log(`⏳ Retrying in ${delay}ms due to service overload...`);
+          console.log(`⏳ Retrying in ${delay}ms due to service overload or quota limit...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
