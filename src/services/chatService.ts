@@ -14,6 +14,7 @@ class GeminiChatService implements ChatService {
   private sessions: Map<string, ChatSession> = new Map();
   private messageCounter = 0;
   private storageKey = 'academic-ai-chat-sessions';
+  private deletedSessions: Set<string> = new Set(); // Track locally deleted sessions
 
   constructor() {
     this.loadFromStorage();
@@ -35,8 +36,9 @@ class GeminiChatService implements ChatService {
       const firebaseSessions = await firebaseService.getChatSessions(user.id);
       
       // Merge Firebase sessions with local sessions, but only if they have valid conversations
+      // and haven't been locally deleted
       firebaseSessions.forEach(session => {
-        if (this.hasValidConversation(session)) {
+        if (this.hasValidConversation(session) && !this.deletedSessions.has(session.id)) {
           this.sessions.set(session.id, session);
         }
       });
@@ -61,7 +63,7 @@ class GeminiChatService implements ChatService {
           const cleanSessions = await firebaseService.getChatSessions(user.id);
           this.sessions.clear();
           cleanSessions.forEach(session => {
-            if (this.hasValidConversation(session)) {
+            if (this.hasValidConversation(session) && !this.deletedSessions.has(session.id)) {
               this.sessions.set(session.id, session);
             }
           });
@@ -87,11 +89,21 @@ class GeminiChatService implements ChatService {
       const unsubscribe = firebaseService.subscribeToChatSessions(user.id, (sessions) => {
         
         // Update local sessions with Firebase data, but only if they have valid conversations
+        // and haven't been locally deleted
         sessions.forEach(session => {
-          if (this.hasValidConversation(session)) {
+          if (this.hasValidConversation(session) && !this.deletedSessions.has(session.id)) {
             this.sessions.set(session.id, session);
           }
         });
+        
+        // Remove any sessions from local storage that are no longer in Firebase
+        // (unless they were locally deleted)
+        const firebaseSessionIds = new Set(sessions.map(s => s.id));
+        for (const [sessionId] of this.sessions.entries()) {
+          if (!firebaseSessionIds.has(sessionId) && !this.deletedSessions.has(sessionId)) {
+            this.sessions.delete(sessionId);
+          }
+        }
         
         // Save to local storage for offline access
         this.saveToStorage();
@@ -498,6 +510,9 @@ Would you like me to help you with anything else about the code, such as explain
   async deleteSession(sessionId: string): Promise<void> {
     console.log('🗑️ Deleting session:', sessionId);
     
+    // Mark session as deleted to prevent re-sync
+    this.deletedSessions.add(sessionId);
+    
     // Delete from local storage
     this.sessions.delete(sessionId);
     this.saveToStorage();
@@ -571,11 +586,20 @@ Would you like me to help you with anything else about the code, such as explain
       }
       this.saveToStorage();
     }
+    
+    // Clean up deleted sessions set to prevent memory leaks
+    // Note: We can't easily track deletion timestamps without more complex changes,
+    // so for now we'll just limit the size of the deleted sessions set
+    if (this.deletedSessions.size > 100) {
+      // Clear the set if it gets too large (this is a safety measure)
+      this.deletedSessions.clear();
+    }
   }
 
   // Clear all chat data (called when user signs out)
   clearAllData(): void {
     this.sessions.clear();
+    this.deletedSessions.clear();
     this.messageCounter = 0;
     localStorage.removeItem(this.storageKey);
   }
