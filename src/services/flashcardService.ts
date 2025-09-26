@@ -27,34 +27,63 @@ class RealFlashcardService implements FlashcardService {
 
   constructor() {
     this.setupAuthListener();
+    // Load localStorage data for anonymous users on initialization
+    this.loadFlashcardSetsFromLocalStorage();
   }
 
   private setupAuthListener() {
     // Listen for auth state changes using the proper auth service listener
     firebaseAuthService.onAuthStateChange((user) => {
+      console.log('🔍 DEBUG: Auth state changed, user:', user?.id || 'null', 'currentUserId:', this.currentUserId);
       if (user && user.id !== this.currentUserId) {
+        console.log('🔍 DEBUG: User logged in, loading flashcard sets');
         this.currentUserId = user.id;
         this.loadFlashcardSets().catch(error => {
           console.error('❌ Error loading flashcard sets on auth change:', error);
         });
       } else if (!user && this.currentUserId) {
+        console.log('🔍 DEBUG: User logged out, clearing flashcard sets');
         this.currentUserId = null;
         this.flashcardSets = [];
+      } else {
+        console.log('🔍 DEBUG: Auth state change but no action needed');
       }
     });
   }
 
   async loadFlashcardSets() {
+    console.log('🔍 DEBUG: loadFlashcardSets called, currentUserId:', this.currentUserId);
     if (!this.currentUserId) {
-      this.flashcardSets = [];
+      console.log('🔍 DEBUG: No currentUserId, loading from localStorage for anonymous user');
+      // For anonymous users, load from localStorage
+      this.loadFlashcardSetsFromLocalStorage();
       return;
     }
 
     try {
+      console.log('🔍 DEBUG: Calling firebaseService.getFlashcardSets');
       this.flashcardSets = await firebaseService.getFlashcardSets(this.currentUserId);
+      console.log('🔍 DEBUG: Loaded', this.flashcardSets.length, 'flashcard sets from Firebase');
     } catch (error) {
       console.error('❌ Error loading flashcard sets from Firebase:', error);
       // Error loading flashcard sets from Firebase
+      this.flashcardSets = [];
+    }
+  }
+
+  // Load flashcard sets from localStorage for anonymous users
+  private loadFlashcardSetsFromLocalStorage(): void {
+    try {
+      const localFlashcards = JSON.parse(localStorage.getItem('anonymous_flashcards') || '[]');
+      this.flashcardSets = localFlashcards.map((set: any) => ({
+        ...set,
+        createdAt: new Date(set.createdAt),
+        updatedAt: new Date(set.updatedAt),
+        lastActivityAt: set.lastActivityAt ? new Date(set.lastActivityAt) : undefined
+      }));
+      console.log('🔍 DEBUG: Loaded', this.flashcardSets.length, 'flashcard sets from localStorage');
+    } catch (error) {
+      console.error('❌ Error loading flashcard sets from localStorage:', error);
       this.flashcardSets = [];
     }
   }
@@ -457,16 +486,29 @@ FINAL REMINDER:
   }
 
   getFlashcardSets(): FlashcardSet[] {
+    console.log('🔍 DEBUG: getFlashcardSets called, returning', this.flashcardSets.length, 'sets');
     return [...this.flashcardSets];
   }
 
   async saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void> {
-    if (!this.currentUserId) {
-      throw new Error('User must be authenticated to save flashcard sets');
+    // Get current user ID from auth service if not available locally
+    let userId = this.currentUserId;
+    console.log('🔍 DEBUG: saveFlashcardSet called, currentUserId:', this.currentUserId);
+    if (!userId) {
+      console.log('🔍 DEBUG: No currentUserId, getting from auth service');
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (!currentUser) {
+        console.log('🔍 DEBUG: No current user from auth service - saving locally for anonymous user');
+        // For anonymous users, save locally and don't throw error
+        this.saveFlashcardSetLocally(flashcardSet);
+        return;
+      }
+      userId = currentUser.id;
+      console.log('🔍 DEBUG: Got userId from auth service:', userId);
     }
 
     try {
-      await firebaseService.saveFlashcardSet(flashcardSet, this.currentUserId);
+      await firebaseService.saveFlashcardSet(flashcardSet, userId);
       
       // Update local cache
       const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
@@ -481,9 +523,40 @@ FINAL REMINDER:
     }
   }
 
+  // Save flashcard set locally for anonymous users
+  private saveFlashcardSetLocally(flashcardSet: FlashcardSet): void {
+    console.log('🔍 DEBUG: Saving flashcard set locally for anonymous user');
+    
+    // Update local cache
+    const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
+    if (existingIndex >= 0) {
+      this.flashcardSets[existingIndex] = flashcardSet;
+    } else {
+      this.flashcardSets.push(flashcardSet);
+    }
+    
+    // Save to localStorage for persistence across page reloads
+    try {
+      const localFlashcards = JSON.parse(localStorage.getItem('anonymous_flashcards') || '[]');
+      const existingLocalIndex = localFlashcards.findIndex((set: FlashcardSet) => set.id === flashcardSet.id);
+      if (existingLocalIndex >= 0) {
+        localFlashcards[existingLocalIndex] = flashcardSet;
+      } else {
+        localFlashcards.push(flashcardSet);
+      }
+      localStorage.setItem('anonymous_flashcards', JSON.stringify(localFlashcards));
+      console.log('🔍 DEBUG: Saved flashcard set to localStorage');
+    } catch (error) {
+      console.error('❌ Failed to save flashcard set to localStorage:', error);
+    }
+  }
+
   async deleteFlashcardSet(setId: string): Promise<void> {
     if (!this.currentUserId) {
-      throw new Error('User must be authenticated to delete flashcard sets');
+      console.log('🔍 DEBUG: No currentUserId, deleting from localStorage for anonymous user');
+      // For anonymous users, delete from localStorage
+      this.deleteFlashcardSetFromLocalStorage(setId);
+      return;
     }
 
     try {
@@ -491,6 +564,22 @@ FINAL REMINDER:
       this.flashcardSets = this.flashcardSets.filter(set => set.id !== setId);
     } catch (error) {
       throw new Error('Failed to delete flashcard set');
+    }
+  }
+
+  // Delete flashcard set from localStorage for anonymous users
+  private deleteFlashcardSetFromLocalStorage(setId: string): void {
+    try {
+      // Remove from local cache
+      this.flashcardSets = this.flashcardSets.filter(set => set.id !== setId);
+      
+      // Remove from localStorage
+      const localFlashcards = JSON.parse(localStorage.getItem('anonymous_flashcards') || '[]');
+      const filteredFlashcards = localFlashcards.filter((set: FlashcardSet) => set.id !== setId);
+      localStorage.setItem('anonymous_flashcards', JSON.stringify(filteredFlashcards));
+      console.log('🔍 DEBUG: Deleted flashcard set from localStorage');
+    } catch (error) {
+      console.error('❌ Error deleting flashcard set from localStorage:', error);
     }
   }
 

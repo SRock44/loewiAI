@@ -17,17 +17,22 @@ export const useAllFlashcards = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Load flashcards from Firebase (user-specific)
-  const loadAllFlashcards = useCallback(() => {
+  const loadAllFlashcards = useCallback(async () => {
+    console.log('🔍 DEBUG: loadAllFlashcards called');
     setIsLoading(true);
     try {
-      // Get flashcard sets from Firebase (user-specific)
+      // First load from Firebase to ensure we have the latest data
+      await flashcardService.loadFlashcardSets();
+      
+      // Then get the updated sets from the service
       const sets = flashcardService.getFlashcardSets();
-      console.log('📚 Loaded flashcard sets:', sets.length, sets);
+      console.log('🔍 DEBUG: Got sets from service:', sets.length, 'sets');
       
       // Sort by creation date (newest first)
       sets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
       setFlashcardSets(sets);
+      console.log('🔍 DEBUG: Set flashcard sets state with', sets.length, 'sets');
     } catch (error) {
       console.error('❌ Error loading flashcards:', error);
       // Error loading flashcards
@@ -72,30 +77,22 @@ export const useAllFlashcards = () => {
     try {
       await flashcardService.deleteFlashcardSet(setId);
       
-      // Reload all flashcards
-      loadAllFlashcards();
+      // Update local state immediately
+      setFlashcardSets(prev => prev.filter(set => set.id !== setId));
       
-      // Dispatch event
-      allFlashcardEventTarget.dispatchEvent(new FlashcardUpdateEvent(flashcardSets));
+      // Dispatch event with updated data to notify other components
+      const updatedSets = flashcardSets.filter(set => set.id !== setId);
+      allFlashcardEventTarget.dispatchEvent(new FlashcardUpdateEvent(updatedSets));
     } catch (error) {
       // Error removing flashcard set
     }
-  }, [flashcardSets, loadAllFlashcards]);
+  }, [flashcardSets]);
 
   // Load flashcards on mount
   useEffect(() => {
     loadAllFlashcards();
   }, [loadAllFlashcards]);
 
-  // Fallback: Poll for updates every 5 seconds (in case events don't work)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Polling for flashcard updates...');
-      loadAllFlashcards();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [loadAllFlashcards]);
 
   // Listen for flashcard update events
   useEffect(() => {
@@ -108,32 +105,19 @@ export const useAllFlashcards = () => {
 
     const handleFlashcardUpdateFromChat = async () => {
       // When flashcards are generated from chat, reload all flashcards
-      console.log('🔄 Received flashcardUpdate event, reloading flashcards...');
-      
-      // Force reload from the service (which will reload from Firebase)
-      try {
-        await flashcardService.loadFlashcardSets();
-        console.log('✅ Service reloaded, now reloading in hook...');
-      } catch (error) {
-        console.error('❌ Error reloading service:', error);
-      }
-      
-      // Then reload in the hook
-      loadAllFlashcards();
-    };
-
-    const handleTestEvent = () => {
-      console.log('🧪 Received test event - event system is working!');
+      // This ensures newly generated flashcards appear in history
+      // Add a small delay to prevent race conditions with deletions
+      setTimeout(async () => {
+        await loadAllFlashcards();
+      }, 100);
     };
 
     allFlashcardEventTarget.addEventListener('allFlashcardUpdate', handleFlashcardUpdate);
     allFlashcardEventTarget.addEventListener('flashcardUpdate', handleFlashcardUpdateFromChat);
-    allFlashcardEventTarget.addEventListener('testEvent', handleTestEvent);
     
     return () => {
       allFlashcardEventTarget.removeEventListener('allFlashcardUpdate', handleFlashcardUpdate);
       allFlashcardEventTarget.removeEventListener('flashcardUpdate', handleFlashcardUpdateFromChat);
-      allFlashcardEventTarget.removeEventListener('testEvent', handleTestEvent);
     };
   }, [loadAllFlashcards]);
 

@@ -172,17 +172,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
   // Listen for session updates (when new chats are created)
   useEffect(() => {
-    const handleStorageChange = () => {
-      if (isAuthenticated) {
-        const sessions = chatService.getSessions();
-        setChatSessions(sessions);
-      }
-    };
-
-    // Listen for localStorage changes (where chat sessions are stored)
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom events if the chat service dispatches them
     const handleSessionUpdate = () => {
       if (isAuthenticated) {
         const sessions = chatService.getSessions();
@@ -190,10 +179,15 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
       }
     };
     
+    // Load initial sessions when authenticated
+    if (isAuthenticated) {
+      const sessions = chatService.getSessions();
+      setChatSessions(sessions);
+    }
+    
     window.addEventListener('sessionUpdated', handleSessionUpdate);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('sessionUpdated', handleSessionUpdate);
     };
   }, [isAuthenticated]);
