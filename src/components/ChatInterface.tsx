@@ -51,7 +51,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const { 
     documents = [], 
     onDocumentsChange,
-    onNewSession 
+    onNewSession
   } = props;
   const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -213,9 +213,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setSessions([]);
       setMessages([]);
       setCurrentSession(null);
-      chatService.clearAllData();
     }
   }, [isAuthenticated]);
+
 
   // Notify parent component when documents are uploaded
   useEffect(() => {
@@ -516,6 +516,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     if (session) {
       setCurrentSession(session);
       setMessages(session.messages);
+    } else {
+      // Session was deleted, create a new blank chat
+      console.log('🔄 Session was deleted, creating new blank chat');
+      createNewSession();
     }
   };
 

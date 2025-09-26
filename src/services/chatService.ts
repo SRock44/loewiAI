@@ -4,6 +4,7 @@ import { firebaseAILogicService, AIResponse } from './firebaseAILogicService';
 import { documentProcessor } from './documentProcessor';
 import { flashcardService } from './flashcardService';
 import { FlashcardGenerationRequest } from '../types/flashcard';
+import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import { codeValidator, CodeValidationResult } from './codeValidator';
 import { codeExecutor } from './codeExecutor';
 import { firebaseService } from './firebaseService';
@@ -13,213 +14,64 @@ import { automaticCleanupService } from './automaticCleanupService';
 class GeminiChatService implements ChatService {
   private sessions: Map<string, ChatSession> = new Map();
   private messageCounter = 0;
-  private storageKey = 'academic-ai-chat-sessions';
-  private deletedSessions: Set<string> = new Set(); // Track locally deleted sessions
+  private currentUserId: string | null = null;
 
   constructor() {
-    this.loadFromStorage();
-    this.cleanupEmptySessions();
-    this.syncWithFirebase();
-    this.setupRealtimeSync();
     this.setupAuthStateListener();
     
     // Start automatic cleanup service
     automaticCleanupService.startAutomaticCleanup();
   }
 
-  // Sync with Firebase
-  private async syncWithFirebase() {
-    const user = firebaseAuthService.getCurrentUser();
-    if (!user) return;
-
-    try {
-      const firebaseSessions = await firebaseService.getChatSessions(user.id);
-      
-      // Merge Firebase sessions with local sessions, but only if they have valid conversations
-      // and haven't been locally deleted
-      firebaseSessions.forEach(session => {
-        if (this.hasValidConversation(session) && !this.deletedSessions.has(session.id)) {
-          this.sessions.set(session.id, session);
-        }
-      });
-      
-      // Only save local sessions to Firebase if they don't already exist in Firebase
-      // This prevents duplicate sessions from being created
-      for (const [, session] of this.sessions) {
-        if (this.hasValidConversation(session) && !session.id.startsWith('firebase_')) {
-          try {
-            await firebaseService.saveChatSession(session, user.id);
-          } catch (error) {
-            // Error saving session to Firebase
-          }
-        }
-      }
-      
-      // Clean up any duplicate sessions that may exist
-      try {
-        const duplicatesRemoved = await firebaseService.cleanupDuplicateSessions(user.id);
-        if (duplicatesRemoved > 0) {
-          // Reload sessions after cleanup
-          const cleanSessions = await firebaseService.getChatSessions(user.id);
-          this.sessions.clear();
-          cleanSessions.forEach(session => {
-            if (this.hasValidConversation(session) && !this.deletedSessions.has(session.id)) {
-              this.sessions.set(session.id, session);
-            }
-          });
-        }
-      } catch (error) {
-        // Error cleaning up duplicates
-      }
-      
-      // Firebase sync completed
-    } catch (error) {
-      // Firebase sync failed silently
-    }
-  }
-
-  // Setup real-time synchronization with Firebase
-  private setupRealtimeSync() {
-    const user = firebaseAuthService.getCurrentUser();
-    if (!user) return;
-
-    try {
-      
-      // Subscribe to real-time chat session updates
-      const unsubscribe = firebaseService.subscribeToChatSessions(user.id, (sessions) => {
-        
-        // Update local sessions with Firebase data, but only if they have valid conversations
-        // and haven't been locally deleted
-        sessions.forEach(session => {
-          if (this.hasValidConversation(session) && !this.deletedSessions.has(session.id)) {
-            this.sessions.set(session.id, session);
-          }
-        });
-        
-        // Remove any sessions from local storage that are no longer in Firebase
-        // (unless they were locally deleted)
-        const firebaseSessionIds = new Set(sessions.map(s => s.id));
-        for (const [sessionId] of this.sessions.entries()) {
-          if (!firebaseSessionIds.has(sessionId) && !this.deletedSessions.has(sessionId)) {
-            this.sessions.delete(sessionId);
-          }
-        }
-        
-        // Save to local storage for offline access
-        this.saveToStorage();
-      });
-
-      // Store unsubscribe function for cleanup
-      (this as any).unsubscribeFirebase = unsubscribe;
-      
-      // Real-time Firebase sync enabled
-    } catch (error) {
-      // Failed to setup real-time sync
-    }
-  }
-
-  // Setup authentication state listener for cross-device sync
+  // Listen for authentication state changes
   private setupAuthStateListener() {
-    try {
-      
-      // Listen for authentication state changes
-      const unsubscribeAuth = firebaseAuthService.onAuthStateChange((user) => {
-        if (user) {
-          // User signed in, sync with Firebase
-          this.syncWithFirebase();
-          this.setupRealtimeSync();
-        } else {
-          // User signed out, clear local sessions
-          this.sessions.clear();
-          this.saveToStorage();
-          
-          // Cleanup Firebase listeners
-          if ((this as any).unsubscribeFirebase) {
-            (this as any).unsubscribeFirebase();
-            (this as any).unsubscribeFirebase = null;
-          }
-        }
-      });
-
-      // Store auth unsubscribe function for cleanup
-      (this as any).unsubscribeAuth = unsubscribeAuth;
-      
-      // Auth state listener enabled
-    } catch (error) {
-      // Failed to setup auth state listener
-    }
+    firebaseAuthService.onAuthStateChange((user) => {
+      if (user && user.id !== this.currentUserId) {
+        // User signed in or switched users
+        this.currentUserId = user.id;
+        this.loadSessionsFromFirebase();
+      } else if (!user && this.currentUserId) {
+        // User signed out
+        this.currentUserId = null;
+        this.sessions.clear();
+        this.messageCounter = 0;
+      }
+    });
   }
 
-  private loadFromStorage() {
-    const user = firebaseAuthService.getCurrentUser();
-    if (!user) {
-      // Clear sessions for unauthenticated users
+  // Load sessions from Firebase
+  private async loadSessionsFromFirebase() {
+    if (!this.currentUserId) {
       this.sessions.clear();
-      this.messageCounter = 0;
       return;
     }
 
     try {
-      const stored = localStorage.getItem(this.storageKey);
+      console.log('🔄 Loading chat sessions from Firebase for user:', this.currentUserId);
+      const firebaseSessions = await firebaseService.getChatSessions(this.currentUserId);
       
-      if (stored) {
-        const data = JSON.parse(stored);
-        
-        // Only load sessions if they belong to the current user
-        if (data.userId === user.id) {
-          const loadedSessions = data.sessions.map((s: any) => ({
-            ...s,
-            createdAt: new Date(s.createdAt),
-            updatedAt: new Date(s.updatedAt),
-            messages: s.messages.map((m: any) => ({
-              ...m,
-              timestamp: new Date(m.timestamp)
-            }))
-          }));
-          
-          // Filter out empty sessions and only keep valid conversations
-          const validSessions = loadedSessions.filter((session: ChatSession) => 
-            this.hasValidConversation(session)
-          );
-          
-          this.sessions = new Map(validSessions.map((s: ChatSession) => [s.id, s]));
-          this.messageCounter = data.messageCounter || 0;
-          // Loaded sessions for user
-        } else {
-          console.log('⚠️ Stored sessions belong to different user, clearing');
-          // Clear sessions if they belong to a different user
-          this.sessions.clear();
-          this.messageCounter = 0;
-        }
-      } else {
-        console.log('📂 No stored chat sessions found');
-      }
+      // Sort sessions by updatedAt (newest first) and limit to 6
+      const sortedSessions = firebaseSessions
+        .filter(session => this.hasValidConversation(session))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 6); // Limit to 6 sessions
+      
+      // Convert to Map
+      this.sessions = new Map();
+      sortedSessions.forEach(session => {
+        this.sessions.set(session.id, session);
+      });
+      
+      console.log('✅ Loaded', this.sessions.size, 'chat sessions from Firebase (limited to 6)');
     } catch (error) {
-      console.error('❌ Error loading chat sessions from storage:', error);
+      console.error('❌ Error loading chat sessions from Firebase:', error);
       this.sessions.clear();
-      this.messageCounter = 0;
     }
   }
 
-  private saveToStorage() {
-    // Only save chat history if user is authenticated
-    const user = firebaseAuthService.getCurrentUser();
-    if (!user) {
-      return; // Don't save chat history for unauthenticated users
-    }
 
-    try {
-      const data = {
-        sessions: Array.from(this.sessions.values()),
-        messageCounter: this.messageCounter,
-        userId: user.id // Associate sessions with user
-      };
-      localStorage.setItem(this.storageKey, JSON.stringify(data));
-      // Sessions saved to storage
-    } catch (error) {
-      // Error saving chat sessions to storage
-    }
-  }
+
+
 
   async sendMessage(message: string, context: ChatContext): Promise<ChatMessage> {
     const userMessage: ChatMessage = {
@@ -329,7 +181,18 @@ Would you like me to help you with anything else about the code, such as explain
         // Update session title based on first message if it's generic
         this.updateSessionTitleIfNeeded(session, message);
         
-        this.saveToStorage();
+        // Save session to Firebase
+        if (this.currentUserId) {
+          try {
+            await firebaseService.saveChatSession(session, this.currentUserId);
+            console.log('✅ Saved session to Firebase:', session.id);
+            
+            // Dispatch event to notify UI components
+            window.dispatchEvent(new CustomEvent('sessionUpdated'));
+          } catch (error) {
+            console.error('❌ Failed to save session to Firebase:', error);
+          }
+        }
         
         // Save messages to Firebase for cross-device sync
         const user = firebaseAuthService.getCurrentUser();
@@ -385,7 +248,18 @@ Would you like me to help you with anything else about the code, such as explain
         const session = this.sessions.get(context.sessionId)!;
         session.messages.push(userMessage, errorMessage);
         session.updatedAt = new Date();
-        this.saveToStorage();
+        // Save session to Firebase
+        if (this.currentUserId) {
+          try {
+            await firebaseService.saveChatSession(session, this.currentUserId);
+            console.log('✅ Saved session to Firebase:', session.id);
+            
+            // Dispatch event to notify UI components
+            window.dispatchEvent(new CustomEvent('sessionUpdated'));
+          } catch (error) {
+            console.error('❌ Failed to save session to Firebase:', error);
+          }
+        }
       }
 
       return errorMessage;
@@ -430,10 +304,24 @@ Would you like me to help you with anything else about the code, such as explain
     };
 
     this.sessions.set(sessionId, session);
-    this.saveToStorage();
     
-    // Note: We do NOT save empty sessions to Firebase
-    // Sessions will only be saved to Firebase when the first message is sent
+    // Save session to Firebase and update ID
+    if (this.currentUserId) {
+      try {
+        const firebaseSessionId = await firebaseService.saveChatSession(session, this.currentUserId);
+        console.log('✅ Saved session to Firebase:', firebaseSessionId);
+        
+        // Update session with Firebase ID
+        session.id = firebaseSessionId;
+        this.sessions.delete(sessionId); // Remove old local ID
+        this.sessions.set(firebaseSessionId, session); // Add with Firebase ID
+        
+        // Clean up old sessions if we exceed the limit
+        await this.cleanupOldSessions();
+      } catch (error) {
+        console.error('❌ Failed to save session to Firebase:', error);
+      }
+    }
     
     return session;
   }
@@ -508,31 +396,31 @@ Would you like me to help you with anything else about the code, such as explain
   async deleteSession(sessionId: string): Promise<void> {
     console.log('🗑️ Deleting session:', sessionId);
     
-    // Mark session as deleted to prevent re-sync
-    this.deletedSessions.add(sessionId);
-    
-    // Delete from local storage
+    // Remove from memory
     this.sessions.delete(sessionId);
-    this.saveToStorage();
-    console.log('✅ Deleted from local storage');
+    console.log('🗑️ Removed session from memory, current sessions count:', this.sessions.size);
     
     // Delete from Firebase
-    const user = firebaseAuthService.getCurrentUser();
-    if (user) {
+    if (this.currentUserId) {
       try {
         console.log('🔥 Deleting from Firebase...');
-        await firebaseService.deleteChatSession(sessionId);
+        
+        // Extract the actual Firebase document ID (remove firebase_ prefix if present)
+        const firebaseDocId = sessionId.startsWith('firebase_') ? sessionId.replace('firebase_', '') : sessionId;
+        
+        await firebaseService.deleteChatSession(firebaseDocId);
         console.log('✅ Deleted chat session from Firebase');
         
         // Also delete associated messages
-        await firebaseService.deleteSessionMessages(sessionId);
+        await firebaseService.deleteSessionMessages(firebaseDocId);
         console.log('✅ Deleted session messages from Firebase');
       } catch (error) {
         console.error('❌ Firebase deletion failed:', error);
-        // Continue execution even if Firebase delete fails
+        throw error; // Re-throw error so UI can handle it
       }
     } else {
-      console.log('⚠️ No user authenticated, skipping Firebase deletion');
+      console.log('⚠️ No user authenticated, cannot delete from Firebase');
+      throw new Error('User not authenticated');
     }
   }
 
@@ -543,7 +431,15 @@ Would you like me to help you with anything else about the code, such as explain
         session.documentIds = context.documentIds;
       }
       session.updatedAt = new Date();
-      this.saveToStorage();
+      // Save session to Firebase
+    if (this.currentUserId) {
+      try {
+        await firebaseService.saveChatSession(session, this.currentUserId);
+        console.log('✅ Saved session to Firebase:', session.id);
+      } catch (error) {
+        console.error('❌ Failed to save session to Firebase:', error);
+      }
+    }
     }
   }
 
@@ -554,7 +450,8 @@ Would you like me to help you with anything else about the code, such as explain
         const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : new Date(a.updatedAt).getTime();
         const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : new Date(b.updatedAt).getTime();
         return bTime - aTime;
-      });
+      })
+      .slice(0, 6); // Limit to 6 sessions
   }
 
   // Check if a session has valid conversation content
@@ -570,60 +467,45 @@ Would you like me to help you with anything else about the code, such as explain
     return hasUserMessage && hasAssistantMessage;
   }
 
-  // Clean up empty sessions to prevent accumulation
-  private cleanupEmptySessions(): void {
-    const emptySessions = Array.from(this.sessions.entries()).filter(([_, session]) => 
-      !this.hasValidConversation(session)
-    );
-    
-    // Keep only one empty session if any exist
-    if (emptySessions.length > 1) {
-      // Remove all but the first empty session
-      for (let i = 1; i < emptySessions.length; i++) {
-        this.sessions.delete(emptySessions[i][0]);
-      }
-      this.saveToStorage();
-    }
-    
-    // Clean up deleted sessions set to prevent memory leaks
-    // Note: We can't easily track deletion timestamps without more complex changes,
-    // so for now we'll just limit the size of the deleted sessions set
-    if (this.deletedSessions.size > 100) {
-      // Clear the set if it gets too large (this is a safety measure)
-      this.deletedSessions.clear();
-    }
-  }
-
-  // Clear all chat data (called when user signs out)
-  clearAllData(): void {
-    this.sessions.clear();
-    this.deletedSessions.clear();
-    this.messageCounter = 0;
-    localStorage.removeItem(this.storageKey);
-  }
 
   // Reload sessions when user authentication changes
   reloadForUser(): void {
     console.log('🔄 Reloading chat service for user');
-    this.loadFromStorage();
+    this.loadSessionsFromFirebase();
   }
 
-  // Debug method to check localStorage contents
-  debugStorage(): void {
-    console.log('🔍 Debugging localStorage:');
-    console.log('Storage key:', this.storageKey);
-    const stored = localStorage.getItem(this.storageKey);
-    console.log('Raw stored data:', stored);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        console.log('Parsed data:', parsed);
-      } catch (e) {
-        console.error('Error parsing stored data:', e);
+  // Clean up old sessions to maintain the 6-session limit
+  private async cleanupOldSessions(): Promise<void> {
+    if (!this.currentUserId) return;
+
+    try {
+      // Get all sessions from Firebase
+      const allSessions = await firebaseService.getChatSessions(this.currentUserId);
+      
+      // Sort by updatedAt (newest first) and get sessions beyond the limit
+      const sortedSessions = allSessions
+        .filter(session => this.hasValidConversation(session))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      
+      const sessionsToDelete = sortedSessions.slice(6); // Sessions beyond the limit
+      
+      if (sessionsToDelete.length > 0) {
+        console.log(`🧹 Cleaning up ${sessionsToDelete.length} old sessions`);
+        
+        // Delete old sessions from Firebase
+        for (const session of sessionsToDelete) {
+          const firebaseDocId = session.id.startsWith('firebase_') ? session.id.replace('firebase_', '') : session.id;
+          await firebaseService.deleteChatSession(firebaseDocId);
+          await firebaseService.deleteSessionMessages(firebaseDocId);
+          console.log(`🗑️ Deleted old session: ${session.title}`);
+        }
+        
+        // Reload sessions to update local cache
+        await this.loadSessionsFromFirebase();
       }
+    } catch (error) {
+      console.error('❌ Error cleaning up old sessions:', error);
     }
-    console.log('Current sessions in memory:', this.sessions.size);
-    console.log('Current user:', firebaseAuthService.getCurrentUser());
   }
 
 
@@ -932,7 +814,20 @@ The document content above contains all the information needed to provide compre
       );
       
       // Save the set
-      flashcardService.saveFlashcardSet(flashcardSet);
+      await flashcardService.saveFlashcardSet(flashcardSet);
+      
+      // Force reload of flashcard sets in the service
+      console.log('🔄 Forcing reload of flashcard sets...');
+      await flashcardService.loadFlashcardSets();
+      
+      // Notify the flashcard system that new flashcards have been saved
+      // This will trigger the useAllFlashcards hook to reload the data
+      console.log('📤 Dispatching flashcardUpdate event...');
+      allFlashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate'));
+      
+      // Also dispatch a test event to verify the event system is working
+      console.log('🧪 Dispatching test event...');
+      allFlashcardEventTarget.dispatchEvent(new CustomEvent('testEvent'));
       
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_${++this.messageCounter}`,
@@ -949,7 +844,18 @@ Your flashcards are now ready for study. You can view them by clicking the "View
         const session = this.sessions.get(context.sessionId)!;
         session.messages.push(userMessage, assistantMessage);
         session.updatedAt = new Date();
-        this.saveToStorage();
+        // Save session to Firebase
+        if (this.currentUserId) {
+          try {
+            await firebaseService.saveChatSession(session, this.currentUserId);
+            console.log('✅ Saved session to Firebase:', session.id);
+            
+            // Dispatch event to notify UI components
+            window.dispatchEvent(new CustomEvent('sessionUpdated'));
+          } catch (error) {
+            console.error('❌ Failed to save session to Firebase:', error);
+          }
+        }
       }
 
       return assistantMessage;
@@ -999,7 +905,18 @@ Your request was valid - this is just a temporary technical issue.`;
         const session = this.sessions.get(context.sessionId)!;
         session.messages.push(userMessage, errorMessage);
         session.updatedAt = new Date();
-        this.saveToStorage();
+        // Save session to Firebase
+        if (this.currentUserId) {
+          try {
+            await firebaseService.saveChatSession(session, this.currentUserId);
+            console.log('✅ Saved session to Firebase:', session.id);
+            
+            // Dispatch event to notify UI components
+            window.dispatchEvent(new CustomEvent('sessionUpdated'));
+          } catch (error) {
+            console.error('❌ Failed to save session to Firebase:', error);
+          }
+        }
       }
 
       return errorMessage;

@@ -18,6 +18,7 @@ export interface FlashcardService {
   getFlashcardSets(): FlashcardSet[];
   saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void>;
   deleteFlashcardSet(setId: string): Promise<void>;
+  loadFlashcardSets(): Promise<void>;
 }
 
 class RealFlashcardService implements FlashcardService {
@@ -29,34 +30,33 @@ class RealFlashcardService implements FlashcardService {
   }
 
   private setupAuthListener() {
-    // Listen for auth state changes
-    const checkAuth = () => {
-      const user = firebaseAuthService.getCurrentUser();
+    // Listen for auth state changes using the proper auth service listener
+    firebaseAuthService.onAuthStateChange((user) => {
       if (user && user.id !== this.currentUserId) {
         this.currentUserId = user.id;
-        this.loadFlashcardSets();
+        this.loadFlashcardSets().catch(error => {
+          console.error('❌ Error loading flashcard sets on auth change:', error);
+        });
       } else if (!user && this.currentUserId) {
         this.currentUserId = null;
         this.flashcardSets = [];
       }
-    };
-
-    // Check auth state immediately
-    checkAuth();
-    
-    // Listen for auth state changes
-    setInterval(checkAuth, 1000);
+    });
   }
 
-  private async loadFlashcardSets() {
+  async loadFlashcardSets() {
     if (!this.currentUserId) {
+      console.log('🔐 No current user, clearing flashcard sets');
       this.flashcardSets = [];
       return;
     }
 
     try {
+      console.log('📥 Loading flashcard sets for user:', this.currentUserId);
       this.flashcardSets = await firebaseService.getFlashcardSets(this.currentUserId);
+      console.log('✅ Loaded flashcard sets:', this.flashcardSets.length, this.flashcardSets);
     } catch (error) {
+      console.error('❌ Error loading flashcard sets from Firebase:', error);
       // Error loading flashcard sets from Firebase
       this.flashcardSets = [];
     }
@@ -469,16 +469,21 @@ FINAL REMINDER:
     }
 
     try {
+      console.log('💾 Saving flashcard set to Firebase:', flashcardSet.id);
       await firebaseService.saveFlashcardSet(flashcardSet, this.currentUserId);
       
       // Update local cache
       const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
       if (existingIndex >= 0) {
+        console.log('🔄 Updating existing flashcard set in cache:', flashcardSet.id);
         this.flashcardSets[existingIndex] = flashcardSet;
       } else {
+        console.log('➕ Adding new flashcard set to cache:', flashcardSet.id);
         this.flashcardSets.push(flashcardSet);
       }
+      console.log('📚 Current flashcard sets in cache:', this.flashcardSets.length);
     } catch (error) {
+      console.error('❌ Failed to save flashcard set:', error);
       throw new Error('Failed to save flashcard set');
     }
   }

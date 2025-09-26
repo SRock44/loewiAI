@@ -25,9 +25,13 @@ function App() {
   };
 
   const handleChatDelete = (chatId: string) => {
-    // If the deleted chat was the current chat, clear the current chat
+    // If the deleted chat was the current chat, create a new chat
     if (currentChatId === chatId) {
       setCurrentChatId(undefined);
+      // Create a new chat to replace the deleted one
+      if (dashboardRef.current?.createNewChat) {
+        dashboardRef.current.createNewChat();
+      }
     }
   };
 

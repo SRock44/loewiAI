@@ -131,6 +131,9 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const { flashcardSets, updateFlashcardSet, removeFlashcardSet } = useAllFlashcards();
   
+  // Debug flashcard sets
+  console.log('🎯 Layout component flashcard sets:', flashcardSets.length, flashcardSets);
+  
   // Wrapper function to update both global flashcard sets and current flashcard set
   const handleFlashcardSetUpdate = (updatedSet: any) => {
     // Update the global flashcard sets
@@ -208,6 +211,8 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
       await chatService.deleteSession(chatId);
       // Refresh chat sessions
       setChatSessions(chatService.getSessions());
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('sessionUpdated'));
       // Notify parent component that a chat was deleted
       if (onChatDelete) {
         onChatDelete(chatId);
