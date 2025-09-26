@@ -28,6 +28,7 @@
     "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
+    "@types/glob": "^9.0.0",
     "@types/katex": "^0.16.7",
     "@types/node": "^24.5.2",
     "@types/prismjs": "^1.26.5",
