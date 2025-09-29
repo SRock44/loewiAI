@@ -33,14 +33,9 @@ class AutomaticCleanupService {
   // Run cleanup manually
   async runCleanup(): Promise<void> {
     try {
-      const results = await firebaseService.runAutomaticCleanup();
+      await firebaseService.runAutomaticCleanup();
       
-      const total = results.expiredSessions + results.expiredFlashcards + results.duplicatesRemoved;
-      if (total > 0) {
-        console.log(`🧹 Automatic cleanup completed: ${total} items cleaned up`);
-      } else {
-        console.log('🧹 Automatic cleanup completed: No items needed cleaning');
-      }
+      // Cleanup completed silently
     } catch (error) {
       console.error('❌ Automatic cleanup failed:', error);
     }

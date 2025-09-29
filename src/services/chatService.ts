@@ -152,8 +152,6 @@ Would you like me to help you with anything else about the code, such as explain
         const correctedResponse = await this.attemptCodeCorrection(aiResponse.content, validationResults, documentContext);
         if (correctedResponse) {
           finalContent = correctedResponse;
-        } else {
-          console.warn('Failed to correct code errors in AI response');
         }
       }
 

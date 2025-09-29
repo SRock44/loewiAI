@@ -49,7 +49,7 @@ const Dashboard = forwardRef<DashboardRef, DashboardProps>(({ onNewSessionCreate
           documents={uploadedDocuments}
           onDocumentsChange={handleDocumentsUploaded}
           onNewSession={(session) => {
-            console.log('New chat session created:', session);
+            // New chat session created
             if (onNewSessionCreated) {
               onNewSessionCreated(session);
             }

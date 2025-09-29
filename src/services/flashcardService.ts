@@ -74,7 +74,7 @@ class RealFlashcardService implements FlashcardService {
       try {
         flashcards = this.parseFlashcardResponse(response.content, request);
       } catch (parseError) {
-        console.warn('⚠️ First attempt failed, retrying with more explicit prompt...');
+        // First attempt failed, retrying with more explicit prompt
         // Retry with a more explicit prompt
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
@@ -123,7 +123,7 @@ ${prompt}`;
       try {
         flashcards = this.parseFlashcardResponse(response.content, request);
       } catch (parseError) {
-        console.warn('⚠️ First attempt failed, retrying with more explicit prompt...');
+        // First attempt failed, retrying with more explicit prompt
         // Retry with a more explicit prompt
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
@@ -217,7 +217,7 @@ FINAL REMINDER:
 
   private parseFlashcardResponse(response: string, request: FlashcardGenerationRequest): Flashcard[] {
     try {
-      console.log('🔍 Raw AI response:', response);
+      // Raw AI response received
       
       // Try to extract JSON from the response
       let jsonString = response.trim();
@@ -250,14 +250,13 @@ FINAL REMINDER:
 
 
       const parsed = JSON.parse(jsonString);
-      console.log('📋 Parsed JSON:', parsed);
+      // Parsed JSON successfully
       
       if (!parsed.flashcards || !Array.isArray(parsed.flashcards)) {
         throw new Error('Invalid flashcard format - missing flashcards array');
       }
 
       // Successfully parsed flashcards
-      console.log('✅ Successfully parsed flashcards:', parsed.flashcards);
 
       return parsed.flashcards.map((card: any, index: number) => ({
         id: `flashcard_${Date.now()}_${index}`,
@@ -450,9 +449,9 @@ FINAL REMINDER:
       // Save to Firebase if we found an updated set
       if (updatedSet) {
         await firebaseService.updateFlashcardSet(updatedSet.id, updatedSet);
-        console.log('✅ Successfully updated flashcard mastery in Firebase');
+        // Successfully updated flashcard mastery in Firebase
       } else {
-        console.log('⚠️ Flashcard not found for mastery update');
+        // Flashcard not found for mastery update
       }
     } catch (error) {
       console.error('Failed to update flashcard mastery:', error);
@@ -474,11 +473,11 @@ FINAL REMINDER:
     const userId = this.getCurrentUserId();
     
     try {
-      console.log('💾 Saving flashcard set to Firebase:', { title: flashcardSet.title, userId });
+      // Saving flashcard set to Firebase
       
       const firebaseId = await firebaseService.saveFlashcardSet(flashcardSet, userId);
       
-      console.log('✅ Successfully saved flashcard set to Firebase with ID:', firebaseId);
+      // Successfully saved flashcard set to Firebase
       
       // Update the flashcard set with the Firebase ID
       flashcardSet.id = firebaseId;
@@ -494,34 +493,34 @@ FINAL REMINDER:
     const userId = this.getCurrentUserId();
     
     try {
-      console.log('🗑️ Attempting to delete flashcard set with ID:', setId);
+      // Attempting to delete flashcard set
       
       // If it's a local ID, we need to find the actual Firebase document
       if (setId.startsWith('set_')) {
-        console.log('⚠️ Local ID detected, finding Firebase document...');
+        // Local ID detected, finding Firebase document
         
         // Get all flashcard sets from Firebase
         const allSets = await firebaseService.getFlashcardSets(userId);
-        console.log('🔍 Available flashcard sets:', allSets.map(s => ({ id: s.id, title: s.title })));
+        // Available flashcard sets retrieved
         
         // Since we can't find the exact match, delete ALL flashcard sets to clean up
-        console.log('🧹 Local ID not found in Firebase, performing complete cleanup...');
+        // Local ID not found in Firebase, performing complete cleanup
         let deletedCount = 0;
         for (const set of allSets) {
           try {
             await firebaseService.deleteFlashcardSet(set.id, userId);
-            console.log('✅ Deleted set:', set.id);
+            // Deleted set successfully
             deletedCount++;
           } catch (error) {
-            console.log('⚠️ Failed to delete set:', set.id, error);
+            // Failed to delete set
           }
         }
-        console.log(`✅ Cleanup completed: deleted ${deletedCount} flashcard sets`);
+        // Cleanup completed
       } else {
         // It's already a Firebase document ID
-        console.log('☁️ Firebase document ID detected, deleting directly...');
+        // Firebase document ID detected, deleting directly
         await firebaseService.deleteFlashcardSet(setId, userId);
-        console.log('✅ Successfully deleted flashcard set from Firebase');
+        // Successfully deleted flashcard set from Firebase
       }
       
     } catch (error) {
@@ -535,7 +534,7 @@ FINAL REMINDER:
     const userId = this.getCurrentUserId();
     
     try {
-      console.log('🧹 Starting cleanup of flashcard sets with local IDs...');
+      // Starting cleanup of flashcard sets with local IDs
       
       // Get all flashcard sets from Firebase
       const allSets = await firebaseService.getFlashcardSets(userId);
@@ -546,19 +545,19 @@ FINAL REMINDER:
         return data.originalId && data.originalId.startsWith('set_');
       });
       
-      console.log(`🔍 Found ${setsWithLocalIds.length} sets with local IDs to cleanup`);
+      // Found sets with local IDs to cleanup
       
       // Delete all sets with local IDs
       for (const set of setsWithLocalIds) {
         try {
           await firebaseService.deleteFlashcardSet(set.id, userId);
-          console.log('✅ Cleaned up set with local ID:', set.id);
+          // Cleaned up set with local ID
         } catch (error) {
-          console.log('⚠️ Failed to cleanup set:', set.id, error);
+          // Failed to cleanup set
         }
       }
       
-      console.log('✅ Cleanup completed');
+      // Cleanup completed
       
     } catch (error) {
       console.error('Failed to cleanup local IDs:', error);

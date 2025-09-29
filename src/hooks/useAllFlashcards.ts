@@ -21,13 +21,12 @@ export const useAllFlashcards = () => {
   const loadAllFlashcards = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('🔄 Loading flashcards from Firebase...');
+      // Loading flashcards from Firebase
       
       // Get flashcard sets directly from Firebase
       const sets = await flashcardService.getFlashcardSets();
       
-      console.log(`📚 Loaded ${sets.length} flashcard sets from Firebase`);
-      console.log('🔍 Flashcard set IDs:', sets.map(s => ({ id: s.id, title: s.title })));
+      // Loaded flashcard sets from Firebase
       
       // Sort by creation date (newest first)
       sets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -94,7 +93,7 @@ export const useAllFlashcards = () => {
     const unsubscribe = firebaseAuthService.onAuthStateChange((user) => {
       if (user && flashcardSets.length === 0 && !isLoading) {
         // User is authenticated but we have no flashcard sets, retry loading
-        console.log('User authenticated, retrying flashcard load...');
+        // User authenticated, retrying flashcard load
         loadAllFlashcards();
       }
     });

@@ -267,8 +267,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const confirmDelete = async () => {
     if (flashcardToDelete) {
       try {
-        console.log('🗑️ UI: Attempting to delete flashcard set with ID:', flashcardToDelete.id);
-        console.log('🗑️ UI: Flashcard set details:', { id: flashcardToDelete.id, title: flashcardToDelete.title });
+        // Attempting to delete flashcard set
         await removeFlashcardSet(flashcardToDelete.id);
         setShowDeleteConfirm(false);
         setFlashcardToDelete(null);

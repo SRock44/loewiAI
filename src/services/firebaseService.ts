@@ -345,7 +345,7 @@ export class FirebaseService {
       // Check for duplicate flashcard sets to prevent duplicates
       const existingSet = await this.findDuplicateFlashcardSet(flashcardSet, userId);
       if (existingSet) {
-        console.log(`🔄 Found duplicate flashcard set, updating existing instead of creating new one`);
+        // Found duplicate flashcard set, updating existing instead of creating new one
         const setRef = doc(db, 'flashcardSets', existingSet.id);
         await updateDoc(setRef, {
           ...cleanFlashcardSet,
@@ -360,7 +360,7 @@ export class FirebaseService {
       const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
       
       // Create new flashcard set only if no duplicates found
-      console.log(`✅ Creating new flashcard set: ${flashcardSet.title}`);
+      // Creating new flashcard set
       const docRef = await addDoc(collection(db, 'flashcardSets'), {
         ...cleanFlashcardSet,
         userId,
@@ -459,11 +459,7 @@ export class FirebaseService {
             expiresAt: data.expiresAt?.toDate ? data.expiresAt.toDate() : data.expiresAt
           } as FlashcardSet;
           
-          console.log('📋 Loaded flashcard set from Firebase:', { 
-            documentId: doc.id, 
-            setId: flashcardSet.id, 
-            title: flashcardSet.title 
-          });
+          // Loaded flashcard set from Firebase
           
           return flashcardSet;
         })
@@ -733,10 +729,7 @@ export class FirebaseService {
         this.cleanupDuplicateSessions('all') // Clean all users
       ]);
       
-      const total = expiredSessions + expiredFlashcards + duplicatesRemoved;
-      if (total > 0) {
-        console.log(`🧹 Cleanup completed: ${total} items removed (sessions: ${expiredSessions}, flashcards: ${expiredFlashcards}, duplicates: ${duplicatesRemoved})`);
-      }
+      // Cleanup completed silently
       
       return {
         expiredSessions,
