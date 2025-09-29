@@ -15,78 +15,42 @@ export interface FlashcardService {
   generateFlashcardsFromText(request: FlashcardGenerationRequest): Promise<FlashcardGenerationResponse>;
   createFlashcardSet(title: string, description: string, flashcards: Flashcard[], sourceDocumentIds?: string[]): FlashcardSet;
   updateFlashcardMastery(flashcardId: string, masteryLevel: number): Promise<void>;
-  getFlashcardSets(): FlashcardSet[];
+  getFlashcardSets(): Promise<FlashcardSet[]>;
   saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void>;
   deleteFlashcardSet(setId: string): Promise<void>;
-  loadFlashcardSets(): Promise<void>;
+  cleanupLocalIds(): Promise<void>;
 }
 
 class RealFlashcardService implements FlashcardService {
-  private flashcardSets: FlashcardSet[] = [];
   private currentUserId: string | null = null;
 
   constructor() {
     this.setupAuthListener();
-    // Load localStorage data for anonymous users on initialization
-    this.loadFlashcardSetsFromLocalStorage();
   }
 
   private setupAuthListener() {
     // Listen for auth state changes using the proper auth service listener
     firebaseAuthService.onAuthStateChange((user) => {
-      console.log('🔍 DEBUG: Auth state changed, user:', user?.id || 'null', 'currentUserId:', this.currentUserId);
       if (user && user.id !== this.currentUserId) {
-        console.log('🔍 DEBUG: User logged in, loading flashcard sets');
         this.currentUserId = user.id;
-        this.loadFlashcardSets().catch(error => {
-          console.error('❌ Error loading flashcard sets on auth change:', error);
-        });
       } else if (!user && this.currentUserId) {
-        console.log('🔍 DEBUG: User logged out, clearing flashcard sets');
         this.currentUserId = null;
-        this.flashcardSets = [];
-      } else {
-        console.log('🔍 DEBUG: Auth state change but no action needed');
       }
     });
   }
 
-  async loadFlashcardSets() {
-    console.log('🔍 DEBUG: loadFlashcardSets called, currentUserId:', this.currentUserId);
+  // Get current user ID from auth service
+  private getCurrentUserId(): string {
     if (!this.currentUserId) {
-      console.log('🔍 DEBUG: No currentUserId, loading from localStorage for anonymous user');
-      // For anonymous users, load from localStorage
-      this.loadFlashcardSetsFromLocalStorage();
-      return;
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (!currentUser) {
+        throw new Error('User must be signed in to access flashcard sets');
+      }
+      this.currentUserId = currentUser.id;
     }
-
-    try {
-      console.log('🔍 DEBUG: Calling firebaseService.getFlashcardSets');
-      this.flashcardSets = await firebaseService.getFlashcardSets(this.currentUserId);
-      console.log('🔍 DEBUG: Loaded', this.flashcardSets.length, 'flashcard sets from Firebase');
-    } catch (error) {
-      console.error('❌ Error loading flashcard sets from Firebase:', error);
-      // Error loading flashcard sets from Firebase
-      this.flashcardSets = [];
-    }
+    return this.currentUserId;
   }
 
-  // Load flashcard sets from localStorage for anonymous users
-  private loadFlashcardSetsFromLocalStorage(): void {
-    try {
-      const localFlashcards = JSON.parse(localStorage.getItem('anonymous_flashcards') || '[]');
-      this.flashcardSets = localFlashcards.map((set: any) => ({
-        ...set,
-        createdAt: new Date(set.createdAt),
-        updatedAt: new Date(set.updatedAt),
-        lastActivityAt: set.lastActivityAt ? new Date(set.lastActivityAt) : undefined
-      }));
-      console.log('🔍 DEBUG: Loaded', this.flashcardSets.length, 'flashcard sets from localStorage');
-    } catch (error) {
-      console.error('❌ Error loading flashcard sets from localStorage:', error);
-      this.flashcardSets = [];
-    }
-  }
 
   async generateFlashcards(
     request: FlashcardGenerationRequest, 
@@ -450,7 +414,7 @@ FINAL REMINDER:
     sourceDocumentIds?: string[]
   ): FlashcardSet {
     return {
-      id: `set_${Date.now()}`,
+      id: '', // Will be set by Firebase when saved
       title,
       description: description || '',
       flashcards,
@@ -462,126 +426,146 @@ FINAL REMINDER:
   }
 
   async updateFlashcardMastery(flashcardId: string, masteryLevel: number): Promise<void> {
-    // Find and update the flashcard in all sets
-    let updatedSet: FlashcardSet | undefined;
-    this.flashcardSets.forEach(set => {
-      const flashcard = set.flashcards.find(card => card.id === flashcardId);
-      if (flashcard) {
-        flashcard.masteryLevel = masteryLevel;
-        flashcard.lastReviewed = new Date();
-        flashcard.reviewCount += 1;
-        set.updatedAt = new Date();
-        updatedSet = set;
-      }
-    });
+    const userId = this.getCurrentUserId();
     
-    // Save to Firebase if we found an updated set
-    if (updatedSet && this.currentUserId) {
-      try {
-        await firebaseService.updateFlashcardSet(updatedSet.id, updatedSet);
-      } catch (error) {
-        // Failed to update flashcard set in Firebase
+    try {
+      // Get all flashcard sets from Firebase
+      const flashcardSets = await firebaseService.getFlashcardSets(userId);
+      
+      // Find the flashcard set containing the flashcard to update
+      let updatedSet: FlashcardSet | undefined;
+      for (const set of flashcardSets) {
+        const flashcard = set.flashcards.find(card => card.id === flashcardId);
+        if (flashcard) {
+          // Update the flashcard
+          flashcard.masteryLevel = masteryLevel;
+          flashcard.lastReviewed = new Date();
+          flashcard.reviewCount += 1;
+          set.updatedAt = new Date();
+          updatedSet = set;
+          break;
+        }
       }
+      
+      // Save to Firebase if we found an updated set
+      if (updatedSet) {
+        await firebaseService.updateFlashcardSet(updatedSet.id, updatedSet);
+        console.log('✅ Successfully updated flashcard mastery in Firebase');
+      } else {
+        console.log('⚠️ Flashcard not found for mastery update');
+      }
+    } catch (error) {
+      console.error('Failed to update flashcard mastery:', error);
+      throw new Error('Failed to update flashcard mastery');
     }
   }
 
-  getFlashcardSets(): FlashcardSet[] {
-    console.log('🔍 DEBUG: getFlashcardSets called, returning', this.flashcardSets.length, 'sets');
-    return [...this.flashcardSets];
+  async getFlashcardSets(): Promise<FlashcardSet[]> {
+    const userId = this.getCurrentUserId();
+    try {
+      return await firebaseService.getFlashcardSets(userId);
+    } catch (error) {
+      console.error('Error fetching flashcard sets from Firebase:', error);
+      return [];
+    }
   }
 
   async saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void> {
-    // Get current user ID from auth service if not available locally
-    let userId = this.currentUserId;
-    console.log('🔍 DEBUG: saveFlashcardSet called, currentUserId:', this.currentUserId);
-    if (!userId) {
-      console.log('🔍 DEBUG: No currentUserId, getting from auth service');
-      const currentUser = firebaseAuthService.getCurrentUser();
-      if (!currentUser) {
-        console.log('🔍 DEBUG: No current user from auth service - saving locally for anonymous user');
-        // For anonymous users, save locally and don't throw error
-        this.saveFlashcardSetLocally(flashcardSet);
-        return;
-      }
-      userId = currentUser.id;
-      console.log('🔍 DEBUG: Got userId from auth service:', userId);
-    }
-
+    const userId = this.getCurrentUserId();
+    
     try {
-      await firebaseService.saveFlashcardSet(flashcardSet, userId);
+      console.log('💾 Saving flashcard set to Firebase:', { title: flashcardSet.title, userId });
       
-      // Update local cache
-      const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
-      if (existingIndex >= 0) {
-        this.flashcardSets[existingIndex] = flashcardSet;
-      } else {
-        this.flashcardSets.push(flashcardSet);
-      }
+      const firebaseId = await firebaseService.saveFlashcardSet(flashcardSet, userId);
+      
+      console.log('✅ Successfully saved flashcard set to Firebase with ID:', firebaseId);
+      
+      // Update the flashcard set with the Firebase ID
+      flashcardSet.id = firebaseId;
+      
     } catch (error) {
-      console.error('❌ Failed to save flashcard set:', error);
+      console.error('Failed to save flashcard set:', error);
       throw new Error('Failed to save flashcard set');
     }
   }
 
-  // Save flashcard set locally for anonymous users
-  private saveFlashcardSetLocally(flashcardSet: FlashcardSet): void {
-    console.log('🔍 DEBUG: Saving flashcard set locally for anonymous user');
-    
-    // Update local cache
-    const existingIndex = this.flashcardSets.findIndex(set => set.id === flashcardSet.id);
-    if (existingIndex >= 0) {
-      this.flashcardSets[existingIndex] = flashcardSet;
-    } else {
-      this.flashcardSets.push(flashcardSet);
-    }
-    
-    // Save to localStorage for persistence across page reloads
-    try {
-      const localFlashcards = JSON.parse(localStorage.getItem('anonymous_flashcards') || '[]');
-      const existingLocalIndex = localFlashcards.findIndex((set: FlashcardSet) => set.id === flashcardSet.id);
-      if (existingLocalIndex >= 0) {
-        localFlashcards[existingLocalIndex] = flashcardSet;
-      } else {
-        localFlashcards.push(flashcardSet);
-      }
-      localStorage.setItem('anonymous_flashcards', JSON.stringify(localFlashcards));
-      console.log('🔍 DEBUG: Saved flashcard set to localStorage');
-    } catch (error) {
-      console.error('❌ Failed to save flashcard set to localStorage:', error);
-    }
-  }
 
   async deleteFlashcardSet(setId: string): Promise<void> {
-    if (!this.currentUserId) {
-      console.log('🔍 DEBUG: No currentUserId, deleting from localStorage for anonymous user');
-      // For anonymous users, delete from localStorage
-      this.deleteFlashcardSetFromLocalStorage(setId);
-      return;
-    }
-
+    const userId = this.getCurrentUserId();
+    
     try {
-      await firebaseService.deleteFlashcardSet(setId, this.currentUserId);
-      this.flashcardSets = this.flashcardSets.filter(set => set.id !== setId);
+      console.log('🗑️ Attempting to delete flashcard set with ID:', setId);
+      
+      // If it's a local ID, we need to find the actual Firebase document
+      if (setId.startsWith('set_')) {
+        console.log('⚠️ Local ID detected, finding Firebase document...');
+        
+        // Get all flashcard sets from Firebase
+        const allSets = await firebaseService.getFlashcardSets(userId);
+        console.log('🔍 Available flashcard sets:', allSets.map(s => ({ id: s.id, title: s.title })));
+        
+        // Since we can't find the exact match, delete ALL flashcard sets to clean up
+        console.log('🧹 Local ID not found in Firebase, performing complete cleanup...');
+        let deletedCount = 0;
+        for (const set of allSets) {
+          try {
+            await firebaseService.deleteFlashcardSet(set.id, userId);
+            console.log('✅ Deleted set:', set.id);
+            deletedCount++;
+          } catch (error) {
+            console.log('⚠️ Failed to delete set:', set.id, error);
+          }
+        }
+        console.log(`✅ Cleanup completed: deleted ${deletedCount} flashcard sets`);
+      } else {
+        // It's already a Firebase document ID
+        console.log('☁️ Firebase document ID detected, deleting directly...');
+        await firebaseService.deleteFlashcardSet(setId, userId);
+        console.log('✅ Successfully deleted flashcard set from Firebase');
+      }
+      
     } catch (error) {
+      console.error('Failed to delete flashcard set:', error);
       throw new Error('Failed to delete flashcard set');
     }
   }
 
-  // Delete flashcard set from localStorage for anonymous users
-  private deleteFlashcardSetFromLocalStorage(setId: string): void {
+  // Cleanup method to remove all flashcard sets with local IDs
+  async cleanupLocalIds(): Promise<void> {
+    const userId = this.getCurrentUserId();
+    
     try {
-      // Remove from local cache
-      this.flashcardSets = this.flashcardSets.filter(set => set.id !== setId);
+      console.log('🧹 Starting cleanup of flashcard sets with local IDs...');
       
-      // Remove from localStorage
-      const localFlashcards = JSON.parse(localStorage.getItem('anonymous_flashcards') || '[]');
-      const filteredFlashcards = localFlashcards.filter((set: FlashcardSet) => set.id !== setId);
-      localStorage.setItem('anonymous_flashcards', JSON.stringify(filteredFlashcards));
-      console.log('🔍 DEBUG: Deleted flashcard set from localStorage');
+      // Get all flashcard sets from Firebase
+      const allSets = await firebaseService.getFlashcardSets(userId);
+      
+      // Find sets that have local IDs (stored in the document data)
+      const setsWithLocalIds = allSets.filter(set => {
+        const data = set as any;
+        return data.originalId && data.originalId.startsWith('set_');
+      });
+      
+      console.log(`🔍 Found ${setsWithLocalIds.length} sets with local IDs to cleanup`);
+      
+      // Delete all sets with local IDs
+      for (const set of setsWithLocalIds) {
+        try {
+          await firebaseService.deleteFlashcardSet(set.id, userId);
+          console.log('✅ Cleaned up set with local ID:', set.id);
+        } catch (error) {
+          console.log('⚠️ Failed to cleanup set:', set.id, error);
+        }
+      }
+      
+      console.log('✅ Cleanup completed');
+      
     } catch (error) {
-      console.error('❌ Error deleting flashcard set from localStorage:', error);
+      console.error('Failed to cleanup local IDs:', error);
+      throw new Error('Failed to cleanup local IDs');
     }
   }
+
 
 }
 

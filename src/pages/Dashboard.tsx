@@ -10,7 +10,11 @@ export interface DashboardRef {
   switchToChat: (chatId: string) => void;
 }
 
-const Dashboard = forwardRef<DashboardRef>((_, ref) => {
+interface DashboardProps {
+  onNewSessionCreated?: (session: any) => void;
+}
+
+const Dashboard = forwardRef<DashboardRef, DashboardProps>(({ onNewSessionCreated }, ref) => {
   useAuth(); // Authentication context
   const [uploadedDocuments, setUploadedDocuments] = useState<DocumentMetadata[]>([]);
   const chatInterfaceRef = useRef<ChatInterfaceRef>(null);
@@ -46,6 +50,9 @@ const Dashboard = forwardRef<DashboardRef>((_, ref) => {
           onDocumentsChange={handleDocumentsUploaded}
           onNewSession={(session) => {
             console.log('New chat session created:', session);
+            if (onNewSessionCreated) {
+              onNewSessionCreated(session);
+            }
           }}
         />
       </ErrorBoundary>

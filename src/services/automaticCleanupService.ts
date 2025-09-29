@@ -37,7 +37,9 @@ class AutomaticCleanupService {
       
       const total = results.expiredSessions + results.expiredFlashcards + results.duplicatesRemoved;
       if (total > 0) {
+        console.log(`🧹 Automatic cleanup completed: ${total} items cleaned up`);
       } else {
+        console.log('🧹 Automatic cleanup completed: No items needed cleaning');
       }
     } catch (error) {
       console.error('❌ Automatic cleanup failed:', error);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ReactCardFlip from 'react-card-flip';
 import { Flashcard as FlashcardType } from '../types/flashcard';
+import { renderMarkdownSafe } from '../utils/markdownRenderer';
 import './Flashcard.css';
 
 interface FlashcardProps {
@@ -103,7 +104,10 @@ const Flashcard: React.FC<FlashcardProps> = ({
           
           <div className="flashcard-content">
             <h3 className="flashcard-title">Question</h3>
-            <p className="flashcard-text">{flashcard.question}</p>
+            <div 
+              className="flashcard-text" 
+              dangerouslySetInnerHTML={{ __html: renderMarkdownSafe(flashcard.question || '') }}
+            />
           </div>
           
           <div className="flashcard-footer">
@@ -143,7 +147,10 @@ const Flashcard: React.FC<FlashcardProps> = ({
           
           <div className="flashcard-content">
             <h3 className="flashcard-title">Answer</h3>
-            <p className="flashcard-text">{flashcard.answer}</p>
+            <div 
+              className="flashcard-text" 
+              dangerouslySetInnerHTML={{ __html: renderMarkdownSafe(flashcard.answer || '') }}
+            />
           </div>
           
           <div className="flashcard-footer">

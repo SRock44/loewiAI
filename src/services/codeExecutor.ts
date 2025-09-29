@@ -112,9 +112,47 @@ export class CodeExecutor {
   }
 
   /**
-   * Executes JavaScript code safely
+   * Executes JavaScript code safely with security restrictions
+   * WARNING: This uses eval() which can be dangerous. Only use in controlled educational environments.
    */
   private async executeJavaScript(code: string, startTime: number): Promise<CodeExecutionResult> {
+    // Security checks - block dangerous operations
+    const dangerousPatterns = [
+      /import\s*\(/g,           // Dynamic imports
+      /require\s*\(/g,          // CommonJS requires
+      /fetch\s*\(/g,            // Network requests
+      /XMLHttpRequest/g,        // XHR requests
+      /localStorage/g,          // Local storage access
+      /sessionStorage/g,        // Session storage access
+      /document\.cookie/g,      // Cookie access
+      /window\./g,              // Window object access
+      /location\./g,            // Location object access
+      /history\./g,             // History object access
+      /navigator\./g,           // Navigator object access
+      /screen\./g,              // Screen object access
+      /alert\s*\(/g,            // Alert dialogs
+      /confirm\s*\(/g,          // Confirm dialogs
+      /prompt\s*\(/g,           // Prompt dialogs
+      /setTimeout\s*\(/g,       // Timers
+      /setInterval\s*\(/g,      // Intervals
+      /Worker\s*\(/g,           // Web workers
+      /eval\s*\(/g,             // Nested eval
+      /Function\s*\(/g,         // Function constructor
+      /new\s+Function/g         // Function constructor
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(code)) {
+        return {
+          success: false,
+          output: '',
+          error: `Security restriction: Code contains potentially dangerous operation. This is blocked for safety.`,
+          executionTime: Date.now() - startTime,
+          language: 'javascript'
+        };
+      }
+    }
+
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         resolve({
@@ -154,7 +192,7 @@ export class CodeExecutor {
           ).join(' ') + '\n';
         };
 
-        // Execute the code
+        // Execute the code with eval (restricted by security checks above)
         const result = eval(code);
         
         // Restore original console methods

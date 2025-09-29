@@ -14,7 +14,13 @@ function App() {
   const handleCreateNewChat = () => {
     if (dashboardRef.current?.createNewChat) {
       dashboardRef.current.createNewChat();
+      // Clear current chat ID when creating a new chat
+      setCurrentChatId(undefined);
     }
+  };
+
+  const handleNewSessionCreated = (session: any) => {
+    setCurrentChatId(session.id);
   };
 
   const handleChatSelect = (chatId: string) => {
@@ -55,7 +61,7 @@ function App() {
                        </>
                      } />
                      <Route path="/dashboard" element={
-                       <Dashboard ref={dashboardRef} />
+                       <Dashboard ref={dashboardRef} onNewSessionCreated={handleNewSessionCreated} />
                      } />
             </Routes>
           </Layout>

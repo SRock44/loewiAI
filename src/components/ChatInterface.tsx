@@ -227,12 +227,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   }, [uploadedFiles, onDocumentsChange]);
 
-  const loadSessions = () => {
+  const loadSessions = async () => {
     if (!isAuthenticated) {
       return;
     }
 
-    chatService.reloadForUser();
+    await chatService.reloadForUser();
     const existingSessions = chatService.getSessions();
     setSessions(existingSessions);
     
@@ -248,7 +248,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const createNewSession = async () => {
     const newSession = await chatService.createNewSession();
     setCurrentSession(newSession);
-    setSessions(prev => [newSession, ...prev]);
+    
+    // Refresh sessions from chat service to get all updated sessions
+    const updatedSessions = chatService.getSessions();
+    setSessions(updatedSessions);
+    
     setMessages([]);
     if (onNewSession) {
       onNewSession(newSession);
@@ -268,48 +272,16 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     setCurrentFlashcardSet(flashcardSet);
     setShowFlashcardList(true);
     
-    // Save to sessionStorage and dispatch event for current session
-    if (currentSession) {
-      const sessionFlashcards = sessionStorage.getItem(`flashcards_${currentSession.id}`);
-      let existingFlashcards = [];
-      if (sessionFlashcards) {
-        try {
-          existingFlashcards = JSON.parse(sessionFlashcards);
-        } catch (error) {
-          // Error parsing existing session flashcards
-        }
-      }
-      
-      const updatedFlashcards = [flashcardSet, ...existingFlashcards];
-      sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
-      
-      // Dispatch event to notify other components
-      allFlashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate', {
-        detail: { sessionId: currentSession.id, flashcardSets: updatedFlashcards }
-      }));
-    }
+    // Dispatch event to notify other components
+    allFlashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate', {
+      detail: { sessionId: currentSession?.id, flashcardSets: [flashcardSet] }
+    }));
   };
 
   const handleFlashcardSetUpdate = (updatedSet: FlashcardSet) => {
     // Flashcard updates are now managed by the unified system
     if (currentFlashcardSet?.id === updatedSet.id) {
       setCurrentFlashcardSet(updatedSet);
-    }
-    
-    // Save updated flashcard set to sessionStorage
-    if (currentSession) {
-      const sessionFlashcards = sessionStorage.getItem(`flashcards_${currentSession.id}`);
-      let existingFlashcards = [];
-      if (sessionFlashcards) {
-        try {
-          existingFlashcards = JSON.parse(sessionFlashcards);
-        } catch (error) {
-          // Error parsing existing session flashcards
-        }
-      }
-      
-      const updatedFlashcards = existingFlashcards.map((set: FlashcardSet) => set.id === updatedSet.id ? updatedSet : set);
-      sessionStorage.setItem(`flashcards_${currentSession.id}`, JSON.stringify(updatedFlashcards));
     }
   };
 

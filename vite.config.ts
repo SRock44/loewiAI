@@ -14,14 +14,33 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['pdfjs-dist']
+    include: ['pdfjs-dist', 'react', 'react-dom', 'react-router-dom']
   },
   build: {
+    target: 'es2015',
+    minify: 'terser',
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
-          'pdfjs': ['pdfjs-dist']
-        }
+          // Separate vendor libraries
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['react-router-dom'],
+          'pdfjs': ['pdfjs-dist'],
+          'ai-services': ['@google/generative-ai'],
+          'utils': ['mammoth', 'pptx-parser', 'katex', 'prismjs']
+        },
+        // Optimize chunk naming for better caching
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    },
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
       }
     }
   }

@@ -153,6 +153,7 @@ Would you like me to help you with anything else about the code, such as explain
         if (correctedResponse) {
           finalContent = correctedResponse;
         } else {
+          console.warn('Failed to correct code errors in AI response');
         }
       }
 
@@ -184,7 +185,7 @@ Would you like me to help you with anything else about the code, such as explain
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
           } catch (error) {
-            console.error('❌ Failed to save session to Firebase:', error);
+            console.error('Failed to save session to Firebase:', error);
           }
         }
         
@@ -250,7 +251,7 @@ Would you like me to help you with anything else about the code, such as explain
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
           } catch (error) {
-            console.error('❌ Failed to save session to Firebase:', error);
+            console.error('Failed to save session to Firebase:', error);
           }
         }
       }
@@ -265,6 +266,34 @@ Would you like me to help you with anything else about the code, such as explain
   }
 
   async createNewSession(title?: string): Promise<ChatSession> {
+    // First, save any existing session with messages to Firebase before creating a new one
+    if (this.currentUserId) {
+      const currentSessions = Array.from(this.sessions.values());
+      const sessionsWithMessages = currentSessions.filter(session => 
+        this.hasValidConversation(session) && !session.id.startsWith('firebase_')
+      );
+      
+      // Save all sessions with messages to Firebase
+      for (const session of sessionsWithMessages) {
+        try {
+          const firebaseSessionId = await firebaseService.saveChatSession(session, this.currentUserId);
+          
+          // Update session with Firebase ID
+          const oldId = session.id;
+          session.id = firebaseSessionId;
+          this.sessions.delete(oldId); // Remove old local ID
+          this.sessions.set(firebaseSessionId, session); // Add with Firebase ID
+        } catch (error) {
+          console.error('❌ Failed to save existing session to Firebase:', error);
+        }
+      }
+      
+      // Dispatch event to notify UI components that sessions have been updated
+      if (sessionsWithMessages.length > 0) {
+        window.dispatchEvent(new CustomEvent('sessionUpdated'));
+      }
+    }
+    
     // Check if there's already an empty session that we can reuse
     const existingEmptySession = Array.from(this.sessions.values()).find(session => 
       !this.hasValidConversation(session)
@@ -387,10 +416,7 @@ Would you like me to help you with anything else about the code, such as explain
 
   async deleteSession(sessionId: string): Promise<void> {
     
-    // Remove from memory
-    this.sessions.delete(sessionId);
-    
-    // Delete from Firebase
+    // Delete from Firebase first
     if (this.currentUserId) {
       try {
         
@@ -401,6 +427,13 @@ Would you like me to help you with anything else about the code, such as explain
         
         // Also delete associated messages
         await firebaseService.deleteSessionMessages(firebaseDocId);
+        
+        // Remove from local memory after successful Firebase deletion
+        this.sessions.delete(sessionId);
+        
+        // Reload sessions from Firebase to ensure consistency
+        await this.loadSessionsFromFirebase();
+        
       } catch (error) {
         console.error('❌ Firebase deletion failed:', error);
         throw error; // Re-throw error so UI can handle it
@@ -454,8 +487,8 @@ Would you like me to help you with anything else about the code, such as explain
 
 
   // Reload sessions when user authentication changes
-  reloadForUser(): void {
-    this.loadSessionsFromFirebase();
+  async reloadForUser(): Promise<void> {
+    await this.loadSessionsFromFirebase();
   }
 
   // Clean up old sessions to maintain the 6-session limit
@@ -791,9 +824,6 @@ The document content above contains all the information needed to provide compre
       // Save the set
       await flashcardService.saveFlashcardSet(flashcardSet);
       
-      // Force reload of flashcard sets in the service
-      await flashcardService.loadFlashcardSets();
-      
       // Notify the flashcard system that new flashcards have been saved
       // This will trigger the useAllFlashcards hook to reload the data
       allFlashcardEventTarget.dispatchEvent(new CustomEvent('flashcardUpdate'));
@@ -824,7 +854,7 @@ Your flashcards are now ready for study. You can view them by clicking the "View
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
           } catch (error) {
-            console.error('❌ Failed to save session to Firebase:', error);
+            console.error('Failed to save session to Firebase:', error);
           }
         }
       }
@@ -884,7 +914,7 @@ Your request was valid - this is just a temporary technical issue.`;
             // Dispatch event to notify UI components
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
           } catch (error) {
-            console.error('❌ Failed to save session to Firebase:', error);
+            console.error('Failed to save session to Firebase:', error);
           }
         }
       }

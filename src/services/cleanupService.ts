@@ -56,7 +56,7 @@ export class CleanupService {
     }
   }
 
-  // Cleanup old chat sessions
+  // Cleanup old chat sessions (24-hour retention policy)
   private async cleanupChatSessions(cutoffTime: Date): Promise<number> {
     try {
       const chatSessionsRef = collection(db, 'chatSessions');

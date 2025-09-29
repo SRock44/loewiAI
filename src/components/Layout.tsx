@@ -125,11 +125,45 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [flashcardToDelete, setFlashcardToDelete] = useState<any>(null);
   const [isGridScrollable, setIsGridScrollable] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   
   // Use custom hooks for efficient state management
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const { flashcardSets, updateFlashcardSet, removeFlashcardSet } = useAllFlashcards();
+  const { flashcardSets, updateFlashcardSet, removeFlashcardSet, forceReload } = useAllFlashcards();
+
+  // Function to generate chat topic description
+  const generateChatTopic = (session: ChatSession): string => {
+    const firstMessage = session.messages.find(m => m.role === 'user');
+    if (!firstMessage) return 'New conversation';
+    
+    const content = firstMessage.content.toLowerCase();
+    let topic = '';
+    
+    // Extract key topics from the first message
+    if (content.includes('math') || content.includes('calculus') || content.includes('algebra')) {
+      topic = 'Mathematics';
+    } else if (content.includes('science') || content.includes('biology') || content.includes('chemistry') || content.includes('physics')) {
+      topic = 'Science';
+    } else if (content.includes('history') || content.includes('historical')) {
+      topic = 'History';
+    } else if (content.includes('literature') || content.includes('english') || content.includes('writing')) {
+      topic = 'Literature';
+    } else if (content.includes('programming') || content.includes('code') || content.includes('computer')) {
+      topic = 'Programming';
+    } else if (content.includes('flashcard') || content.includes('study') || content.includes('learn')) {
+      topic = 'Study Help';
+    } else {
+      // Extract first few words as topic
+      const words = firstMessage.content.split(' ').slice(0, 4);
+      topic = words.join(' ');
+      if (topic.length > 30) {
+        topic = topic.substring(0, 30) + '...';
+      }
+    }
+    
+    return topic;
+  };
   
   
   // Wrapper function to update both global flashcard sets and current flashcard set
@@ -174,8 +208,11 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   useEffect(() => {
     const handleSessionUpdate = () => {
       if (isAuthenticated) {
-        const sessions = chatService.getSessions();
-        setChatSessions(sessions);
+        // Add a small delay to ensure sessions are properly updated
+        setTimeout(() => {
+          const sessions = chatService.getSessions();
+          setChatSessions(sessions);
+        }, 100);
       }
     };
     
@@ -193,6 +230,11 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   }, [isAuthenticated]);
 
   const handleChatSelect = (chatId: string) => {
+    // Don't switch if the user is already in this chat
+    if (currentChatId === chatId) {
+      return;
+    }
+    
     if (onChatSelect) {
       onChatSelect(chatId);
     }
@@ -201,8 +243,9 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const handleDeleteChat = async (chatId: string) => {
     try {
       await chatService.deleteSession(chatId);
-      // Refresh chat sessions
-      setChatSessions(chatService.getSessions());
+      // Refresh chat sessions after deletion
+      const updatedSessions = chatService.getSessions();
+      setChatSessions(updatedSessions);
       // Dispatch event to notify other components
       window.dispatchEvent(new CustomEvent('sessionUpdated'));
       // Notify parent component that a chat was deleted
@@ -221,11 +264,18 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (flashcardToDelete) {
-      removeFlashcardSet(flashcardToDelete.id);
-      setShowDeleteConfirm(false);
-      setFlashcardToDelete(null);
+      try {
+        console.log('🗑️ UI: Attempting to delete flashcard set with ID:', flashcardToDelete.id);
+        console.log('🗑️ UI: Flashcard set details:', { id: flashcardToDelete.id, title: flashcardToDelete.title });
+        await removeFlashcardSet(flashcardToDelete.id);
+        setShowDeleteConfirm(false);
+        setFlashcardToDelete(null);
+      } catch (error) {
+        console.error('Error deleting flashcard set:', error);
+        alert('Failed to delete flashcard set. Please try again.');
+      }
     }
   };
 
@@ -251,19 +301,23 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   return (
     <div className="layout">
       {/* Left Sidebar */}
-      <aside className="sidebar">
+      <aside 
+        className="sidebar"
+        onMouseEnter={() => setIsSidebarExpanded(true)}
+        onMouseLeave={() => setIsSidebarExpanded(false)}
+      >
         <nav className="sidebar-nav">
           {!isAuthenticated && (
-            <div className="sign-in-section">
-              <button
-                className="sidebar-sign-in-btn"
-                onClick={() => {
-                  signInWithGoogle().catch(error => {
-                    console.error('Sign in error:', error);
-                  });
-                }}
-                disabled={isLoading}
-              >
+            <button
+              className="nav-item"
+              onClick={() => {
+                signInWithGoogle().catch(error => {
+                  console.error('Sign in error:', error);
+                });
+              }}
+              disabled={isLoading}
+            >
+              <span className="nav-icon">
                 {isLoading ? (
                   <div className="spinner"></div>
                 ) : (
@@ -274,8 +328,9 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
                 )}
-              </button>
-            </div>
+              </span>
+              <span className="nav-label">Sign In</span>
+            </button>
           )}
           {navigationItems.map((item) => (
             <Link
@@ -284,6 +339,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
             >
               <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
             </Link>
           ))}
           
@@ -297,15 +353,17 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               <span className="nav-icon">
                 <AddSquare size={16} />
               </span>
+              <span className="nav-label">New Chat</span>
             </button>
           )}
           
-          {/* Chat History Section - only show when chats exist */}
+          {/* Chat History - directly below New Chat button */}
           {location.pathname === '/dashboard' && chatSessions.length > 0 && (
-            <div className="chat-history-section">
+            <>
               {chatSessions.slice(0, 10).map((session, index) => {
                 const firstMessage = session.messages.find(m => m.role === 'user');
                 const summary = firstMessage ? `Chat about: ${firstMessage.content.substring(0, 100)}${firstMessage.content.length > 100 ? '...' : ''}` : 'New conversation';
+                const chatTopic = generateChatTopic(session);
                 
                 return (
                   <div key={session.id} className="chat-history-item-container">
@@ -317,6 +375,11 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                       <span className="nav-icon chat-number">
                         {index + 1}
                       </span>
+                      {isSidebarExpanded && (
+                        <span className="nav-label chat-topic">
+                          {chatTopic}
+                        </span>
+                      )}
                     </button>
                     <button
                       className="delete-chat-btn"
@@ -331,34 +394,39 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                   </div>
                 );
               })}
-            </div>
+            </>
           )}
           
           {/* Flashcard Button */}
           {location.pathname === '/dashboard' && (
-            <div>
-              <button
-                className="nav-item flashcard-nav-btn"
-                onClick={() => setShowFlashcardList(true)}
-                title={flashcardSets.length > 0 ? `View your flashcard sets (${flashcardSets.length})` : "No flashcards yet - click to create some"}
-              >
-                <span className="nav-icon">
-                  {flashcardSets.length > 0 ? <Card size={16} /> : <DocumentIcon size={16} />}
-                </span>
-              </button>
-            </div>
+            <button
+              className="nav-item flashcard-nav-btn"
+              onClick={() => {
+                setShowFlashcardList(true);
+                forceReload(); // Force reload to get latest Firebase data
+              }}
+              title={flashcardSets.length > 0 ? `View your flashcard sets (${flashcardSets.length})` : "No flashcards yet - click to create some"}
+            >
+              <span className="nav-icon">
+                {flashcardSets.length > 0 ? <Card size={16} /> : <DocumentIcon size={16} />}
+              </span>
+              <span className="nav-label">Flashcards</span>
+            </button>
           )}
         </nav>
 
         <div className="sidebar-footer">
           {isAuthenticated && (
             <button 
-              className="profile-icon-only"
+              className="nav-item"
               onClick={() => setShowSettings(true)}
               title="User Settings"
             >
-              <div className="user-profile-icon">
-              </div>
+              <span className="nav-icon">
+                <div className="user-profile-icon">
+                </div>
+              </span>
+              <span className="nav-label">Settings</span>
             </button>
           )}
         </div>
@@ -387,6 +455,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               ✕
             </button>
             <div className="flashcard-list-content">
+              <div className="modal-section-label">Flashcard History</div>
               {flashcardSets.length === 0 ? (
                 <div className="no-flashcards">
                   <h3>No Flashcards Yet</h3>

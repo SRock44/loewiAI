@@ -26,12 +26,40 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
 }
 
 #root {
   width: 100%;
   margin: 0 auto;
   text-align: center;
+  overflow-x: hidden;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  body {
+    min-width: 280px;
+  }
+  
+  #root {
+    width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    min-width: 260px;
+  }
+}
+
+@media (max-width: 360px) {
+  body {
+    min-width: 240px;
+  }
 }
 
 @media (prefers-color-scheme: light) {

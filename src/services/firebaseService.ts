@@ -50,8 +50,9 @@ export class FirebaseService {
       if (session.id && session.id.startsWith('firebase_')) {
         // Session already exists in Firebase, update it
         const sessionRef = doc(db, 'chatSessions', session.id.replace('firebase_', ''));
+        const cleanSession = this.deepCleanObject(session);
         await updateDoc(sessionRef, {
-          ...session,
+          ...cleanSession,
           userId,
           updatedAt: serverTimestamp(),
           lastActivityAt: serverTimestamp()
@@ -64,8 +65,9 @@ export class FirebaseService {
       if (existingSession) {
         // Update existing session instead of creating duplicate
         const sessionRef = doc(db, 'chatSessions', existingSession.id);
+        const cleanSession = this.deepCleanObject(session);
         await updateDoc(sessionRef, {
-          ...session,
+          ...cleanSession,
           userId,
           updatedAt: serverTimestamp(),
           lastActivityAt: serverTimestamp()
@@ -77,8 +79,9 @@ export class FirebaseService {
       const recentDuplicate = await this.findRecentDuplicateSession(session, userId);
       if (recentDuplicate) {
         const sessionRef = doc(db, 'chatSessions', recentDuplicate.id);
+        const cleanSession = this.deepCleanObject(session);
         await updateDoc(sessionRef, {
-          ...session,
+          ...cleanSession,
           userId,
           updatedAt: serverTimestamp(),
           lastActivityAt: serverTimestamp()
@@ -87,8 +90,9 @@ export class FirebaseService {
       }
 
       // Create new session only if no duplicates found
+      const cleanSession = this.deepCleanObject(session);
       const docRef = await addDoc(collection(db, 'chatSessions'), {
-        ...session,
+        ...cleanSession,
         userId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -423,6 +427,10 @@ export class FirebaseService {
 
   async getFlashcardSets(userId: string): Promise<FlashcardSet[]> {
     try {
+      if (!userId) {
+        return [];
+      }
+      
       const q = query(
         collection(db, 'flashcardSets'),
         where('userId', '==', userId),
@@ -432,26 +440,44 @@ export class FirebaseService {
       const snapshot = await getDocs(q);
       const now = new Date();
       
-      return snapshot.docs
+      const flashcardSets = snapshot.docs
         .map(doc => {
           const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
+          if (!data) {
+            return null;
+          }
+          
+          // Always use the Firebase document ID, ignore any stored local ID
+          const { id: _, ...dataWithoutId } = data;
+          const flashcardSet = {
+            id: doc.id, // Always use the Firebase document ID
+            ...dataWithoutId,
             // Convert Firestore Timestamps to Date objects
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
             updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
             lastActivityAt: data.lastActivityAt?.toDate ? data.lastActivityAt.toDate() : data.lastActivityAt,
             expiresAt: data.expiresAt?.toDate ? data.expiresAt.toDate() : data.expiresAt
           } as FlashcardSet;
+          
+          console.log('📋 Loaded flashcard set from Firebase:', { 
+            documentId: doc.id, 
+            setId: flashcardSet.id, 
+            title: flashcardSet.title 
+          });
+          
+          return flashcardSet;
         })
-        .filter(flashcardSet => {
+        .filter((flashcardSet): flashcardSet is FlashcardSet => {
+          if (!flashcardSet) return false;
+          
           // Filter out expired flashcard sets (24 hours)
           if (flashcardSet.expiresAt) {
             return flashcardSet.expiresAt > now;
           }
           return true; // Keep sets without expiration (backward compatibility)
         });
+
+      return flashcardSets;
     } catch (error) {
       console.error('Error getting flashcard sets:', error);
       return [];
@@ -461,8 +487,9 @@ export class FirebaseService {
   async updateFlashcardSet(setId: string, updates: Partial<FlashcardSet>): Promise<void> {
     try {
       const setRef = doc(db, 'flashcardSets', setId);
+      const cleanUpdates = this.deepCleanObject(updates);
       await updateDoc(setRef, {
-        ...updates,
+        ...cleanUpdates,
         updatedAt: serverTimestamp()
       });
     } catch (error) {
@@ -473,15 +500,34 @@ export class FirebaseService {
 
   async deleteFlashcardSet(setId: string, userId: string): Promise<void> {
     try {
+      console.log('🔍 Checking flashcard set for deletion:', { setId, userId });
+      
       // First verify the flashcard set belongs to the user
       const setRef = doc(db, 'flashcardSets', setId);
-      const setDoc = await getDocs(query(collection(db, 'flashcardSets'), where('id', '==', setId), where('userId', '==', userId)));
+      const setDoc = await getDoc(setRef);
       
-      if (setDoc.empty) {
-        throw new Error('Flashcard set not found or access denied');
+      if (!setDoc.exists()) {
+        console.error('❌ Flashcard set not found in Firebase:', setId);
+        throw new Error('Flashcard set not found');
       }
       
+      const setData = setDoc.data();
+      console.log('📋 Flashcard set data:', { 
+        setId, 
+        setUserId: setData.userId, 
+        requestingUserId: userId,
+        title: setData.title,
+        hasLocalId: setId.startsWith('set_')
+      });
+      
+      if (setData.userId !== userId) {
+        console.error('❌ Access denied - flashcard set belongs to different user');
+        throw new Error('Access denied - flashcard set belongs to different user');
+      }
+      
+      console.log('✅ User authorized, proceeding with deletion');
       await deleteDoc(setRef);
+      console.log('✅ Successfully deleted flashcard set from Firebase');
     } catch (error) {
       console.error('Error deleting flashcard set:', error);
       throw error;
@@ -689,6 +735,7 @@ export class FirebaseService {
       
       const total = expiredSessions + expiredFlashcards + duplicatesRemoved;
       if (total > 0) {
+        console.log(`🧹 Cleanup completed: ${total} items removed (sessions: ${expiredSessions}, flashcards: ${expiredFlashcards}, duplicates: ${duplicatesRemoved})`);
       }
       
       return {

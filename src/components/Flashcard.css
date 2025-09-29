@@ -170,6 +170,59 @@
   margin-bottom: 0;
 }
 
+/* Markdown formatting styles */
+.flashcard-text strong {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 1);
+}
+
+.flashcard-text em {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.flashcard-text ul {
+  margin: 12px 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.flashcard-text li {
+  margin: 6px 0;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.flashcard-text br {
+  line-height: 1.8;
+}
+
+/* Ensure proper spacing for formatted content */
+.flashcard-text p + p {
+  margin-top: 12px;
+}
+
+.flashcard-text p + ul,
+.flashcard-text ul + p {
+  margin-top: 8px;
+}
+
+/* Better list styling */
+.flashcard-text ul {
+  list-style-position: outside;
+}
+
+.flashcard-text li {
+  position: relative;
+}
+
+/* Ensure text doesn't overflow */
+.flashcard-text {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
 .flashcard-footer {
   padding: 8px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
