@@ -19,6 +19,12 @@ export const useAllFlashcards = () => {
 
   // Load flashcards from Firebase (user-specific)
   const loadAllFlashcards = useCallback(async () => {
+    // Check if user is authenticated before attempting to load flashcards
+    if (!firebaseAuthService.isAuthenticated()) {
+      setFlashcardSets([]);
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Loading flashcards from Firebase
@@ -91,15 +97,17 @@ export const useAllFlashcards = () => {
   // Listen for authentication state changes and retry loading if needed
   useEffect(() => {
     const unsubscribe = firebaseAuthService.onAuthStateChange((user) => {
-      if (user && flashcardSets.length === 0 && !isLoading) {
-        // User is authenticated but we have no flashcard sets, retry loading
-        // User authenticated, retrying flashcard load
+      if (user) {
+        // User is authenticated, load flashcards
         loadAllFlashcards();
+      } else {
+        // User signed out, clear flashcards
+        setFlashcardSets([]);
       }
     });
 
     return unsubscribe;
-  }, [flashcardSets.length, isLoading, loadAllFlashcards]);
+  }, [loadAllFlashcards]);
 
 
   // Listen for flashcard update events
