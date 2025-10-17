@@ -15,7 +15,8 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['pdfjs-dist', 'react', 'react-dom', 'react-router-dom']
+    include: ['pdfjs-dist', 'react', 'react-dom', 'react-router-dom', 'prismjs'],
+    exclude: ['prismjs/components'] // Let Prism.js language components load dynamically
   },
   build: {
     target: 'es2015',
@@ -24,13 +25,37 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Separate vendor libraries
-          'react-vendor': ['react', 'react-dom'],
-          'router': ['react-router-dom'],
-          'pdfjs': ['pdfjs-dist'],
-          'ai-services': ['@google/generative-ai'],
-          'utils': ['mammoth', 'pptx-parser', 'katex', 'prismjs']
+        manualChunks: (id) => {
+          // Separate vendor libraries into logical chunks
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('react-router-dom')) {
+              return 'router';
+            }
+            if (id.includes('pdfjs-dist')) {
+              return 'pdfjs';
+            }
+            if (id.includes('@google/generative-ai') || id.includes('firebase')) {
+              return 'ai-services';
+            }
+            if (id.includes('prismjs')) {
+              // Split Prism.js core and components
+              if (id.includes('components')) {
+                return 'prism-languages';
+              }
+              return 'prism-core';
+            }
+            if (id.includes('mammoth') || id.includes('pptx-parser')) {
+              return 'document-parsers';
+            }
+            if (id.includes('katex')) {
+              return 'katex';
+            }
+            // Other node_modules
+            return 'vendor';
+          }
         },
         // Optimize chunk naming for better caching
         chunkFileNames: 'assets/[name]-[hash].js',

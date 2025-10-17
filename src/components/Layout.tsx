@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import UserSettings from './UserSettings';
 import { Home, ChatSquare, AddSquare, Card, Document as DocumentIcon } from 'solar-icons';
-import FlashcardList from './FlashcardList';
 import { useAllFlashcards } from '../hooks/useAllFlashcards';
 import { chatService } from '../services/chatService';
 import { ChatSession } from '../types/chat';
 import './Layout.css';
+
+// Lazy load heavy components
+const UserSettings = lazy(() => import('./UserSettings'));
+const FlashcardList = lazy(() => import('./FlashcardList'));
 
 // Remove the custom ChatHistoryItem interface - we'll use ChatSession directly
 
@@ -437,11 +439,15 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
       </main>
 
       {/* User Settings Modal */}
-      <UserSettings
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        onSignOut={signOut}
-      />
+      {showSettings && (
+        <Suspense fallback={<div className="loading-spinner">Loading Settings...</div>}>
+          <UserSettings
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            onSignOut={signOut}
+          />
+        </Suspense>
+      )}
 
       {/* Flashcard Modal */}
       {showFlashcardList && (
@@ -520,10 +526,12 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               ✕
             </button>
             <div className="flashcard-list-content">
-              <FlashcardList
-                flashcardSet={currentFlashcardSet}
-                onSetUpdate={handleFlashcardSetUpdate}
-              />
+              <Suspense fallback={<div className="loading-spinner">Loading Flashcards...</div>}>
+                <FlashcardList
+                  flashcardSet={currentFlashcardSet}
+                  onSetUpdate={handleFlashcardSetUpdate}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

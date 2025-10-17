@@ -9,24 +9,87 @@ import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-java';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-csharp';
-import 'prismjs/components/prism-ruby';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-rust';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-markup';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-yaml';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-jsx';
-import 'prismjs/components/prism-tsx';
+// Dynamic Prism.js loading for better performance
+const loadPrismLanguage = async (language: string) => {
+  try {
+    switch (language) {
+      case 'javascript':
+        // @ts-ignore - Dynamic import for code splitting
+        await import('prismjs/components/prism-javascript');
+        break;
+      case 'python':
+        // @ts-ignore
+        await import('prismjs/components/prism-python');
+        break;
+      case 'java':
+        // @ts-ignore
+        await import('prismjs/components/prism-java');
+        break;
+      case 'c':
+        // @ts-ignore
+        await import('prismjs/components/prism-c');
+        break;
+      case 'csharp':
+        // @ts-ignore
+        await import('prismjs/components/prism-csharp');
+        break;
+      case 'ruby':
+        // @ts-ignore
+        await import('prismjs/components/prism-ruby');
+        break;
+      case 'go':
+        // @ts-ignore
+        await import('prismjs/components/prism-go');
+        break;
+      case 'rust':
+        // @ts-ignore
+        await import('prismjs/components/prism-rust');
+        break;
+      case 'sql':
+        // @ts-ignore
+        await import('prismjs/components/prism-sql');
+        break;
+      case 'json':
+        // @ts-ignore
+        await import('prismjs/components/prism-json');
+        break;
+      case 'css':
+        // @ts-ignore
+        await import('prismjs/components/prism-css');
+        break;
+      case 'html':
+      case 'xml':
+        // @ts-ignore
+        await import('prismjs/components/prism-markup');
+        break;
+      case 'bash':
+      case 'shell':
+        // @ts-ignore
+        await import('prismjs/components/prism-bash');
+        break;
+      case 'yaml':
+        // @ts-ignore
+        await import('prismjs/components/prism-yaml');
+        break;
+      case 'typescript':
+        // @ts-ignore
+        await import('prismjs/components/prism-typescript');
+        break;
+      case 'jsx':
+        // @ts-ignore
+        await import('prismjs/components/prism-jsx');
+        break;
+      case 'tsx':
+        // @ts-ignore
+        await import('prismjs/components/prism-tsx');
+        break;
+    }
+  } catch (error) {
+    console.warn(`Failed to load Prism language: ${language}`, error);
+  }
+};
+
+import * as Prism from 'prismjs';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -524,16 +587,20 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     return languageMap[lang.toLowerCase()] || lang.toLowerCase();
   };
 
-  const formatMessage = (message: ChatMessage) => {
+  const formatMessage = async (message: ChatMessage) => {
     let content = message.content;
     
     // First, handle code blocks (triple backticks) - must be done before other replacements
-    content = content.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, language, code) => {
+    const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
+    const codeBlocks = [...content.matchAll(codeBlockRegex)];
+    
+    for (const match of codeBlocks) {
+      const [fullMatch, language, code] = match;
       const lang = language || 'text';
       const cleanCode = code.trim();
       const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      // Apply syntax highlighting using Prism.js
+      // Apply syntax highlighting using Prism.js with dynamic loading
       let highlightedCode = cleanCode;
       const prismLang = getPrismLanguage(lang);
       
@@ -544,30 +611,46 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           if (languageDef && typeof languageDef === 'object') {
             highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
           } else {
-            // Invalid language definition
+            // Try to load the language dynamically
+            await loadPrismLanguage(prismLang);
+            const updatedLanguageDef = Prism.languages[prismLang];
+            if (updatedLanguageDef && typeof updatedLanguageDef === 'object') {
+              highlightedCode = Prism.highlight(cleanCode, updatedLanguageDef, prismLang);
+            }
           }
         } catch (error) {
           // Failed to highlight code
           highlightedCode = cleanCode;
         }
       } else if (lang !== 'text') {
-        // Language not supported
+        // Try to load the language dynamically if not available
+        try {
+          await loadPrismLanguage(prismLang);
+          const languageDef = Prism.languages[prismLang];
+          if (languageDef && typeof languageDef === 'object') {
+            highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
+          }
+        } catch (error) {
+          // Failed to load or highlight code
+          highlightedCode = cleanCode;
+        }
       }
       
-      return `<div class="code-block-container">
+      const codeBlockHtml = `<div class="code-block-container">
         <div class="code-block-header">
           <span class="code-language">${lang}</span>
-          <button class="copy-code-btn" data-code-id="${codeId}" data-code-content="${cleanCode.replace(/"/g, '&quot;').replace(/\n/g, '\\n')}">
+          <button class="copy-code-btn" onclick="copyCodeToClipboard('${codeId}')" title="Copy code">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            Copy
           </button>
         </div>
-        <pre class="code-block" id="${codeId}"><code class="language-${prismLang}">${highlightedCode}</code></pre>
+        <pre><code id="${codeId}" class="language-${prismLang}">${highlightedCode}</code></pre>
       </div>`;
-    });
+      
+      content = content.replace(fullMatch, codeBlockHtml);
+    }
     
     // Handle inline code (single backticks)
     content = content.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');

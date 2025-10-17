@@ -1,11 +1,13 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from './components/Layout'
-import Hero from './components/Hero'
-import Features from './components/Features'
-import Dashboard from './pages/Dashboard'
 import './App.css'
+
+// Lazy load components for better performance
+const Hero = lazy(() => import('./components/Hero'))
+const Features = lazy(() => import('./components/Features'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 
 function App() {
   const dashboardRef = useRef<{ createNewChat: () => void; switchToChat: (chatId: string) => void }>(null);
@@ -55,13 +57,15 @@ function App() {
           >
             <Routes>
                      <Route path="/" element={
-                       <>
+                       <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
                          <Hero />
                          <Features />
-                       </>
+                       </Suspense>
                      } />
                      <Route path="/dashboard" element={
-                       <Dashboard ref={dashboardRef} onNewSessionCreated={handleNewSessionCreated} />
+                       <Suspense fallback={<div className="loading-spinner">Loading Dashboard...</div>}>
+                         <Dashboard ref={dashboardRef} onNewSessionCreated={handleNewSessionCreated} />
+                       </Suspense>
                      } />
             </Routes>
           </Layout>
