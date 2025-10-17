@@ -587,56 +587,43 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     return languageMap[lang.toLowerCase()] || lang.toLowerCase();
   };
 
-  const formatMessage = async (message: ChatMessage) => {
+  const formatMessage = (message: ChatMessage) => {
     let content = message.content;
     
     // First, handle code blocks (triple backticks) - must be done before other replacements
-    const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
-    const codeBlocks = [...content.matchAll(codeBlockRegex)];
-    
-    for (const match of codeBlocks) {
-      const [fullMatch, language, code] = match;
+    content = content.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, language, code) => {
       const lang = language || 'text';
       const cleanCode = code.trim();
       const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      // Apply syntax highlighting using Prism.js with dynamic loading
+      // Apply syntax highlighting using Prism.js
       let highlightedCode = cleanCode;
       const prismLang = getPrismLanguage(lang);
       
       if (lang !== 'text' && Prism && Prism.languages && Prism.languages[prismLang] && Prism.highlight) {
         try {
-          // Additional safety check for the specific language
-          const languageDef = Prism.languages[prismLang];
-          if (languageDef && typeof languageDef === 'object') {
-            highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
-          } else {
-            // Try to load the language dynamically
-            await loadPrismLanguage(prismLang);
-            const updatedLanguageDef = Prism.languages[prismLang];
-            if (updatedLanguageDef && typeof updatedLanguageDef === 'object') {
-              highlightedCode = Prism.highlight(cleanCode, updatedLanguageDef, prismLang);
-            }
-          }
-        } catch (error) {
-          // Failed to highlight code
-          highlightedCode = cleanCode;
-        }
-      } else if (lang !== 'text') {
-        // Try to load the language dynamically if not available
-        try {
-          await loadPrismLanguage(prismLang);
           const languageDef = Prism.languages[prismLang];
           if (languageDef && typeof languageDef === 'object') {
             highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
           }
         } catch (error) {
-          // Failed to load or highlight code
+          // Failed to highlight code, use plain text
           highlightedCode = cleanCode;
         }
       }
       
-      const codeBlockHtml = `<div class="code-block-container">
+      // Load language dynamically if not available (fire and forget)
+      if (lang !== 'text' && (!Prism.languages || !Prism.languages[prismLang])) {
+        loadPrismLanguage(prismLang).then(() => {
+          // Re-render the message after language loads
+          const event = new CustomEvent('prismLanguageLoaded', { detail: { messageId: message.id } });
+          window.dispatchEvent(event);
+        }).catch(() => {
+          // Silently fail - code will remain unstyled
+        });
+      }
+      
+      return `<div class="code-block-container">
         <div class="code-block-header">
           <span class="code-language">${lang}</span>
           <button class="copy-code-btn" onclick="copyCodeToClipboard('${codeId}')" title="Copy code">
@@ -648,9 +635,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         </div>
         <pre><code id="${codeId}" class="language-${prismLang}">${highlightedCode}</code></pre>
       </div>`;
-      
-      content = content.replace(fullMatch, codeBlockHtml);
-    }
+    });
     
     // Handle inline code (single backticks)
     content = content.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');

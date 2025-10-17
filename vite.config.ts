@@ -26,13 +26,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Separate vendor libraries into logical chunks
+          // Simplified chunking to avoid circular dependencies
           if (id.includes('node_modules')) {
             if (id.includes('react') || id.includes('react-dom')) {
               return 'react-vendor';
-            }
-            if (id.includes('react-router-dom')) {
-              return 'router';
             }
             if (id.includes('pdfjs-dist')) {
               return 'pdfjs';
@@ -41,17 +38,12 @@ export default defineConfig({
               return 'ai-services';
             }
             if (id.includes('prismjs')) {
-              // Split Prism.js core and components
-              if (id.includes('components')) {
-                return 'prism-languages';
-              }
-              return 'prism-core';
+              // Keep Prism.js components together to avoid issues
+              return 'prism';
             }
-            if (id.includes('mammoth') || id.includes('pptx-parser')) {
-              return 'document-parsers';
-            }
-            if (id.includes('katex')) {
-              return 'katex';
+            // Group document parsers with other utilities to avoid circular deps
+            if (id.includes('mammoth') || id.includes('pptx-parser') || id.includes('katex')) {
+              return 'utils';
             }
             // Other node_modules
             return 'vendor';
