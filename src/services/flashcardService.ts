@@ -40,11 +40,11 @@ class RealFlashcardService implements FlashcardService {
   }
 
   // Get current user ID from auth service
-  private getCurrentUserId(): string {
+  private getCurrentUserId(): string | null {
     if (!this.currentUserId) {
       const currentUser = firebaseAuthService.getCurrentUser();
       if (!currentUser) {
-        throw new Error('User must be signed in to access flashcard sets');
+        return null; // Return null instead of throwing error
       }
       this.currentUserId = currentUser.id;
     }
@@ -427,6 +427,12 @@ FINAL REMINDER:
   async updateFlashcardMastery(flashcardId: string, masteryLevel: number): Promise<void> {
     const userId = this.getCurrentUserId();
     
+    if (!userId) {
+      // For unauthenticated users, update local storage
+      this.updateLocalFlashcardMastery(flashcardId, masteryLevel);
+      return;
+    }
+    
     try {
       // Get all flashcard sets from Firebase
       const flashcardSets = await firebaseService.getFlashcardSets(userId);
@@ -461,6 +467,12 @@ FINAL REMINDER:
 
   async getFlashcardSets(): Promise<FlashcardSet[]> {
     const userId = this.getCurrentUserId();
+    
+    if (!userId) {
+      // For unauthenticated users, get from local storage
+      return this.getLocalFlashcardSets();
+    }
+    
     try {
       return await firebaseService.getFlashcardSets(userId);
     } catch (error) {
@@ -471,6 +483,12 @@ FINAL REMINDER:
 
   async saveFlashcardSet(flashcardSet: FlashcardSet): Promise<void> {
     const userId = this.getCurrentUserId();
+    
+    if (!userId) {
+      // For unauthenticated users, save to local storage
+      this.saveLocalFlashcardSet(flashcardSet);
+      return;
+    }
     
     try {
       // Saving flashcard set to Firebase
@@ -491,6 +509,12 @@ FINAL REMINDER:
 
   async deleteFlashcardSet(setId: string): Promise<void> {
     const userId = this.getCurrentUserId();
+    
+    if (!userId) {
+      // For unauthenticated users, delete from local storage
+      this.deleteLocalFlashcardSet(setId);
+      return;
+    }
     
     try {
       // Attempting to delete flashcard set
@@ -533,6 +557,12 @@ FINAL REMINDER:
   async cleanupLocalIds(): Promise<void> {
     const userId = this.getCurrentUserId();
     
+    if (!userId) {
+      // For unauthenticated users, cleanup local storage
+      this.cleanupLocalStorage();
+      return;
+    }
+    
     try {
       // Starting cleanup of flashcard sets with local IDs
       
@@ -562,6 +592,82 @@ FINAL REMINDER:
     } catch (error) {
       console.error('Failed to cleanup local IDs:', error);
       throw new Error('Failed to cleanup local IDs');
+    }
+  }
+
+  // Local storage methods for unauthenticated users
+  private getLocalFlashcardSets(): FlashcardSet[] {
+    try {
+      const stored = localStorage.getItem('flashcardSets');
+      if (stored) {
+        const sets = JSON.parse(stored);
+        // Convert date strings back to Date objects
+        return sets.map((set: any) => ({
+          ...set,
+          createdAt: new Date(set.createdAt),
+          updatedAt: new Date(set.updatedAt),
+          flashcards: set.flashcards.map((card: any) => ({
+            ...card,
+            createdAt: new Date(card.createdAt),
+            lastReviewed: card.lastReviewed ? new Date(card.lastReviewed) : undefined
+          }))
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error loading flashcard sets from local storage:', error);
+      return [];
+    }
+  }
+
+  private saveLocalFlashcardSet(flashcardSet: FlashcardSet): void {
+    try {
+      const existingSets = this.getLocalFlashcardSets();
+      const updatedSets = [...existingSets, flashcardSet];
+      localStorage.setItem('flashcardSets', JSON.stringify(updatedSets));
+    } catch (error) {
+      console.error('Error saving flashcard set to local storage:', error);
+    }
+  }
+
+  private deleteLocalFlashcardSet(setId: string): void {
+    try {
+      const existingSets = this.getLocalFlashcardSets();
+      const updatedSets = existingSets.filter(set => set.id !== setId);
+      localStorage.setItem('flashcardSets', JSON.stringify(updatedSets));
+    } catch (error) {
+      console.error('Error deleting flashcard set from local storage:', error);
+    }
+  }
+
+  private updateLocalFlashcardMastery(flashcardId: string, masteryLevel: number): void {
+    try {
+      const existingSets = this.getLocalFlashcardSets();
+      const updatedSets = existingSets.map(set => ({
+        ...set,
+        flashcards: set.flashcards.map(card => 
+          card.id === flashcardId 
+            ? { ...card, masteryLevel, lastReviewed: new Date(), reviewCount: (card.reviewCount || 0) + 1 }
+            : card
+        )
+      }));
+      localStorage.setItem('flashcardSets', JSON.stringify(updatedSets));
+    } catch (error) {
+      console.error('Error updating flashcard mastery in local storage:', error);
+    }
+  }
+
+  private cleanupLocalStorage(): void {
+    try {
+      // Remove flashcard sets older than 24 hours from local storage
+      const existingSets = this.getLocalFlashcardSets();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recentSets = existingSets.filter(set => 
+        new Date(set.createdAt) > twentyFourHoursAgo
+      );
+      localStorage.setItem('flashcardSets', JSON.stringify(recentSets));
+    } catch (error) {
+      console.error('Error cleaning up local storage:', error);
     }
   }
 

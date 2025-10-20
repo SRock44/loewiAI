@@ -33,11 +33,32 @@ class AutomaticCleanupService {
   // Run cleanup manually
   async runCleanup(): Promise<void> {
     try {
+      // Only run cleanup if we have authentication or if it's a server-side operation
+      // For now, we'll skip cleanup when not authenticated to avoid permission errors
+      const hasAuth = await this.checkAuthentication();
+      if (!hasAuth) {
+        // Skip cleanup when not authenticated to avoid permission errors
+        return;
+      }
+      
       await firebaseService.runAutomaticCleanup();
       
       // Cleanup completed silently
     } catch (error) {
       console.error('❌ Automatic cleanup failed:', error);
+    }
+  }
+
+  // Check if we have authentication for cleanup operations
+  private async checkAuthentication(): Promise<boolean> {
+    try {
+      // Import the auth service to check authentication status
+      const { firebaseAuthService } = await import('./firebaseAuthService');
+      const currentUser = firebaseAuthService.getCurrentUser();
+      return currentUser !== null;
+    } catch (error) {
+      // If we can't check auth, assume we don't have it
+      return false;
     }
   }
 

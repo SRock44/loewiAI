@@ -40,6 +40,13 @@ export class CleanupService {
   // Run cleanup process
   public async runCleanup(): Promise<void> {
     try {
+      // Check if we have authentication before running cleanup
+      const hasAuth = await this.checkAuthentication();
+      if (!hasAuth) {
+        // Skip cleanup when not authenticated to avoid permission errors
+        return;
+      }
+      
       const cutoffTime = new Date(Date.now() - this.EXPIRY_TIME);
       
       // Cleanup chat sessions
@@ -53,6 +60,19 @@ export class CleanupService {
       
     } catch (error) {
       // Silent error handling - cleanup failures shouldn't affect user experience
+    }
+  }
+
+  // Check if we have authentication for cleanup operations
+  private async checkAuthentication(): Promise<boolean> {
+    try {
+      // Import the auth service to check authentication status
+      const { firebaseAuthService } = await import('./firebaseAuthService');
+      const currentUser = firebaseAuthService.getCurrentUser();
+      return currentUser !== null;
+    } catch (error) {
+      // If we can't check auth, assume we don't have it
+      return false;
     }
   }
 
