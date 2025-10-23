@@ -243,25 +243,29 @@ export class FirebaseService {
 
   async deleteChatSession(sessionId: string): Promise<void> {
     try {
+      console.log('🗑️ Firebase: Deleting chat session:', sessionId);
       await deleteDoc(doc(db, 'chatSessions', sessionId));
+      console.log('✅ Firebase: Chat session deleted successfully');
     } catch (error) {
-      console.error('Error deleting chat session:', error);
+      console.error('❌ Firebase: Error deleting chat session:', error);
       throw error;
     }
   }
 
   async deleteSessionMessages(sessionId: string): Promise<void> {
     try {
+      console.log('🗑️ Firebase: Deleting messages for session:', sessionId);
       const messagesRef = collection(db, 'messages');
       const q = query(messagesRef, where('sessionId', '==', sessionId));
       const snapshot = await getDocs(q);
       
-      
+      console.log(`🗑️ Firebase: Found ${snapshot.docs.length} messages to delete`);
       const deletePromises = snapshot.docs.map(docSnapshot => 
         deleteDoc(doc(db, 'messages', docSnapshot.id))
       );
       
       await Promise.all(deletePromises);
+      console.log('✅ Firebase: Session messages deleted successfully');
     } catch (error) {
       console.error('❌ Firebase: Error deleting session messages:', error);
       throw error;
@@ -635,11 +639,9 @@ export class FirebaseService {
       let deletedCount = 0;
       for (const sessionDoc of expiredSessions) {
         try {
-          // Delete the session
-          await deleteDoc(doc(db, 'chatSessions', sessionDoc.id));
-          
-          // Also delete associated messages
+          // Delete associated messages first, then the session
           await this.deleteSessionMessages(sessionDoc.id);
+          await deleteDoc(doc(db, 'chatSessions', sessionDoc.id));
           
           deletedCount++;
         } catch (error) {

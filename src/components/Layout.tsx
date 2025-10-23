@@ -231,6 +231,14 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
     };
   }, [isAuthenticated]);
 
+  // Also load sessions when component mounts (in case user is already authenticated)
+  useEffect(() => {
+    if (isAuthenticated) {
+      const sessions = chatService.getSessions();
+      setChatSessions(sessions);
+    }
+  }, []); // Run once on mount
+
   const handleChatSelect = (chatId: string) => {
     // Don't switch if the user is already in this chat
     if (currentChatId === chatId) {
@@ -244,18 +252,23 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
   const handleDeleteChat = async (chatId: string) => {
     try {
+      console.log('🗑️ Layout: Starting chat deletion for:', chatId);
       await chatService.deleteSession(chatId);
-      // Refresh chat sessions after deletion
+      console.log('✅ Layout: Chat service deletion completed');
+      
+      // The chatService.deleteSession already reloads from Firebase and dispatches sessionUpdated
+      // Just refresh the local state
       const updatedSessions = chatService.getSessions();
+      console.log('📋 Layout: Updated sessions after deletion:', updatedSessions.length);
       setChatSessions(updatedSessions);
-      // Dispatch event to notify other components
-      window.dispatchEvent(new CustomEvent('sessionUpdated'));
+      
       // Notify parent component that a chat was deleted
       if (onChatDelete) {
         onChatDelete(chatId);
       }
+      console.log('✅ Layout: Chat deletion completed successfully');
     } catch (error) {
-      console.error('Error deleting chat:', error);
+      console.error('❌ Layout: Error deleting chat:', error);
       alert('Failed to delete chat. Please try again.');
     }
   };
