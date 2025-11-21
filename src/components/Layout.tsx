@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Home, ChatSquare, AddSquare, Card, Document as DocumentIcon } from 'solar-icons';
+import { Home, ChatSquare, AddSquare, Card, Document as DocumentIcon } from '@solar-icons/react';
 import { useAllFlashcards } from '../hooks/useAllFlashcards';
 import { chatService } from '../services/chatService';
 import { ChatSession } from '../types/chat';

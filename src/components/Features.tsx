@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { ClipboardList, Home, TextSquare, ChatSquare, Calendar, QuestionCircle } from 'solar-icons'
+import { ClipboardList, Home, TextSquare, ChatSquare, Calendar, QuestionCircle } from '@solar-icons/react'
 import './Features.css'
 
 const Features: React.FC = () => {

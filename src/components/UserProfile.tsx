@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowRight } from 'solar-icons';
+import { ArrowRight } from '@solar-icons/react';
 import './UserProfile.css';
 
 // User Plus SVG Icon Component

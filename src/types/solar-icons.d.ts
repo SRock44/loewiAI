@@ -1,4 +1,4 @@
-declare module 'solar-icons' {
+declare module '@solar-icons/react' {
   import { FC, SVGProps } from 'react';
   
   export interface SolarIconProps extends SVGProps<SVGSVGElement> {

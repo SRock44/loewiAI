@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
-import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from 'solar-icons';
+import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 // Dynamic Prism.js loading for better performance
 const loadPrismLanguage = async (language: string) => {
