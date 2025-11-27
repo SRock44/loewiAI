@@ -30,6 +30,68 @@ npm run dev
 npm run build
 ```
 
+## 🧪 Testing
+
+This project uses [Vitest](https://vitest.dev/) for unit testing with React Testing Library for component testing.
+
+### Running Tests
+
+**Run tests in watch mode (recommended for development):**
+```bash
+npm test
+```
+
+**Run tests once:**
+```bash
+npm run test:run
+```
+
+**Run tests with UI (interactive test runner):**
+```bash
+npm run test:ui
+```
+
+### Test Structure
+
+Tests are organized alongside the source code:
+- Utility tests: `src/utils/__tests__/`
+- Service tests: `src/services/__tests__/`
+- Component tests: `src/components/__tests__/`
+
+### Writing Tests
+
+Example test file structure:
+```typescript
+import { describe, it, expect } from 'vitest'
+import { myFunction } from '../myModule'
+
+describe('myModule', () => {
+  it('should do something', () => {
+    expect(myFunction()).toBe(expectedValue)
+  })
+})
+```
+
+For component tests, use React Testing Library:
+```typescript
+import { render, screen } from '@testing-library/react'
+import MyComponent from '../MyComponent'
+
+describe('MyComponent', () => {
+  it('should render correctly', () => {
+    render(<MyComponent />)
+    expect(screen.getByText('Hello')).toBeInTheDocument()
+  })
+})
+```
+
+### Test Coverage
+
+The project includes unit tests for:
+- ✅ Utility functions (file validation, markdown rendering)
+- ✅ Service modules (flashcard service)
+- ✅ React components (Flashcard component)
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 18 + TypeScript + Vite

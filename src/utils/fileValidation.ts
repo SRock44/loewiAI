@@ -26,8 +26,9 @@ export function validateFile(file: File): FileValidationResult {
 
 export function getFileIcon(fileType: string): string {
   if (fileType.includes('pdf')) return '📄';
-  if (fileType.includes('word') || fileType.includes('document')) return '📝';
+  // Check for presentation before document (since 'presentationml' contains 'document')
   if (fileType.includes('presentation') || fileType.includes('powerpoint')) return '📊';
+  if (fileType.includes('word') || fileType.includes('document')) return '📝';
   return '📎';
 }
 
