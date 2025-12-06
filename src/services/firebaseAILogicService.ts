@@ -61,10 +61,8 @@ class FirebaseAILogicProvider implements AIProvider {
         generationConfig: this.getGenerationConfig(isFlashcardRequest)
       });
       this.currentModelName = modelName;
-      console.log(`✅ Switched to model: ${modelName}`);
       return true;
     } catch (error) {
-      console.warn(`⚠️ Failed to switch to model ${modelName}:`, error);
       return false;
     }
   }
@@ -85,16 +83,15 @@ class FirebaseAILogicProvider implements AIProvider {
   }
 
   private initializeFirebaseAIAsync() {
-    // initialize in the background - if it fails, we'll just log it
-    // the app can still work, just AI features won't be available
-    this.initializeFirebaseAI().catch(error => {
-      console.error('❌ Async Firebase AI Logic initialization failed:', error);
+    // initialize in the background - if it fails, the app can still work
+    // just AI features won't be available
+    this.initializeFirebaseAI().catch(() => {
+      // Initialization failed silently
     });
   }
 
   private async initializeFirebaseAI() {
     if (!this.apiKey) {
-      console.warn('Gemini API key not provided for Firebase AI Logic');
       return;
     }
 
@@ -115,10 +112,9 @@ class FirebaseAILogicProvider implements AIProvider {
           this.currentModelName = modelName;
           this.triedModels.add(modelName);
           modelInitialized = true;
-          console.log(`✅ Initialized Firebase AI Logic with model: ${modelName}`);
           break;
         } catch (modelError) {
-          console.warn(`⚠️ Failed to initialize Firebase AI Logic model ${modelName}:`, modelError);
+          // Model initialization failed, try next
         }
       }
 
@@ -126,7 +122,6 @@ class FirebaseAILogicProvider implements AIProvider {
         throw new Error('All Firebase AI Logic models failed to initialize');
       }
     } catch (error) {
-      console.error('❌ Failed to initialize Firebase AI Logic:', error);
       this.genAI = null;
       this.model = null;
     }
@@ -168,8 +163,6 @@ class FirebaseAILogicProvider implements AIProvider {
           provider: 'Firebase AI Logic'
         };
       } catch (error) {
-        console.error(`❌ Firebase AI Logic flashcard error (attempt ${attempt}/${maxRetries}):`, error);
-        
         // Check if this is a quota exhaustion error (not just rate limiting)
         const errorMessage = error instanceof Error ? error.message : String(error);
         const isQuotaExhausted = errorMessage.includes('quota') && 
@@ -184,7 +177,6 @@ class FirebaseAILogicProvider implements AIProvider {
         
         // If model not found, try switching to another model immediately
         if (isModelNotFound && this.currentModelName) {
-          console.warn(`⚠️ Model ${this.currentModelName} not found for flashcard generation, trying alternative models...`);
           this.triedModels.add(this.currentModelName);
           
           const untriedModels = this.availableModels.filter(m => !this.triedModels.has(m));
@@ -199,7 +191,6 @@ class FirebaseAILogicProvider implements AIProvider {
           }
           
           if (!switched) {
-            console.error('❌ All Firebase AI Logic models are unavailable for flashcard generation');
             throw new Error(`Firebase AI Logic models unavailable: ${errorMessage}`);
           }
           continue;
@@ -207,7 +198,6 @@ class FirebaseAILogicProvider implements AIProvider {
         
         // If quota is exhausted, try switching models
         if (isQuotaExhausted && this.currentModelName) {
-          console.warn(`⚠️ Quota exhausted for model ${this.currentModelName} (flashcards), trying alternative models...`);
           this.triedModels.add(this.currentModelName);
           
           const untriedModels = this.availableModels.filter(m => !this.triedModels.has(m));
@@ -229,7 +219,6 @@ class FirebaseAILogicProvider implements AIProvider {
         // if it's a rate limit or service overload error, wait and retry
         if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
-          console.log(`⏳ Retrying flashcard generation in ${delay}ms due to service overload or rate limit...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -272,8 +261,6 @@ class FirebaseAILogicProvider implements AIProvider {
           provider: 'Firebase AI Logic'
         };
       } catch (error) {
-        console.error(`❌ Firebase AI Logic error (attempt ${attempt}/${maxRetries}):`, error);
-        
         // Check if this is a quota exhaustion error (not just rate limiting)
         const errorMessage = error instanceof Error ? error.message : String(error);
         const isQuotaExhausted = errorMessage.includes('quota') && 
@@ -288,7 +275,6 @@ class FirebaseAILogicProvider implements AIProvider {
         
         // If model not found, try switching to another model immediately
         if (isModelNotFound && this.currentModelName) {
-          console.warn(`⚠️ Model ${this.currentModelName} not found or unavailable, trying alternative models...`);
           this.triedModels.add(this.currentModelName);
           
           // Try other models that haven't been tried yet
@@ -304,7 +290,6 @@ class FirebaseAILogicProvider implements AIProvider {
           
           // If we couldn't switch models, all models are unavailable - fall back
           if (!switched) {
-            console.error('❌ All Firebase AI Logic models are unavailable - falling back');
             throw new Error(`Firebase AI Logic models unavailable: ${errorMessage}`);
           }
           // Continue to retry with the new model (this will restart the loop)
@@ -313,7 +298,6 @@ class FirebaseAILogicProvider implements AIProvider {
         
         // If quota is exhausted for current model, try switching to another model
         if (isQuotaExhausted && this.currentModelName) {
-          console.warn(`⚠️ Quota exhausted for model ${this.currentModelName}, trying alternative models...`);
           this.triedModels.add(this.currentModelName);
           
           // Try other models that haven't been tried yet
@@ -329,7 +313,6 @@ class FirebaseAILogicProvider implements AIProvider {
           
           // If we couldn't switch models, all models have quota issues - fall back
           if (!switched) {
-            console.error('❌ All Firebase AI Logic models have quota exhausted - falling back');
             throw new Error(`Firebase AI Logic quota exhausted for all models: ${errorMessage}`);
           }
           // Continue to retry with the new model (this will restart the loop)
@@ -340,7 +323,6 @@ class FirebaseAILogicProvider implements AIProvider {
         // exponential backoff means we wait 1s, then 2s, then 4s
         if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
-          console.log(`⏳ Retrying in ${delay}ms due to service overload or rate limit...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -564,8 +546,6 @@ export class FirebaseAILogicService {
     // Add Firebase AI Logic provider if API key is available
     if (apiKey) {
       this.providers.push(new FirebaseAILogicProvider(apiKey));
-    } else {
-      console.warn('⚠️  Gemini API key not found for Firebase AI Logic');
     }
 
     // Always add mock as fallback
@@ -584,16 +564,13 @@ export class FirebaseAILogicService {
     try {
       return await this.currentProvider.generateFlashcards(prompt);
     } catch (error) {
-      console.error(`❌ Error with ${this.currentProvider.name} for flashcard generation:`, error);
-      
       // Try fallback providers
       for (const provider of this.providers) {
         if (provider !== this.currentProvider && provider.isAvailable()) {
-          console.log(`🔄 Falling back to ${provider.name} for flashcard generation`);
           try {
             return await provider.generateFlashcards(prompt);
           } catch (fallbackError) {
-            console.error(`❌ Fallback ${provider.name} also failed:`, fallbackError);
+            // Fallback failed, try next
           }
         }
       }
@@ -610,16 +587,13 @@ export class FirebaseAILogicService {
     try {
       return await this.currentProvider.generateResponse(_message, _context, _conversationHistory);
     } catch (error) {
-      console.error(`❌ Error with ${this.currentProvider.name}:`, error);
-      
       // Try fallback providers
       for (const provider of this.providers) {
         if (provider !== this.currentProvider && provider.isAvailable()) {
-          console.log(`🔄 Falling back to ${provider.name}`);
           try {
             return await provider.generateResponse(_message, _context, _conversationHistory);
           } catch (fallbackError) {
-            console.error(`❌ Fallback ${provider.name} also failed:`, fallbackError);
+            // Fallback failed, try next
           }
         }
       }
@@ -644,7 +618,6 @@ export class FirebaseAILogicService {
       await this.generateResponse("Hello, is Firebase AI Logic working?");
       return true;
     } catch (error) {
-      console.error('❌ Firebase AI Logic connection test failed:', error);
       return false;
     }
   }
