@@ -1,23 +1,26 @@
-// Browser-Compatible Document Processing Service
-// Handles file uploads with real text extraction
+// this service handles extracting text from uploaded documents
+// it works entirely in the browser - documents never leave the user's computer
+// we use different libraries for different file types (pdf.js for pdfs, mammoth for word docs, etc)
 
 import { DocumentMetadata } from '../types/ai';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { PPTXParser } from 'pptx-parser';
 
-// Configure PDF.js worker for Vite environment
+// configure pdf.js worker - this is needed for pdf processing
+// the worker runs in a separate thread so it doesn't block the main ui
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export interface ProcessedDocument extends DocumentMetadata {
-  extractedContent: string;
-  chunks: string[];
-  summary: string;
-  keyTopics: string[];
+  extractedContent: string;  // the full text we extracted
+  chunks: string[];          // text split into chunks (for AI processing)
+  summary: string;           // auto-generated summary
+  keyTopics: string[];       // main topics we detected
   contentLength: number;
   contentPreview: string;
 }
 
+// singleton pattern - only one instance of this processor exists
 export class DocumentProcessor {
   private static instance: DocumentProcessor;
 
@@ -28,6 +31,7 @@ export class DocumentProcessor {
     return DocumentProcessor.instance;
   }
 
+  // main entry point - takes a file and returns processed document with extracted text
   async processDocument(file: File): Promise<ProcessedDocument> {
     console.log(`📄 Processing document: ${file.name}`);
     console.log(`📄 File type: ${file.type}, Size: ${file.size} bytes`);
@@ -35,7 +39,8 @@ export class DocumentProcessor {
     try {
       let extractedContent = '';
       
-      // Try to extract content based on file type
+      // figure out what type of file it is and use the right extraction method
+      // we check both mime type and file extension since sometimes mime types are wrong
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         extractedContent = await this.extractFromPDF(file);
       } else if (file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
@@ -43,16 +48,19 @@ export class DocumentProcessor {
       } else if (file.name.toLowerCase().endsWith('.pptx') || file.name.toLowerCase().endsWith('.ppt')) {
         extractedContent = await this.extractFromPowerPoint(file);
       } else {
+        // fallback for unknown types - just try to read as text
         extractedContent = await this.extractAsText(file);
       }
 
-      // If extraction failed or returned minimal content, use intelligent fallback
+      // if extraction failed or we got almost nothing, generate a fallback based on filename
+      // this way the user can still use the document even if extraction didn't work
       if (!extractedContent || extractedContent.trim().length < 50) {
         console.log('📄 Using intelligent fallback content based on filename');
         extractedContent = this.generateIntelligentFallback(file.name);
       }
 
-      // Process the extracted content
+      // now process the extracted text - split into chunks, generate summary, find topics
+      // chunks are important because AI has token limits, so we split large docs
       const chunks = this.chunkText(extractedContent);
       const summary = this.generateSummary(extractedContent, file.name);
       const keyTopics = this.extractKeyTopics(extractedContent, file.name);

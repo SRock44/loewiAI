@@ -1,3 +1,5 @@
+// this context provides authentication state to the entire app
+// any component can use useAuth() hook to check if user is logged in, get user info, etc.
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { AuthState, AuthContextType } from '../types/auth';
 import { firebaseAuthService } from '../services/firebaseAuthService';
@@ -9,9 +11,10 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  // track auth state - user info, loading status, errors
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    isLoading: true,
+    isLoading: true,  // start as loading while we check if user is already logged in
     isAuthenticated: false,
     error: null
   });
@@ -19,32 +22,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     initializeAuth();
     
-    // Listen for Firebase Auth state changes
+    // listen for when user signs in/out - firebase handles this automatically
+    // when auth state changes, we update our state so all components know
     const unsubscribe = firebaseAuthService.onAuthStateChange((user) => {
       setAuthState({
         user,
-        isLoading: false,
+        isLoading: false,  // done loading once we get the auth state
         isAuthenticated: user !== null,
         error: null
       });
     });
 
-    // Cleanup listener on unmount
+    // cleanup - unsubscribe when component unmounts
     return unsubscribe;
   }, []);
 
   const initializeAuth = async () => {
-    // Firebase Auth handles initialization automatically
-    // We just need to listen for state changes
+    // firebase auth automatically checks if user is already logged in
+    // we just set loading state - the onAuthStateChange listener will update us
     setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
   };
 
+  // when user clicks "sign in with google" button
   const signInWithGoogle = async () => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
+      // this opens google sign-in popup and handles the OAuth flow
       const user = await firebaseAuthService.signInWithGoogle();
       
+      // update state with user info - this triggers re-renders in components using useAuth()
       setAuthState({
         user,
         isLoading: false,
@@ -52,6 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         error: null
       });
     } catch (error) {
+      // if sign in fails, show error to user
       setAuthState(prev => ({
         ...prev,
         isLoading: false,

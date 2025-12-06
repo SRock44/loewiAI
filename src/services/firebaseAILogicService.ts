@@ -18,7 +18,9 @@ export interface AIProvider {
   isAvailable(): boolean;
 }
 
-// Firebase AI Logic Provider using Google Generative AI
+// this is the AI provider that talks to google's gemini API
+// it handles all the AI requests - chat messages, flashcard generation, etc.
+// we use gemini-2.0-flash which is fast and good for academic content
 class FirebaseAILogicProvider implements AIProvider {
   name = 'Firebase AI Logic (Gemini)';
   private genAI: GoogleGenerativeAI | null = null;
@@ -28,11 +30,13 @@ class FirebaseAILogicProvider implements AIProvider {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    // initialize async so we don't block the app startup
     this.initializeFirebaseAIAsync();
   }
 
   private initializeFirebaseAIAsync() {
-    // Initialize asynchronously without blocking the constructor
+    // initialize in the background - if it fails, we'll just log it
+    // the app can still work, just AI features won't be available
     this.initializeFirebaseAI().catch(error => {
       console.error('❌ Async Firebase AI Logic initialization failed:', error);
     });
@@ -45,9 +49,12 @@ class FirebaseAILogicProvider implements AIProvider {
     }
 
     try {
+      // create the google generative AI client with our API key
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       
-      // Initialize the model with Firebase-optimized configuration
+      // configure how the AI responds - temperature controls creativity (0.7 = balanced)
+      // topK and topP control which tokens it considers
+      // maxOutputTokens limits response length (2048 is good for our use case)
       const generationConfig: GenerationConfig = {
         temperature: 0.7,
         topK: 40,
@@ -55,7 +62,8 @@ class FirebaseAILogicProvider implements AIProvider {
         maxOutputTokens: 2048,
       };
 
-      // Try known working models in order of preference
+      // try different models in order - if one doesn't work, try the next
+      // gemini-2.0-flash is fast and good for academic content
       const modelNames = [
         'gemini-2.0-flash-001',
         'gemini-2.0-flash-lite-001'
@@ -90,25 +98,29 @@ class FirebaseAILogicProvider implements AIProvider {
     return this.genAI !== null && this.model !== null;
   }
 
+  // main function that sends a message to the AI and gets a response back
+  // _context is document content, _conversationHistory is previous messages
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
     if (!this.isAvailable()) {
       throw new Error('Firebase AI Logic is not available');
     }
 
+    // retry logic - sometimes the API is overloaded (503) or we hit rate limits (429)
+    // we retry up to 3 times with exponential backoff (wait longer each time)
     const maxRetries = 3;
     const baseDelay = 1000;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Build the prompt with Firebase AI Logic context
+        // build the full prompt - includes system instructions, document context,
+        // conversation history, and the user's current message
         const systemPrompt = this.buildFirebaseAIPrompt(_context, _conversationHistory);
         const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
-        
+        // send to gemini API and get response
         const result = await this.model!.generateContent(fullPrompt);
         const response = await result.response;
         const content = response.text();
-
 
         return {
           content: content,
@@ -118,7 +130,8 @@ class FirebaseAILogicProvider implements AIProvider {
       } catch (error) {
         console.error(`❌ Firebase AI Logic error (attempt ${attempt}/${maxRetries}):`, error);
         
-        // Check if this is a 503 error (service overloaded) or 429 error (quota exceeded)
+        // if it's a rate limit or service overload error, wait and retry
+        // exponential backoff means we wait 1s, then 2s, then 4s
         if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
           console.log(`⏳ Retrying in ${delay}ms due to service overload or quota limit...`);

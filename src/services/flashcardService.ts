@@ -21,15 +21,21 @@ export interface FlashcardService {
   cleanupLocalIds(): Promise<void>;
 }
 
+// this service handles all flashcard operations - generating them from documents/text,
+// saving them, updating mastery levels, etc.
+// it works for both authenticated users (saves to firebase) and unauthenticated (localStorage)
 class RealFlashcardService implements FlashcardService {
+  // track which user is logged in so we know where to save flashcards
   private currentUserId: string | null = null;
 
   constructor() {
+    // listen for when user signs in/out so we can update where we save data
     this.setupAuthListener();
   }
 
   private setupAuthListener() {
-    // Listen for auth state changes using the proper auth service listener
+    // when auth state changes, update our current user id
+    // if user signs in, we'll save to firebase. if they sign out, we'll use localStorage
     firebaseAuthService.onAuthStateChange((user) => {
       if (user && user.id !== this.currentUserId) {
         this.currentUserId = user.id;
@@ -39,23 +45,25 @@ class RealFlashcardService implements FlashcardService {
     });
   }
 
-  // Get current user ID from auth service
+  // helper to get current user id - checks auth service if we don't have it cached
   private getCurrentUserId(): string | null {
     if (!this.currentUserId) {
       const currentUser = firebaseAuthService.getCurrentUser();
       if (!currentUser) {
-        return null; // Return null instead of throwing error
+        return null; // not logged in - that's ok, we'll use localStorage
       }
       this.currentUserId = currentUser.id;
     }
     return this.currentUserId;
   }
 
-
+  // main function to generate flashcards from a document
+  // the AI reads the document content and creates question/answer pairs
   async generateFlashcards(
     request: FlashcardGenerationRequest, 
     document?: ProcessedDocument
   ): Promise<FlashcardGenerationResponse> {
+    // if user provided text directly instead of a document, use that path
     if (request.sourceType === 'text' || request.textContent) {
       return this.generateFlashcardsFromText(request);
     }
@@ -64,18 +72,19 @@ class RealFlashcardService implements FlashcardService {
       throw new Error('Document is required for document-based flashcard generation');
     }
     
-    
     try {
+      // build a prompt that tells the AI what kind of flashcards to make
+      // includes document content, user preferences (count, difficulty, format), etc.
       const prompt = await this.buildFlashcardPrompt(request, document);
       let response = await firebaseAILogicService.generateResponse(prompt);
       
-      // Try to parse the response
+      // try to parse the AI response as JSON (it should return flashcards in JSON format)
       let flashcards: Flashcard[];
       try {
         flashcards = this.parseFlashcardResponse(response.content, request);
       } catch (parseError) {
-        // First attempt failed, retrying with more explicit prompt
-        // Retry with a more explicit prompt
+        // sometimes the AI adds extra text around the JSON (like markdown code blocks)
+        // if parsing fails, we retry with a more explicit prompt telling it to return ONLY json
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
 ${prompt}`;

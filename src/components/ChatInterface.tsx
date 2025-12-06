@@ -110,27 +110,29 @@ interface UploadedFile extends DocumentMetadata {
   processedDocument?: ProcessedDocument;
 }
 
+// this is the main chat interface - handles all user interaction
+// it manages messages, document uploads, chat sessions, and coordinates with the chat service
 const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, ref) => {
   const { 
-    documents = [], 
-    onDocumentsChange,
-    onNewSession
+    documents = [],  // documents passed from parent (dashboard)
+    onDocumentsChange,  // callback when documents are uploaded
+    onNewSession  // callback when a new chat session is created
   } = props;
-  const { isAuthenticated } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
-  const [, setSessions] = useState<ChatSession[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [showFlashcardList, setShowFlashcardList] = useState(false);
-  const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);
-  const [typingText, setTypingText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isTypingRef = useRef(false);
+  const { isAuthenticated } = useAuth();  // check if user is logged in
+  const [messages, setMessages] = useState<ChatMessage[]>([]);  // all messages in current chat
+  const [inputValue, setInputValue] = useState('');  // what user is typing
+  const [isLoading, setIsLoading] = useState(false);  // is AI currently responding?
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);  // current chat session
+  const [, setSessions] = useState<ChatSession[]>([]);  // all chat sessions (for sidebar)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);  // files being uploaded/processed
+  const [showFlashcardList, setShowFlashcardList] = useState(false);  // show flashcard list sidebar?
+  const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
+  const [typingText, setTypingText] = useState('');  // for typing animation effect
+  const [isTyping, setIsTyping] = useState(false);  // is typing animation active?
+  const messagesEndRef = useRef<HTMLDivElement>(null);  // ref to scroll to bottom of messages
+  const fileInputRef = useRef<HTMLInputElement>(null);  // ref to hidden file input
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);  // timeout for typing animation
+  const isTypingRef = useRef(false);  // track if typing animation is running
 
   // Example prompts to cycle through
   const examplePrompts = [
@@ -458,21 +460,24 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   }, [onDocumentsChange]);
 
+  // this is called when user hits enter or clicks send
+  // it sends the message to the chat service which handles AI communication
   const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading) return;
+    if (!content.trim() || isLoading) return;  // don't send empty messages or if already loading
 
-
-    // Create a session if one doesn't exist
+    // create a new chat session if this is the first message
+    // each chat session has its own message history
     let session = currentSession;
     if (!session) {
       session = await chatService.createNewSession();
       setCurrentSession(session);
       setSessions(prev => [session!, ...prev]);
       
-      // Dispatch custom event to notify other components
+      // notify other components (like sidebar) that a new session was created
       window.dispatchEvent(new CustomEvent('sessionUpdated'));
     }
 
+    // add user message to UI immediately so it feels responsive
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
@@ -481,39 +486,43 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
+    setInputValue('');  // clear input field
     setIsLoading(true);
 
     try {
-      // Get processed documents from uploaded files
+      // get all the processed documents that are ready
+      // these get sent to the AI as context so it knows what documents to reference
       const processedDocs = uploadedFiles
         .filter(f => f.uploadStatus === 'completed' && f.processedDocument)
         .map(f => f.processedDocument!);
 
+      // build context object - includes session id, document ids, and full processed documents
+      // the chat service uses this to build the prompt for the AI
       const context: ChatContext = {
         sessionId: session.id,
         documentIds: documents.map(doc => doc.id),
         currentTopic: 'general',
         processedDocuments: processedDocs
       };
+      // send to chat service - it handles AI communication and returns the response
       const response = await chatService.sendMessage(content.trim(), context);
       setMessages(prev => [...prev, response]);
       
-      // Chat sessions are automatically managed by the chat service
-      // No need to manually add to history - the Layout component will pick up new sessions
+      // chat service automatically saves sessions to firebase (if logged in) or memory
+      // the layout component listens for session updates to show them in the sidebar
       
-      // Check if the response contains a flashcard set
+      // if the AI generated flashcards, show them to the user
       if (response.flashcardSet) {
         handleFlashcardsGenerated(response.flashcardSet);
       }
       
-      // Refresh sessions to get updated titles
+      // refresh session list to get updated titles (AI sometimes updates session title based on conversation)
       if (isAuthenticated) {
         const updatedSessions = chatService.getSessions();
         setSessions(updatedSessions);
       }
     } catch (error) {
-      // Error sending message
+      // if something goes wrong, show error message to user
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}`,
         role: 'assistant',

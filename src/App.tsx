@@ -4,27 +4,34 @@ import { AuthProvider } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import './App.css'
 
-// Lazy load components for better performance
+// lazy load components for better performance - these only load when needed
+// this makes the initial page load faster since we don't bundle everything upfront
 const Hero = lazy(() => import('./components/Hero'))
 const Features = lazy(() => import('./components/Features'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 
 function App() {
+  // this ref lets us call methods on the dashboard from the layout component
+  // like when user clicks "new chat" in the sidebar, we need to tell dashboard to create one
   const dashboardRef = useRef<{ createNewChat: () => void; switchToChat: (chatId: string) => void }>(null);
+  // track which chat session is currently active so we can highlight it in the sidebar
   const [currentChatId, setCurrentChatId] = useState<string | undefined>();
 
+  // when user clicks "new chat" button in the sidebar
   const handleCreateNewChat = () => {
     if (dashboardRef.current?.createNewChat) {
       dashboardRef.current.createNewChat();
-      // Clear current chat ID when creating a new chat
+      // clear current chat id when creating a new chat so sidebar doesn't highlight old one
       setCurrentChatId(undefined);
     }
   };
 
+  // callback when a new chat session gets created - we track it so sidebar can highlight it
   const handleNewSessionCreated = (session: any) => {
     setCurrentChatId(session.id);
   };
 
+  // when user clicks on a chat in the sidebar to switch to it
   const handleChatSelect = (chatId: string) => {
     setCurrentChatId(chatId);
     if (dashboardRef.current?.switchToChat) {
@@ -32,18 +39,17 @@ function App() {
     }
   };
 
+  // when user deletes a chat - if it was the current one, we need to create a new empty chat
+  // otherwise user would be stuck with no chat open
   const handleChatDelete = (chatId: string) => {
-    // If the deleted chat was the current chat, create a new chat
     if (currentChatId === chatId) {
       setCurrentChatId(undefined);
-      // Create a new chat to replace the deleted one
+      // create a new chat to replace the deleted one so user always has a chat open
       if (dashboardRef.current?.createNewChat) {
         dashboardRef.current.createNewChat();
       }
     }
   };
-
-  // No need for handleAddChatToHistory - we use the actual chat service
 
   return (
     <AuthProvider>

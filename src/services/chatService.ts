@@ -10,31 +10,39 @@ import { codeExecutor } from './codeExecutor';
 import { firebaseService } from './firebaseService';
 import { automaticCleanupService } from './automaticCleanupService';
 
-// Enhanced Chat Service with Gemini AI integration
+// this is the main chat service - handles all chat logic, AI integration, and session management
+// it's a singleton that gets created once when the app starts
 class GeminiChatService implements ChatService {
+  // store all chat sessions in memory - key is session id, value is the session object
   private sessions: Map<string, ChatSession> = new Map();
+  // counter to make sure each message gets a unique id
   private messageCounter = 0;
+  // track which user is currently logged in (null if not logged in)
   private currentUserId: string | null = null;
+  // function to unsubscribe from firebase real-time updates when user logs out
   private realtimeUnsubscribe: (() => void) | null = null;
 
   constructor() {
+    // listen for when user signs in/out so we can load their sessions
     this.setupAuthStateListener();
     
-    // Start automatic cleanup service
+    // start the automatic cleanup service that deletes old data every hour
+    // this keeps the database clean and respects privacy (24 hour expiration)
     automaticCleanupService.startAutomaticCleanup();
   }
 
-  // Listen for authentication state changes
+  // this listens for auth changes - when user signs in, we load their chat sessions
+  // when they sign out, we clear everything from memory
   private setupAuthStateListener() {
     firebaseAuthService.onAuthStateChange((user) => {
       console.log('🔐 Auth state changed:', user ? `User ${user.id}` : 'No user');
       if (user && user.id !== this.currentUserId) {
-        // User signed in or switched users
+        // user just signed in or switched accounts - load their sessions from firebase
         console.log('👤 User signed in, loading sessions...');
         this.currentUserId = user.id;
         this.loadSessionsFromFirebase();
       } else if (!user && this.currentUserId) {
-        // User signed out - cleanup real-time listener
+        // user signed out - clean up everything
         console.log('👋 User signed out, clearing sessions...');
         if (this.realtimeUnsubscribe) {
           this.realtimeUnsubscribe();
@@ -119,7 +127,10 @@ class GeminiChatService implements ChatService {
 
 
 
+  // this is the main function that handles when user sends a message
+  // it figures out what the user wants (regular chat, flashcards, code help) and routes accordingly
   async sendMessage(message: string, context: ChatContext): Promise<ChatMessage> {
+    // create the user message object - this gets saved to the session
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}_${++this.messageCounter}`,
       role: 'user',
@@ -128,17 +139,20 @@ class GeminiChatService implements ChatService {
     };
 
     try {
-      // Check if this is a flashcard generation request
+      // first check if user is asking to generate flashcards
+      // we look for keywords like "create flashcards" or "make flashcards"
       const flashcardRequest = this.detectFlashcardRequest(message, context);
       
       if (flashcardRequest) {
+        // if it's a flashcard request, handle it specially and return early
         return await this.handleFlashcardGeneration(flashcardRequest, context, userMessage);
       }
 
-      // Build context from uploaded documents
+      // build context from any documents user uploaded
+      // this gets sent to the AI so it knows what documents to reference
       const documentContext = this.buildDocumentContext(context.documentIds, context.processedDocuments);
       
-      // Check if user is asking for code execution
+      // check if user wants to execute code (we can't actually run it, but we can help)
       if (this.isCodeExecutionRequest(message)) {
         const executionGuidanceMessage: ChatMessage = {
           id: `msg_${Date.now()}_${++this.messageCounter}`,
