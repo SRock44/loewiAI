@@ -20,18 +20,50 @@ export interface AIProvider {
 
 // this is the AI provider that talks to google's gemini API
 // it handles all the AI requests - chat messages, flashcard generation, etc.
-// we use gemini-2.0-flash which is fast and good for academic content
+// we prioritize gemini-2.5-flash which is the latest fast model, with fallbacks to 2.0 and 1.5 models
 class FirebaseAILogicProvider implements AIProvider {
   name = 'Firebase AI Logic (Gemini)';
   private genAI: GoogleGenerativeAI | null = null;
   private model: GenerativeModel | null = null;
   private apiKey: string;
   private currentModelName: string = '';
+  private availableModels: string[] = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-001',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash'
+  ];
+  private triedModels: Set<string> = new Set();
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     // initialize async so we don't block the app startup
     this.initializeFirebaseAIAsync();
+  }
+
+  private getGenerationConfig(): GenerationConfig {
+    return {
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 1024, // Reduced from 2048 to save token usage while maintaining quality
+    };
+  }
+
+  private trySwitchModel(modelName: string): boolean {
+    if (!this.genAI) return false;
+    try {
+      this.model = this.genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: this.getGenerationConfig()
+      });
+      this.currentModelName = modelName;
+      console.log(`✅ Switched to model: ${modelName}`);
+      return true;
+    } catch (error) {
+      console.warn(`⚠️ Failed to switch to model ${modelName}:`, error);
+      return false;
+    }
   }
 
   private initializeFirebaseAIAsync() {
@@ -52,32 +84,20 @@ class FirebaseAILogicProvider implements AIProvider {
       // create the google generative AI client with our API key
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       
-      // configure how the AI responds - temperature controls creativity (0.7 = balanced)
-      // topK and topP control which tokens it considers
-      // maxOutputTokens limits response length (2048 is good for our use case)
-      const generationConfig: GenerationConfig = {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
-      };
-
       // try different models in order - if one doesn't work, try the next
-      // gemini-2.0-flash is fast and good for academic content
-      const modelNames = [
-        'gemini-2.0-flash-001',
-        'gemini-2.0-flash-lite-001'
-      ];
-
+      // prioritizes gemini-2.5-flash (latest), with gemini-2.0 models as backups
+      // each model is tried until one successfully initializes
       let modelInitialized = false;
-      for (const modelName of modelNames) {
+      for (const modelName of this.availableModels) {
         try {
           this.model = this.genAI.getGenerativeModel({ 
             model: modelName,
-            generationConfig: generationConfig
+            generationConfig: this.getGenerationConfig()
           });
           this.currentModelName = modelName;
+          this.triedModels.add(modelName);
           modelInitialized = true;
+          console.log(`✅ Initialized Firebase AI Logic with model: ${modelName}`);
           break;
         } catch (modelError) {
           console.warn(`⚠️ Failed to initialize Firebase AI Logic model ${modelName}:`, modelError);
@@ -124,17 +144,79 @@ class FirebaseAILogicProvider implements AIProvider {
 
         return {
           content: content,
-          model: this.currentModelName || 'gemini-1.5-flash',
+          model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
       } catch (error) {
         console.error(`❌ Firebase AI Logic error (attempt ${attempt}/${maxRetries}):`, error);
         
-        // if it's a rate limit or service overload error, wait and retry
+        // Check if this is a quota exhaustion error (not just rate limiting)
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isQuotaExhausted = errorMessage.includes('quota') && 
+                                 (errorMessage.includes('limit: 0') || 
+                                  errorMessage.includes('exceeded your current quota') ||
+                                  errorMessage.includes('FreeTier'));
+        
+        // Check if this is a model not found error (404)
+        const isModelNotFound = errorMessage.includes('404') || 
+                                errorMessage.includes('not found') ||
+                                errorMessage.includes('is not found for API version');
+        
+        // If model not found, try switching to another model immediately
+        if (isModelNotFound && this.currentModelName) {
+          console.warn(`⚠️ Model ${this.currentModelName} not found or unavailable, trying alternative models...`);
+          this.triedModels.add(this.currentModelName);
+          
+          // Try other models that haven't been tried yet
+          const untriedModels = this.availableModels.filter(m => !this.triedModels.has(m));
+          let switched = false;
+          
+          for (const modelName of untriedModels) {
+            if (this.trySwitchModel(modelName)) {
+              switched = true;
+              break; // Break out of model loop, continue to retry request
+            }
+          }
+          
+          // If we couldn't switch models, all models are unavailable - fall back
+          if (!switched) {
+            console.error('❌ All Firebase AI Logic models are unavailable - falling back');
+            throw new Error(`Firebase AI Logic models unavailable: ${errorMessage}`);
+          }
+          // Continue to retry with the new model (this will restart the loop)
+          continue;
+        }
+        
+        // If quota is exhausted for current model, try switching to another model
+        if (isQuotaExhausted && this.currentModelName) {
+          console.warn(`⚠️ Quota exhausted for model ${this.currentModelName}, trying alternative models...`);
+          this.triedModels.add(this.currentModelName);
+          
+          // Try other models that haven't been tried yet
+          const untriedModels = this.availableModels.filter(m => !this.triedModels.has(m));
+          let switched = false;
+          
+          for (const modelName of untriedModels) {
+            if (this.trySwitchModel(modelName)) {
+              switched = true;
+              break; // Break out of model loop, continue to retry request
+            }
+          }
+          
+          // If we couldn't switch models, all models have quota issues - fall back
+          if (!switched) {
+            console.error('❌ All Firebase AI Logic models have quota exhausted - falling back');
+            throw new Error(`Firebase AI Logic quota exhausted for all models: ${errorMessage}`);
+          }
+          // Continue to retry with the new model (this will restart the loop)
+          continue;
+        }
+        
+        // if it's a rate limit or service overload error (but not quota exhaustion), wait and retry
         // exponential backoff means we wait 1s, then 2s, then 4s
         if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
-          console.log(`⏳ Retrying in ${delay}ms due to service overload or quota limit...`);
+          console.log(`⏳ Retrying in ${delay}ms due to service overload or rate limit...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -191,10 +273,18 @@ CODE FORMATTING:
 - Include test cases and examples when appropriate
 - Write executable code snippets that demonstrate the concept
 
+RESPONSE EFFICIENCY:
+- **Be concise and direct** - aim for quality over quantity
+- **Get to the point quickly** - start with the core answer, then add context if needed
+- **Avoid unnecessary elaboration** - explain clearly but briefly
+- **Use lists and formatting** to convey information efficiently
+- **Prioritize essential information** - focus on what the user needs to know
+- **Keep responses focused** - avoid tangents or excessive background unless specifically requested
+
 Guidelines:
 - Be encouraging and supportive
-- Break down complex topics into understandable parts
-- Provide examples when helpful
+- Break down complex topics into understandable parts (but concisely)
+- Provide examples when helpful (keep them brief)
 - Ask clarifying questions when needed
 - Maintain an academic tone while being approachable
 - Focus on learning and understanding over just answers
@@ -273,9 +363,9 @@ class MockProvider implements AIProvider {
     }
 
     const responses = [
-      "I'm currently in fallback mode due to AI service quota limits. The main AI service is temporarily unavailable.",
-      "The AI service has hit its quota limits and is currently unavailable. This is a temporary fallback response.",
-      "The AI service is experiencing high demand and quota limits. Please try again in a few minutes when the service is restored."
+      "⚠️ **AI Service Status**: I'm currently operating in limited mode due to API quota exhaustion. The Gemini AI service has reached its free tier limits.\n\n**What this means:**\n- The primary AI service is temporarily unavailable\n- You're seeing this fallback response\n- Your data and chat history are safe\n\n**What you can do:**\n- Wait 24 hours for quota limits to reset\n- Check your Gemini API quota at: https://ai.dev/usage?tab=rate-limit\n- Consider upgrading your API plan for higher limits\n\n**Note:** This is a temporary situation and the service should resume automatically once quotas reset.",
+      "🔧 **Service Notice**: The AI service is currently unavailable due to quota limitations. The free tier quota for Gemini models has been exhausted.\n\n**Current Status:**\n- ✅ Your chat history is preserved\n- ✅ All features will work once service is restored\n- ⚠️ AI responses are limited until quota resets\n\n**Next Steps:**\n- The quota typically resets every 24 hours\n- Monitor service status at: https://ai.dev/usage\n- The service will automatically resume when available\n\nThank you for your patience!",
+      "📊 **AI Service Update**: I'm in fallback mode because the Gemini API has reached its quota limits for the free tier.\n\n**Understanding Quota Limits:**\n- Free tier has daily and per-minute request limits\n- Once exceeded, service pauses until the next reset period\n- This usually resets every 24 hours\n\n**Your Options:**\n1. **Wait**: Service typically auto-restores within 24 hours\n2. **Check Status**: Visit https://ai.dev/usage?tab=rate-limit\n3. **Upgrade**: Consider a paid API plan for higher limits\n\n**Good News:** All your conversations and data remain intact and will work normally once service resumes!"
     ];
 
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];

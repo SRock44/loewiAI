@@ -48,6 +48,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
   const [typingText, setTypingText] = useState('');  // for typing animation effect
   const messagesEndRef = useRef<HTMLDivElement>(null);  // ref to scroll to bottom of messages
+  const lastAssistantMessageRef = useRef<HTMLDivElement>(null);  // ref to last assistant message for scrolling
   const fileInputRef = useRef<HTMLInputElement>(null);  // ref to hidden file input
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);  // timeout for typing animation
   const isTypingRef = useRef(false);  // track if typing animation is running
@@ -65,9 +66,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     "Ask me anything about your studies..."
   ];
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to top of last assistant message when it's generated
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant' && lastAssistantMessageRef.current) {
+      // Scroll to the top of the assistant message
+      lastAssistantMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, [messages]);
 
   // handle copy button clicks for code blocks
@@ -642,40 +647,47 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`message ${message.role} ${message.flashcardSet ? 'flashcard-message' : ''}`}
-              >
-                <div 
-                  className={`message-content ${message.flashcardSet ? 'clickable-flashcard-message' : ''}`}
-                  onClick={message.flashcardSet ? () => {
-                    setCurrentFlashcardSet(message.flashcardSet!);
-                    setShowFlashcardList(true);
-                  } : undefined}
+            messages.map((message, index) => {
+              const isLastAssistantMessage = 
+                message.role === 'assistant' && 
+                index === messages.length - 1;
+              
+              return (
+                <div
+                  key={message.id}
+                  ref={isLastAssistantMessage ? lastAssistantMessageRef : null}
+                  className={`message ${message.role} ${message.flashcardSet ? 'flashcard-message' : ''}`}
                 >
-                  <div className="message-text">
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: formatMessage(message)
-                      }}
-                    />
-                  </div>
-                  
-                  {message.flashcardSet && (
-                    <div className="flashcard-message-hint">
-                      <span className="hint-text">Click to view flashcards</span>
+                  <div 
+                    className={`message-content ${message.flashcardSet ? 'clickable-flashcard-message' : ''}`}
+                    onClick={message.flashcardSet ? () => {
+                      setCurrentFlashcardSet(message.flashcardSet!);
+                      setShowFlashcardList(true);
+                    } : undefined}
+                  >
+                    <div className="message-text">
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: formatMessage(message)
+                        }}
+                      />
                     </div>
-                  )}
-                  <div className="message-time">
-                    {message.timestamp instanceof Date 
-                      ? message.timestamp.toLocaleTimeString()
-                      : new Date(message.timestamp).toLocaleTimeString()
-                    }
+                    
+                    {message.flashcardSet && (
+                      <div className="flashcard-message-hint">
+                        <span className="hint-text">Click to view flashcards</span>
+                      </div>
+                    )}
+                    <div className="message-time">
+                      {message.timestamp instanceof Date 
+                        ? message.timestamp.toLocaleTimeString()
+                        : new Date(message.timestamp).toLocaleTimeString()
+                      }
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           
           {isLoading && (
