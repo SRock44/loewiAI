@@ -1,9 +1,11 @@
 import React from 'react'
+import { AnimatedBackground } from './AnimatedBackground'
 import './Hero.css'
 
 const Hero: React.FC = () => {
   return (
     <section className="hero">
+      <AnimatedBackground />
       <div className="container">
         <div className="hero-content">
           <h1 className="hero-title">
@@ -21,16 +23,6 @@ const Hero: React.FC = () => {
             <a href="/dashboard" className="btn btn-primary">
               Chat Now
             </a>
-          </div>
-        </div>
-        <div className="hero-visual">
-          <div className="hero-illustration">
-            <div className="ai-icon">🤖</div>
-            <div className="learning-elements">
-              <div className="element">📚</div>
-              <div className="element">🎯</div>
-              <div className="element">⚡</div>
-            </div>
           </div>
         </div>
       </div>

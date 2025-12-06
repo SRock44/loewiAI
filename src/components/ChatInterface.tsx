@@ -584,7 +584,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 
                 {!isAuthenticated && (
                   <div className="auth-notice">
-                    <div className="notice-icon">💡</div>
+                    <div className="notice-icon">
+                      <Lightbulb size={50} />
+                    </div>
                     <p><strong>Tip:</strong> Sign in with Google to save your chat history and get personalized recommendations based on your uploaded documents!</p>
                   </div>
                 )}

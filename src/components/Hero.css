@@ -69,87 +69,6 @@
   will-change: transform, opacity;
 }
 
-.hero-visual {
-  margin-top: 3rem;
-  display: flex;
-  justify-content: center;
-}
-
-.hero-illustration {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ai-icon {
-  font-size: 4rem;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  animation: float 3s ease-in-out infinite;
-}
-
-.learning-elements {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 200px;
-  height: 200px;
-}
-
-.element {
-  position: absolute;
-  font-size: 2rem;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  animation: orbit 8s linear infinite;
-}
-
-.element:nth-child(1) {
-  top: -30px;
-  left: 50%;
-  transform: translateX(-50%);
-  animation-delay: 0s;
-}
-
-.element:nth-child(2) {
-  top: 50%;
-  right: -30px;
-  transform: translateY(-50%);
-  animation-delay: -2.67s;
-}
-
-.element:nth-child(3) {
-  bottom: -30px;
-  left: 50%;
-  transform: translateX(-50%);
-  animation-delay: -5.33s;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-
-@keyframes orbit {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 
 @keyframes fadeInUpSmooth {
   0% {
@@ -194,22 +113,5 @@
   .hero-buttons {
     flex-direction: column;
     align-items: center;
-  }
-  
-  .ai-icon {
-    width: 100px;
-    height: 100px;
-    font-size: 3rem;
-  }
-  
-  .learning-elements {
-    width: 160px;
-    height: 160px;
-  }
-  
-  .element {
-    width: 50px;
-    height: 50px;
-    font-size: 1.5rem;
   }
 }

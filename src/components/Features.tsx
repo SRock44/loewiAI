@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { ClipboardList, Home, TextSquare, ChatSquare, Calendar, QuestionCircle } from '@solar-icons/react'
+import { AnimatedBackground } from './AnimatedBackground'
 import './Features.css'
 
 const Features: React.FC = () => {
@@ -65,6 +66,7 @@ const Features: React.FC = () => {
 
   return (
     <section ref={sectionRef} id="features" className="features section">
+      <AnimatedBackground />
       <div className="container">
         <div className="features-header">
           <h2 className={`section-title ${isVisible ? 'animate' : ''}`}>Academic Features</h2>
