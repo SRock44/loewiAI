@@ -1753,10 +1753,17 @@
 .loading-spinner {
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 16px;
+  max-height: 16px;
   border: 2px solid #e2e8f0;
   border-top: 2px solid #667eea;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: inline-block;
 }
 
 @keyframes spin {
