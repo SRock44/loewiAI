@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/generative-ai';
-// import { firebaseAuthService } from './firebaseAuthService';
+import { UserProfileService } from './userProfileService';
 
 export interface AIResponse {
   content: string;
@@ -113,8 +113,8 @@ class FirebaseAILogicProvider implements AIProvider {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // build the full prompt - includes system instructions, document context,
-        // conversation history, and the user's current message
-        const systemPrompt = this.buildFirebaseAIPrompt(_context, _conversationHistory);
+        // conversation history, personalization, and the user's current message
+        const systemPrompt = await this.buildFirebaseAIPrompt(_context, _conversationHistory);
         const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
         // send to gemini API and get response
@@ -146,7 +146,7 @@ class FirebaseAILogicProvider implements AIProvider {
     throw new Error('Firebase AI Logic failed after all retry attempts');
   }
 
-  private buildFirebaseAIPrompt(context?: string, conversationHistory?: string): string {
+  private async buildFirebaseAIPrompt(context?: string, conversationHistory?: string): Promise<string> {
     const basePrompt = `You are Newton 1.0, an intelligent next-generation academic AI prototype powered by Firebase AI Logic. You provide:
 
 1. **Clear explanations** of complex academic concepts
@@ -164,10 +164,14 @@ FIREBASE AI LOGIC FEATURES:
 
 FORMATTING GUIDELINES:
 - **Code blocks**: Always wrap code in triple backticks with language specification (e.g., \`\`\`python, \`\`\`javascript, \`\`\`sql)
+  - IMPORTANT: Use actual newlines in code blocks, NOT HTML tags like <br/> or <br>
+  - Use proper markdown formatting with triple backticks
+  - Preserve indentation using spaces, not HTML entities
 - **Math problems**: Use clear step-by-step format with numbered steps and proper mathematical notation
 - **Inline code**: Use single backticks for short code snippets or variable names
 - **Lists**: Use numbered lists for step-by-step solutions, bullet points for general lists
 - **Emphasis**: Use **bold** for important concepts and *italics* for emphasis
+- **CRITICAL**: Never use HTML tags (<br/>, <br>, &nbsp;, etc.) in your responses. Use plain markdown only.
 
 MATH PROBLEM FORMAT:
 When solving math problems, use this structure:
@@ -200,7 +204,15 @@ Guidelines:
 - **Handle ambiguous references** - if the user says "what about X?" or "how about Y?", refer to the conversation history to understand the context
 - **Code execution requests** - if users ask to run/execute code, explain that they should use IDEs like VS Code, Cursor, or online compilers like Replit`;
 
+    // get user profile information for personalization
+    const userProfileContext = await UserProfileService.buildPersonalizationContext();
+    
     let fullPrompt = basePrompt;
+    
+    // add personalization context if available
+    if (userProfileContext) {
+      fullPrompt += `\n\n${userProfileContext}`;
+    }
     
     if (context) {
       fullPrompt += `\n\nAdditional Context: ${context}`;

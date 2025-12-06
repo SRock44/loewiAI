@@ -9,87 +9,6 @@ import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
-// Dynamic Prism.js loading for better performance
-const loadPrismLanguage = async (language: string) => {
-  try {
-    switch (language) {
-      case 'javascript':
-        // @ts-ignore - Dynamic import for code splitting
-        await import('prismjs/components/prism-javascript');
-        break;
-      case 'python':
-        // @ts-ignore
-        await import('prismjs/components/prism-python');
-        break;
-      case 'java':
-        // @ts-ignore
-        await import('prismjs/components/prism-java');
-        break;
-      case 'c':
-        // @ts-ignore
-        await import('prismjs/components/prism-c');
-        break;
-      case 'csharp':
-        // @ts-ignore
-        await import('prismjs/components/prism-csharp');
-        break;
-      case 'ruby':
-        // @ts-ignore
-        await import('prismjs/components/prism-ruby');
-        break;
-      case 'go':
-        // @ts-ignore
-        await import('prismjs/components/prism-go');
-        break;
-      case 'rust':
-        // @ts-ignore
-        await import('prismjs/components/prism-rust');
-        break;
-      case 'sql':
-        // @ts-ignore
-        await import('prismjs/components/prism-sql');
-        break;
-      case 'json':
-        // @ts-ignore
-        await import('prismjs/components/prism-json');
-        break;
-      case 'css':
-        // @ts-ignore
-        await import('prismjs/components/prism-css');
-        break;
-      case 'html':
-      case 'xml':
-        // @ts-ignore
-        await import('prismjs/components/prism-markup');
-        break;
-      case 'bash':
-      case 'shell':
-        // @ts-ignore
-        await import('prismjs/components/prism-bash');
-        break;
-      case 'yaml':
-        // @ts-ignore
-        await import('prismjs/components/prism-yaml');
-        break;
-      case 'typescript':
-        // @ts-ignore
-        await import('prismjs/components/prism-typescript');
-        break;
-      case 'jsx':
-        // @ts-ignore
-        await import('prismjs/components/prism-jsx');
-        break;
-      case 'tsx':
-        // @ts-ignore
-        await import('prismjs/components/prism-tsx');
-        break;
-    }
-  } catch (error) {
-    console.warn(`Failed to load Prism language: ${language}`, error);
-  }
-};
-
-import * as Prism from 'prismjs';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -128,7 +47,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [showFlashcardList, setShowFlashcardList] = useState(false);  // show flashcard list sidebar?
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
   const [typingText, setTypingText] = useState('');  // for typing animation effect
-  const [isTyping, setIsTyping] = useState(false);  // is typing animation active?
   const messagesEndRef = useRef<HTMLDivElement>(null);  // ref to scroll to bottom of messages
   const fileInputRef = useRef<HTMLInputElement>(null);  // ref to hidden file input
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);  // timeout for typing animation
@@ -152,32 +70,37 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle copy button clicks for code blocks
+  // handle copy button clicks for code blocks
   useEffect(() => {
     const handleCopyClick = (event: Event) => {
       const target = event.target as HTMLElement;
-      if (target.classList.contains('copy-code-btn')) {
-        const codeContent = target.getAttribute('data-code-content');
+      // check if click was on the button or its child (svg)
+      const button = target.closest('.copy-code-btn') as HTMLElement;
+      if (button) {
+        const codeContent = button.getAttribute('data-code-content');
         if (codeContent) {
-          // Decode the escaped content
+          // decode the escaped content - this is the clean code stored in the data attribute
           const decodedContent = codeContent
+            .replace(/&amp;/g, '&')  // decode &amp; first
             .replace(/&quot;/g, '"')
-            .replace(/\\n/g, '\n')
+            .replace(/&#39;/g, "'")
             .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&amp;/g, '&');
+            .replace(/&gt;/g, '>');
           
-          navigator.clipboard.writeText(decodedContent).then(() => {
-            // Show feedback
-            const originalText = target.textContent;
-            target.textContent = 'Copied!';
-            target.style.color = '#10b981';
+          // ensure the decoded content is clean (no HTML tags)
+          const cleanDecodedContent = decodedContent.replace(/<[^>]*>/g, '').trim();
+          
+          navigator.clipboard.writeText(cleanDecodedContent).then(() => {
+            // show feedback - save original html and restore after 2 seconds
+            const originalHTML = button.innerHTML;
+            button.innerHTML = 'Copied!';
+            button.style.color = '#10b981';
             setTimeout(() => {
-              target.textContent = originalText;
-              target.style.color = '';
+              button.innerHTML = originalHTML;
+              button.style.color = '';
             }, 2000);
           }).catch(() => {
-            // Failed to copy code
+            // failed to copy code
           });
         }
       }
@@ -186,6 +109,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     document.addEventListener('click', handleCopyClick);
     return () => document.removeEventListener('click', handleCopyClick);
   }, []);
+
 
   // Typing animation effect
   useEffect(() => {
@@ -208,7 +132,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       return;
     }
     
-    setIsTyping(true);
     isTypingRef.current = true;
     
     // Start with a random prompt
@@ -260,7 +183,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   };
 
   const stopTypingAnimation = () => {
-    setIsTyping(false);
     isTypingRef.current = false;
     setTypingText('');
     if (typingTimeoutRef.current) {
@@ -566,83 +488,30 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   };
 
-  // Language mapping for Prism.js
-  const getPrismLanguage = (lang: string): string => {
-    const languageMap: { [key: string]: string } = {
-      'js': 'javascript',
-      'ts': 'typescript',
-      'py': 'python',
-      'cpp': 'c', // Use C highlighting for C++ since prism-cpp has issues
-      'c++': 'c',
-      'c': 'c',
-      'cs': 'csharp',
-      'php': 'markup', // Use markup highlighting for PHP since prism-php has dependency issues
-      'rb': 'ruby',
-      'go': 'go',
-      'rs': 'rust',
-      'sql': 'sql',
-      'json': 'json',
-      'css': 'css',
-      'html': 'markup',
-      'xml': 'markup',
-      'md': 'markdown',
-      'sh': 'bash',
-      'bash': 'bash',
-      'yml': 'yaml',
-      'yaml': 'yaml',
-      'jsx': 'jsx',
-      'tsx': 'tsx'
-    };
-    return languageMap[lang.toLowerCase()] || lang.toLowerCase();
-  };
-
   const formatMessage = (message: ChatMessage) => {
     let content = message.content;
     
-    // First, handle code blocks (triple backticks) - must be done before other replacements
-    content = content.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, language, code) => {
-      const lang = language || 'text';
-      const cleanCode = code.trim();
-      const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Apply syntax highlighting using Prism.js
-      let highlightedCode = cleanCode;
-      const prismLang = getPrismLanguage(lang);
-      
-      if (lang !== 'text' && Prism && Prism.languages && Prism.languages[prismLang] && Prism.highlight) {
-        try {
-          const languageDef = Prism.languages[prismLang];
-          if (languageDef && typeof languageDef === 'object') {
-            highlightedCode = Prism.highlight(cleanCode, languageDef, prismLang);
-          }
-        } catch (error) {
-          // Failed to highlight code, use plain text
-          highlightedCode = cleanCode;
-        }
-      }
-      
-      // Load language dynamically if not available (fire and forget)
-      if (lang !== 'text' && (!Prism.languages || !Prism.languages[prismLang])) {
-        loadPrismLanguage(prismLang).then(() => {
-          // Re-render the message after language loads
-          const event = new CustomEvent('prismLanguageLoaded', { detail: { messageId: message.id } });
-          window.dispatchEvent(event);
-        }).catch(() => {
-          // Silently fail - code will remain unstyled
-        });
-      }
+    // Handle code blocks (triple backticks)
+    content = content.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (_, language, code) => {
+      const lang = (language && language.trim()) || 'text';
+      const escapedCode = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
       
       return `<div class="code-block-container">
         <div class="code-block-header">
-          <span class="code-language">${lang}</span>
-          <button class="copy-code-btn" onclick="copyCodeToClipboard('${codeId}')" title="Copy code">
+          <span class="code-language">${lang !== 'text' ? lang.toUpperCase() : 'CODE'}</span>
+          <button class="copy-code-btn" data-code-content="${escapedCode}" title="Copy code">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
         </div>
-        <pre><code id="${codeId}" class="language-${prismLang}">${highlightedCode}</code></pre>
+        <pre class="code-block"><code>${escapedCode}</code></pre>
       </div>`;
     });
     
@@ -669,6 +538,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     // Handle line breaks with proper spacing
     content = content.replace(/\n\n/g, '<br/><br/>');
     content = content.replace(/\n/g, '<br/>');
+    
+    // note: we removed the fallback code detection because it was creating false positives
+    // the AI should use proper markdown code blocks with triple backticks
+    // if code doesn't have backticks, it will display as regular text (which is acceptable)
     
     return content;
   };
@@ -894,9 +767,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   handleFiles(e.dataTransfer.files);
                 }}
               />
-              {inputValue === '' && !isLoading && isTyping && (
-                <div className="typing-cursor">|</div>
-              )}
               <div className="input-actions">
                 <button
                   type="button"

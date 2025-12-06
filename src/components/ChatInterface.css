@@ -1525,9 +1525,25 @@
   margin: 16px 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #1e293b;
+  background: #1e293b !important;
   border: 1px solid #334155;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.code-block-container .code-block {
+  margin: 0 !important;
+  padding: 16px !important;
+  background: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace !important;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre !important;
+  text-align: left;
+  border-radius: 0;
+  word-wrap: normal;
+  word-break: normal;
 }
 
 .code-block-header {
@@ -1575,92 +1591,132 @@
 .code-block {
   margin: 0;
   padding: 16px;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
+  background: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace !important;
   font-size: 0.875rem;
   line-height: 1.5;
   overflow-x: auto;
-  white-space: pre;
+  white-space: pre !important;
   text-align: left;
   border-radius: 0;
+  word-wrap: normal;
+  word-break: normal;
 }
 
 .code-block code {
-  background: transparent;
-  color: inherit;
+  background: transparent !important;
+  color: inherit !important;
   padding: 0;
   border-radius: 0;
-  font-family: inherit;
+  font-family: inherit !important;
+  white-space: pre !important;
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  word-wrap: normal;
+  word-break: normal;
+  /* ensure newlines are preserved and displayed - white-space: pre preserves all whitespace including newlines */
 }
 
-/* VS Code Dark Theme Syntax Highlighting */
-.code-block .token.comment,
-.code-block .token.prolog,
-.code-block .token.doctype,
-.code-block .token.cdata {
-  color: #6a9955;
+/* VS Code Dark Theme Syntax Highlighting - ensure these styles apply to all code blocks */
+.code-block-container .code-block .token.comment,
+.code-block-container .code-block .token.prolog,
+.code-block-container .code-block .token.doctype,
+.code-block-container .code-block .token.cdata,
+code.token.comment,
+code.token.prolog,
+code.token.doctype,
+code.token.cdata {
+  color: #6a9955 !important;
   font-style: italic;
 }
 
-.code-block .token.punctuation {
-  color: #d4d4d4;
+.code-block-container .code-block .token.punctuation,
+code.token.punctuation {
+  color: #d4d4d4 !important;
 }
 
-.code-block .token.property,
-.code-block .token.tag,
-.code-block .token.boolean,
-.code-block .token.number,
-.code-block .token.constant,
-.code-block .token.symbol,
-.code-block .token.deleted {
-  color: #b5cea8;
+.code-block-container .code-block .token.property,
+.code-block-container .code-block .token.tag,
+.code-block-container .code-block .token.boolean,
+.code-block-container .code-block .token.number,
+.code-block-container .code-block .token.constant,
+.code-block-container .code-block .token.symbol,
+.code-block-container .code-block .token.deleted,
+code.token.property,
+code.token.tag,
+code.token.boolean,
+code.token.number,
+code.token.constant,
+code.token.symbol,
+code.token.deleted {
+  color: #b5cea8 !important;
 }
 
-.code-block .token.selector,
-.code-block .token.attr-name,
-.code-block .token.string,
-.code-block .token.char,
-.code-block .token.builtin,
-.code-block .token.inserted {
-  color: #ce9178;
+.code-block-container .code-block .token.selector,
+.code-block-container .code-block .token.attr-name,
+.code-block-container .code-block .token.string,
+.code-block-container .code-block .token.char,
+.code-block-container .code-block .token.builtin,
+.code-block-container .code-block .token.inserted,
+code.token.selector,
+code.token.attr-name,
+code.token.string,
+code.token.char,
+code.token.builtin,
+code.token.inserted {
+  color: #ce9178 !important;
 }
 
-.code-block .token.operator,
-.code-block .token.entity,
-.code-block .token.url,
-.code-block .language-css .token.string,
-.code-block .style .token.string {
-  color: #d4d4d4;
+.code-block-container .code-block .token.operator,
+.code-block-container .code-block .token.entity,
+.code-block-container .code-block .token.url,
+code.token.operator,
+code.token.entity,
+code.token.url {
+  color: #d4d4d4 !important;
 }
 
-.code-block .token.atrule,
-.code-block .token.attr-value,
-.code-block .token.keyword {
-  color: #569cd6;
+.code-block-container .code-block .token.atrule,
+.code-block-container .code-block .token.attr-value,
+.code-block-container .code-block .token.keyword,
+code.token.atrule,
+code.token.attr-value,
+code.token.keyword {
+  color: #569cd6 !important;
 }
 
-.code-block .token.function,
-.code-block .token.class-name {
-  color: #dcdcaa;
+.code-block-container .code-block .token.function,
+.code-block-container .code-block .token.class-name,
+code.token.function,
+code.token.class-name {
+  color: #dcdcaa !important;
 }
 
-.code-block .token.regex,
-.code-block .token.important,
-.code-block .token.variable {
-  color: #d16969;
+.code-block-container .code-block .token.regex,
+.code-block-container .code-block .token.important,
+.code-block-container .code-block .token.variable,
+code.token.regex,
+code.token.important,
+code.token.variable {
+  color: #d16969 !important;
 }
 
-.code-block .token.important,
-.code-block .token.bold {
+.code-block-container .code-block .token.important,
+.code-block-container .code-block .token.bold,
+code.token.important,
+code.token.bold {
   font-weight: bold;
 }
 
-.code-block .token.italic {
+.code-block-container .code-block .token.italic,
+code.token.italic {
   font-style: italic;
 }
 
-.code-block .token.entity {
+.code-block-container .code-block .token.entity,
+code.token.entity {
   cursor: help;
 }
 
