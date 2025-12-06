@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { validateFile, getFileIcon, formatFileSize } from '../fileValidation'
-import { SUPPORTED_FILE_TYPES, MAX_FILE_SIZE } from '../../types/ai'
+import { MAX_FILE_SIZE } from '../../types/ai'
 
 describe('fileValidation', () => {
   describe('validateFile', () => {
