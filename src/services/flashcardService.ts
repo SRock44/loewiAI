@@ -76,7 +76,8 @@ class RealFlashcardService implements FlashcardService {
       // build a prompt that tells the AI what kind of flashcards to make
       // includes document content, user preferences (count, difficulty, format), etc.
       const prompt = await this.buildFlashcardPrompt(request, document);
-      let response = await firebaseAILogicService.generateResponse(prompt);
+      // Use dedicated flashcard generation method that bypasses system prompt
+      let response = await firebaseAILogicService.generateFlashcards(prompt);
       
       // try to parse the AI response as JSON (it should return flashcards in JSON format)
       let flashcards: Flashcard[];
@@ -88,7 +89,7 @@ class RealFlashcardService implements FlashcardService {
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
 ${prompt}`;
-        response = await firebaseAILogicService.generateResponse(retryPrompt);
+        response = await firebaseAILogicService.generateFlashcards(retryPrompt);
         flashcards = this.parseFlashcardResponse(response.content, request);
       }
       
@@ -125,7 +126,8 @@ ${prompt}`;
     
     try {
       const prompt = await this.buildTextFlashcardPrompt(request);
-      let response = await firebaseAILogicService.generateResponse(prompt);
+      // Use dedicated flashcard generation method that bypasses system prompt
+      let response = await firebaseAILogicService.generateFlashcards(prompt);
       
       // Try to parse the response
       let flashcards: Flashcard[];
@@ -137,7 +139,7 @@ ${prompt}`;
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
 
 ${prompt}`;
-        response = await firebaseAILogicService.generateResponse(retryPrompt);
+        response = await firebaseAILogicService.generateFlashcards(retryPrompt);
         flashcards = this.parseFlashcardResponse(response.content, request);
       }
       

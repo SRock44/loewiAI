@@ -15,6 +15,7 @@ export interface AIResponse {
 export interface AIProvider {
   name: string;
   generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse>;
+  generateFlashcards(_prompt: string): Promise<AIResponse>;
   isAvailable(): boolean;
 }
 
@@ -41,21 +42,23 @@ class FirebaseAILogicProvider implements AIProvider {
     this.initializeFirebaseAIAsync();
   }
 
-  private getGenerationConfig(): GenerationConfig {
+  private getGenerationConfig(isFlashcardRequest: boolean = false): GenerationConfig {
     return {
       temperature: 0.7,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: 1024, // Reduced from 2048 to save token usage while maintaining quality
+      // Use more tokens for flashcard generation to ensure comprehensive Q&A pairs
+      // Regular conversations stay concise to save tokens
+      maxOutputTokens: isFlashcardRequest ? 4096 : 1024,
     };
   }
 
-  private trySwitchModel(modelName: string): boolean {
+  private trySwitchModel(modelName: string, isFlashcardRequest: boolean = false): boolean {
     if (!this.genAI) return false;
     try {
       this.model = this.genAI.getGenerativeModel({ 
         model: modelName,
-        generationConfig: this.getGenerationConfig()
+        generationConfig: this.getGenerationConfig(isFlashcardRequest)
       });
       this.currentModelName = modelName;
       console.log(`✅ Switched to model: ${modelName}`);
@@ -64,6 +67,21 @@ class FirebaseAILogicProvider implements AIProvider {
       console.warn(`⚠️ Failed to switch to model ${modelName}:`, error);
       return false;
     }
+  }
+
+  private isFlashcardOrStructuredRequest(message?: string): boolean {
+    if (!message) return false;
+    const lowerMessage = message.toLowerCase();
+    // Check for flashcard generation keywords - be very permissive
+    return lowerMessage.includes('flashcard') ||
+           (lowerMessage.includes('generate') && (lowerMessage.includes('flashcard') || lowerMessage.includes('json'))) ||
+           lowerMessage.includes('respond with only valid json') ||
+           lowerMessage.includes('must respond with only') ||
+           lowerMessage.includes('expert educational content creator') ||
+           lowerMessage.includes('required json format') ||
+           lowerMessage.includes('you are an expert educational') ||
+           lowerMessage.includes('high-quality flashcards') ||
+           lowerMessage.includes('educational content creator');
   }
 
   private initializeFirebaseAIAsync() {
@@ -92,7 +110,7 @@ class FirebaseAILogicProvider implements AIProvider {
         try {
           this.model = this.genAI.getGenerativeModel({ 
             model: modelName,
-            generationConfig: this.getGenerationConfig()
+            generationConfig: this.getGenerationConfig(false)
           });
           this.currentModelName = modelName;
           this.triedModels.add(modelName);
@@ -118,6 +136,111 @@ class FirebaseAILogicProvider implements AIProvider {
     return this.genAI !== null && this.model !== null;
   }
 
+  // Direct flashcard generation - bypasses system prompt and uses flashcard-specific config
+  async generateFlashcards(_prompt: string): Promise<AIResponse> {
+    if (!this.isAvailable()) {
+      throw new Error('Firebase AI Logic is not available');
+    }
+
+    // Create a model instance specifically for flashcard generation with higher token limit
+    if (!this.genAI) {
+      throw new Error('Firebase AI Logic is not initialized');
+    }
+
+    const flashcardModel = this.genAI.getGenerativeModel({
+      model: this.currentModelName || 'gemini-2.5-flash',
+      generationConfig: this.getGenerationConfig(true) // true = isFlashcardRequest
+    });
+
+    const maxRetries = 3;
+    const baseDelay = 1000;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Use the prompt directly without adding system prompt - the flashcard prompt is self-contained
+        const result = await flashcardModel.generateContent(_prompt);
+        const response = await result.response;
+        const content = response.text();
+
+        return {
+          content: content,
+          model: this.currentModelName || 'gemini-2.5-flash',
+          provider: 'Firebase AI Logic'
+        };
+      } catch (error) {
+        console.error(`❌ Firebase AI Logic flashcard error (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Check if this is a quota exhaustion error (not just rate limiting)
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isQuotaExhausted = errorMessage.includes('quota') && 
+                                 (errorMessage.includes('limit: 0') || 
+                                  errorMessage.includes('exceeded your current quota') ||
+                                  errorMessage.includes('FreeTier'));
+        
+        // Check if this is a model not found error (404)
+        const isModelNotFound = errorMessage.includes('404') || 
+                                errorMessage.includes('not found') ||
+                                errorMessage.includes('is not found for API version');
+        
+        // If model not found, try switching to another model immediately
+        if (isModelNotFound && this.currentModelName) {
+          console.warn(`⚠️ Model ${this.currentModelName} not found for flashcard generation, trying alternative models...`);
+          this.triedModels.add(this.currentModelName);
+          
+          const untriedModels = this.availableModels.filter(m => !this.triedModels.has(m));
+          let switched = false;
+          
+          for (const modelName of untriedModels) {
+            if (this.trySwitchModel(modelName, true)) {
+              switched = true;
+              // Retry with new model
+              continue;
+            }
+          }
+          
+          if (!switched) {
+            console.error('❌ All Firebase AI Logic models are unavailable for flashcard generation');
+            throw new Error(`Firebase AI Logic models unavailable: ${errorMessage}`);
+          }
+          continue;
+        }
+        
+        // If quota is exhausted, try switching models
+        if (isQuotaExhausted && this.currentModelName) {
+          console.warn(`⚠️ Quota exhausted for model ${this.currentModelName} (flashcards), trying alternative models...`);
+          this.triedModels.add(this.currentModelName);
+          
+          const untriedModels = this.availableModels.filter(m => !this.triedModels.has(m));
+          let switched = false;
+          
+          for (const modelName of untriedModels) {
+            if (this.trySwitchModel(modelName, true)) {
+              switched = true;
+              continue;
+            }
+          }
+          
+          if (!switched) {
+            throw new Error(`Firebase AI Logic quota exhausted for all models: ${errorMessage}`);
+          }
+          continue;
+        }
+        
+        // if it's a rate limit or service overload error, wait and retry
+        if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          console.log(`⏳ Retrying flashcard generation in ${delay}ms due to service overload or rate limit...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw new Error(`Firebase AI Logic flashcard error: ${error}`);
+      }
+    }
+    
+    throw new Error('Firebase AI Logic flashcard generation failed after all retry attempts');
+  }
+
   // main function that sends a message to the AI and gets a response back
   // _context is document content, _conversationHistory is previous messages
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
@@ -129,12 +252,13 @@ class FirebaseAILogicProvider implements AIProvider {
     // we retry up to 3 times with exponential backoff (wait longer each time)
     const maxRetries = 3;
     const baseDelay = 1000;
+    const isFlashcardRequest = this.isFlashcardOrStructuredRequest(_message);
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // build the full prompt - includes system instructions, document context,
         // conversation history, personalization, and the user's current message
-        const systemPrompt = await this.buildFirebaseAIPrompt(_context, _conversationHistory);
+        const systemPrompt = await this.buildFirebaseAIPrompt(_context, _conversationHistory, _message);
         const fullPrompt = `${systemPrompt}\n\nUser: ${_message}`;
 
         // send to gemini API and get response
@@ -172,7 +296,7 @@ class FirebaseAILogicProvider implements AIProvider {
           let switched = false;
           
           for (const modelName of untriedModels) {
-            if (this.trySwitchModel(modelName)) {
+            if (this.trySwitchModel(modelName, isFlashcardRequest)) {
               switched = true;
               break; // Break out of model loop, continue to retry request
             }
@@ -197,7 +321,7 @@ class FirebaseAILogicProvider implements AIProvider {
           let switched = false;
           
           for (const modelName of untriedModels) {
-            if (this.trySwitchModel(modelName)) {
+            if (this.trySwitchModel(modelName, isFlashcardRequest)) {
               switched = true;
               break; // Break out of model loop, continue to retry request
             }
@@ -228,8 +352,8 @@ class FirebaseAILogicProvider implements AIProvider {
     throw new Error('Firebase AI Logic failed after all retry attempts');
   }
 
-  private async buildFirebaseAIPrompt(context?: string, conversationHistory?: string): Promise<string> {
-    const basePrompt = `You are Newton 1.0, an intelligent next-generation academic AI prototype powered by Firebase AI Logic. You provide:
+  private async buildFirebaseAIPrompt(context?: string, conversationHistory?: string, userMessage?: string): Promise<string> {
+    const promptStart = `You are Newton 1.0, an intelligent next-generation academic AI prototype powered by Firebase AI Logic. You provide:
 
 1. **Clear explanations** of complex academic concepts
 2. **Step-by-step guidance** for assignments and projects  
@@ -273,18 +397,33 @@ CODE FORMATTING:
 - Include test cases and examples when appropriate
 - Write executable code snippets that demonstrate the concept
 
-RESPONSE EFFICIENCY:
+RESPONSE EFFICIENCY:`;
+
+    // Build response efficiency section based on request type
+    const isStructuredRequest = this.isFlashcardOrStructuredRequest(userMessage);
+    const responseEfficiencySection = isStructuredRequest ? `
+- **CRITICAL FOR FLASHCARD GENERATION**: You are creating educational flashcards. This is VERY DIFFERENT from regular chat.
+- **MUST provide COMPREHENSIVE, DETAILED answers** - students need complete explanations to learn
+- **Do NOT be concise** - flashcards require thorough answers that fully explain concepts
+- **Each flashcard answer must be educational and complete** - include examples, context, and explanations
+- **Questions should be specific and test understanding** - avoid generic questions like "What is the main topic?"
+- **Answers must be detailed enough for independent learning** - students study from these flashcards
+- **IGNORE any conciseness guidelines** - comprehensive answers are required for flashcards
+` : `
 - **Be concise and direct** - aim for quality over quantity
 - **Get to the point quickly** - start with the core answer, then add context if needed
 - **Avoid unnecessary elaboration** - explain clearly but briefly
 - **Use lists and formatting** to convey information efficiently
 - **Prioritize essential information** - focus on what the user needs to know
 - **Keep responses focused** - avoid tangents or excessive background unless specifically requested
+`;
+
+    const basePrompt = `${promptStart}${responseEfficiencySection}
 
 Guidelines:
 - Be encouraging and supportive
-- Break down complex topics into understandable parts (but concisely)
-- Provide examples when helpful (keep them brief)
+- Break down complex topics into understandable parts${isStructuredRequest ? '' : ' (but concisely)'}
+- Provide examples when helpful${isStructuredRequest ? ' (provide comprehensive examples)' : ' (keep them brief)'}
 - Ask clarifying questions when needed
 - Maintain an academic tone while being approachable
 - Focus on learning and understanding over just answers
@@ -322,6 +461,37 @@ class MockProvider implements AIProvider {
   
   isAvailable(): boolean {
     return true;
+  }
+
+  async generateFlashcards(_prompt: string): Promise<AIResponse> {
+    // Simulate AI processing time
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Return a proper JSON response for flashcard requests
+    const flashcardResponse = {
+      "flashcards": [
+        {
+          "question": "What is the current status of the AI service?",
+          "answer": "The AI service is temporarily unavailable due to quota limits or high demand. This is a fallback response. Please try again in a few minutes when the service is restored.",
+          "category": "System Status",
+          "difficulty": "easy",
+          "tags": ["service-status", "fallback", "ai-unavailable"]
+        },
+        {
+          "question": "What should I do if I see this fallback message?",
+          "answer": "This indicates the AI service has hit its quota limits or is experiencing high demand. Wait a few minutes and try again, or contact support if the issue persists.",
+          "category": "Troubleshooting",
+          "difficulty": "easy",
+          "tags": ["troubleshooting", "support", "quota-limits"]
+        }
+      ]
+    };
+    
+    return {
+      content: JSON.stringify(flashcardResponse),
+      model: 'mock-firebase-ai-logic',
+      provider: 'Mock (Firebase AI Logic Fallback)'
+    };
   }
 
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
@@ -404,6 +574,32 @@ export class FirebaseAILogicService {
 
   private selectBestProvider() {
     this.currentProvider = this.providers.find(provider => provider.isAvailable()) || null;
+  }
+
+  async generateFlashcards(prompt: string): Promise<AIResponse> {
+    if (!this.currentProvider) {
+      throw new Error('No Firebase AI Logic provider available');
+    }
+
+    try {
+      return await this.currentProvider.generateFlashcards(prompt);
+    } catch (error) {
+      console.error(`❌ Error with ${this.currentProvider.name} for flashcard generation:`, error);
+      
+      // Try fallback providers
+      for (const provider of this.providers) {
+        if (provider !== this.currentProvider && provider.isAvailable()) {
+          console.log(`🔄 Falling back to ${provider.name} for flashcard generation`);
+          try {
+            return await provider.generateFlashcards(prompt);
+          } catch (fallbackError) {
+            console.error(`❌ Fallback ${provider.name} also failed:`, fallbackError);
+          }
+        }
+      }
+      
+      throw new Error('All Firebase AI Logic providers failed for flashcard generation');
+    }
   }
 
   async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
