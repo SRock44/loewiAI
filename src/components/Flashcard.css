@@ -12,6 +12,8 @@
   position: relative;
   perspective: 1000px;
   user-select: none;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
 }
 
 .flashcard {
@@ -26,25 +28,36 @@
   position: absolute;
   top: 0;
   left: 0;
-  backfaceVisibility: hidden;
-  -webkit-backfaceVisibility: hidden;
+  right: 0;
+  bottom: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   overflow: hidden;
+  transform-style: preserve-3d;
 }
 
 .flashcard-front {
   background: white;
+  transform: rotateY(0deg);
 }
 
 .flashcard-back {
   background: #f9fafb;
+  transform: rotateY(180deg);
 }
 
 .flashcard-header-new {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 32px;
+  margin-bottom: 0;
+  padding-bottom: 16px;
   flex-shrink: 0;
+  /* Ensure header stays at top and doesn't overlap with content */
+  position: relative;
+  z-index: 1;
+  /* Add border to visually separate from content */
+  border-bottom: 1px solid #f3f4f6;
 }
 
 .flashcard-number {
@@ -88,17 +101,19 @@
 .flashcard-content-new {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 0;
+  padding: 0;
   min-height: 0;
   max-height: 100%;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   position: relative;
   user-select: text;
+  /* Ensure content starts below header and above footer */
+  margin: 0;
 }
 
 .flashcard-content-new::-webkit-scrollbar {
@@ -127,7 +142,13 @@
   width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  padding: 8px 0;
+  padding: 16px 0;
+  /* Ensure first word is always visible - add top padding */
+  padding-top: 16px;
+  /* Ensure content doesn't get cut off at bottom */
+  padding-bottom: 24px;
+  /* Prevent negative margins that could cause overlap */
+  margin: 0;
 }
 
 .flashcard-back .flashcard-text-new {
@@ -170,9 +191,15 @@
 
 .flashcard-footer-new {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: 16px;
+  padding-bottom: 0;
   text-align: center;
   flex-shrink: 0;
+  /* Ensure footer stays at bottom and doesn't overlap with content */
+  position: relative;
+  z-index: 1;
+  /* Add border to visually separate from content */
+  border-top: 1px solid #f3f4f6;
 }
 
 .flashcard-hint-new {
@@ -261,11 +288,17 @@
   }
 
   .flashcard-header-new {
-    margin-bottom: 24px;
+    margin-bottom: 0;
+    padding-bottom: 12px;
   }
 
   .flashcard-footer-new {
-    margin-top: 24px;
+    padding-top: 12px;
+  }
+
+  .flashcard-text-new {
+    padding-top: 12px;
+    padding-bottom: 20px;
   }
 }
 
@@ -284,7 +317,8 @@
   }
 
   .flashcard-header-new {
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    padding-bottom: 10px;
   }
 
   .flashcard-number {
@@ -297,7 +331,12 @@
   }
 
   .flashcard-footer-new {
-    margin-top: 20px;
+    padding-top: 10px;
+  }
+
+  .flashcard-text-new {
+    padding-top: 10px;
+    padding-bottom: 16px;
   }
 
   .mastery-btn-new {

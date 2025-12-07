@@ -269,10 +269,43 @@ FINAL REMINDER:
 
       // Successfully parsed flashcards
 
+      // Helper function to clean flashcard text content
+      const cleanFlashcardText = (text: any): string => {
+        if (!text) return '';
+        let cleaned = String(text).trim();
+        
+        // Remove markdown code blocks if present
+        cleaned = cleaned.replace(/```(?:json|markdown|html)?\s*([\s\S]*?)```/g, '$1');
+        
+        // Remove JSON wrapper if it's a JSON string
+        if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(cleaned);
+            if (typeof parsed === 'string') {
+              cleaned = parsed;
+            } else if (parsed.question) {
+              cleaned = parsed.question;
+            } else if (parsed.answer) {
+              cleaned = parsed.answer;
+            }
+          } catch {
+            // Not valid JSON, continue with original
+          }
+        }
+        
+        // Replace escaped newlines with actual newlines
+        cleaned = cleaned.replace(/\\n/g, '\n');
+        cleaned = cleaned.replace(/\\t/g, '\t');
+        cleaned = cleaned.replace(/\\"/g, '"');
+        cleaned = cleaned.replace(/\\'/g, "'");
+        
+        return cleaned.trim();
+      };
+
       return parsed.flashcards.map((card: any, index: number) => ({
         id: `flashcard_${Date.now()}_${index}`,
-        question: card.question || 'No question provided',
-        answer: card.answer || 'No answer provided',
+        question: cleanFlashcardText(card.question) || 'No question provided',
+        answer: cleanFlashcardText(card.answer) || 'No answer provided',
         category: card.category || 'General',
         difficulty: card.difficulty || request.difficulty || 'medium',
         tags: Array.isArray(card.tags) ? card.tags : [],

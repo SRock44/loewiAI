@@ -49,7 +49,8 @@ class FirebaseAILogicProvider implements AIProvider {
       topP: 0.95,
       // Use more tokens for flashcard generation to ensure comprehensive Q&A pairs
       // Regular conversations stay concise to save tokens
-      maxOutputTokens: isFlashcardRequest ? 4096 : 1024,
+      // Increased maxOutputTokens for flashcard generation to handle longer responses
+      maxOutputTokens: isFlashcardRequest ? 8192 : 1024,
     };
   }
 
@@ -153,9 +154,19 @@ class FirebaseAILogicProvider implements AIProvider {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Use the prompt directly without adding system prompt - the flashcard prompt is self-contained
+        // Ensure we wait for the complete response - generateContent returns a promise that resolves when complete
         const result = await flashcardModel.generateContent(_prompt);
+        
+        // Wait for the full response to be available
         const response = await result.response;
+        
+        // Get the complete text content - this should wait for the full response
         const content = response.text();
+        
+        // Verify we got content - if empty or too short, might indicate incomplete response
+        if (!content || content.trim().length < 10) {
+          throw new Error('Received empty or incomplete response from AI');
+        }
 
         return {
           content: content,
@@ -216,9 +227,18 @@ class FirebaseAILogicProvider implements AIProvider {
           continue;
         }
         
-        // if it's a rate limit or service overload error, wait and retry
+        // if it's a rate limit or service overload error, wait and retry with exponential backoff
         if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
+          // Wait longer for flashcard generation to ensure server has time to process
+          const extendedDelay = delay * 2; // Double the delay for flashcard generation
+          await new Promise(resolve => setTimeout(resolve, extendedDelay));
+          continue;
+        }
+        
+        // If it's an incomplete response error, retry with longer wait
+        if (error instanceof Error && (error.message.includes('empty') || error.message.includes('incomplete')) && attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1) * 3; // Triple the delay for incomplete responses
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }

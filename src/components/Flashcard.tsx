@@ -89,10 +89,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
         {/* Front Side - Question */}
         <div
           className="flashcard flashcard-front"
-          style={{
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-          }}
         >
           {/* Header */}
           <div className="flashcard-header-new">
@@ -121,11 +117,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
         {/* Back Side - Answer */}
         <div
           className="flashcard flashcard-back"
-          style={{
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-          }}
         >
           {/* Header */}
           <div className="flashcard-header-new">
