@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Flashcard from './Flashcard';
 import { FlashcardSet } from '../types/flashcard';
@@ -11,9 +11,7 @@ interface FlashcardListProps {
 }
 
 const FlashcardList: React.FC<FlashcardListProps> = ({
-  flashcardSet,
-  onMasteryUpdate,
-  onSetUpdate
+  flashcardSet
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -25,6 +23,10 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
 
   // Filter flashcards based on selected criteria
   const filteredFlashcards = useMemo(() => {
+    if (!flashcardSet?.flashcards || flashcardSet.flashcards.length === 0) {
+      return [];
+    }
+    
     let filtered = [...flashcardSet.flashcards];
 
     if (filterDifficulty !== 'all') {
@@ -49,31 +51,18 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
       default:
         return filtered;
     }
-  }, [flashcardSet.flashcards, filterDifficulty, filterMastery, studyMode]);
+  }, [flashcardSet?.flashcards, filterDifficulty, filterMastery, studyMode]);
 
-  const currentFlashcard = filteredFlashcards[currentIndex];
-
-  const handleMasteryUpdate = (flashcardId: string, masteryLevel: number) => {
-    const updatedFlashcards = flashcardSet.flashcards.map(card =>
-      card.id === flashcardId
-        ? { ...card, masteryLevel, lastReviewed: new Date(), reviewCount: card.reviewCount + 1 }
-        : card
-    );
-
-    const updatedSet: FlashcardSet = {
-      ...flashcardSet,
-      flashcards: updatedFlashcards,
-      updatedAt: new Date()
-    };
-
-    if (onSetUpdate) {
-      onSetUpdate(updatedSet);
+  // Reset index if it's out of bounds
+  useEffect(() => {
+    if (filteredFlashcards.length > 0 && currentIndex >= filteredFlashcards.length) {
+      setCurrentIndex(0);
     }
+  }, [filteredFlashcards.length, currentIndex]);
 
-    if (onMasteryUpdate) {
-      onMasteryUpdate(flashcardId, masteryLevel);
-    }
-  };
+  const currentFlashcard = filteredFlashcards.length > 0 && currentIndex < filteredFlashcards.length 
+    ? filteredFlashcards[currentIndex] 
+    : null;
 
   const goToNext = () => {
     setDirection(1);
@@ -122,13 +111,24 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
     </svg>
   );
 
-  if (filteredFlashcards.length === 0) {
+  if (!flashcardSet || !flashcardSet.flashcards || filteredFlashcards.length === 0) {
     return (
-      <div className="flashcard-list-container">
+      <div className="flashcard-list-container-new">
         <div className="no-cards-message">
           <div className="no-cards-icon">📚</div>
           <h3>No flashcards available</h3>
           <p>No flashcards in this set.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentFlashcard) {
+    return (
+      <div className="flashcard-list-container-new">
+        <div className="no-cards-message">
+          <div className="no-cards-icon">📚</div>
+          <h3>Loading flashcard...</h3>
         </div>
       </div>
     );
@@ -155,8 +155,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
             {currentFlashcard && (
               <Flashcard
                 flashcard={currentFlashcard}
-                onMasteryUpdate={handleMasteryUpdate}
-                showControls={true}
                 isFlipped={isFlipped}
                 onFlipChange={setIsFlipped}
                 number={currentIndex + 1}

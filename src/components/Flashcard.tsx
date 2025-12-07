@@ -6,8 +6,6 @@ import './Flashcard.css';
 
 interface FlashcardProps {
   flashcard: FlashcardType;
-  onMasteryUpdate?: (flashcardId: string, masteryLevel: number) => void;
-  showControls?: boolean;
   className?: string;
   isFlipped?: boolean;
   onFlipChange?: (flipped: boolean) => void;
@@ -17,8 +15,6 @@ interface FlashcardProps {
 
 const Flashcard: React.FC<FlashcardProps> = ({ 
   flashcard, 
-  onMasteryUpdate, 
-  showControls = true,
   className = '',
   isFlipped: externalIsFlipped,
   onFlipChange,
@@ -50,7 +46,7 @@ const Flashcard: React.FC<FlashcardProps> = ({
     };
   }, []);
 
-  const handleFlip = (e: React.MouseEvent) => {
+  const handleFlip = () => {
     // Don't flip if scrolling
     if (isScrolling) {
       return;
@@ -60,12 +56,6 @@ const Flashcard: React.FC<FlashcardProps> = ({
       onFlipChange(newFlippedState);
     } else {
       setInternalIsFlipped(newFlippedState);
-    }
-  };
-
-  const handleMasteryUpdate = (level: number) => {
-    if (onMasteryUpdate) {
-      onMasteryUpdate(flashcard.id, level);
     }
   };
 
