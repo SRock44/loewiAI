@@ -32,7 +32,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['pdfjs-dist', 'react', 'react-dom', 'react-router-dom', 'prismjs'],
+    include: ['react', 'react-dom', 'react/jsx-runtime', 'react-router-dom', 'pdfjs-dist', 'prismjs', 'framer-motion'],
     exclude: ['prismjs/components'] // Let Prism.js language components load dynamically
   },
   build: {
@@ -43,9 +43,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Simplified chunking to avoid circular dependencies
+          // Ensure React and React-DOM are always together and loaded first
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
+            // React must be in the same chunk to avoid undefined errors
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
               return 'react-vendor';
             }
             if (id.includes('pdfjs-dist')) {
@@ -53,6 +54,9 @@ export default defineConfig({
             }
             if (id.includes('@google/generative-ai') || id.includes('firebase')) {
               return 'ai-services';
+            }
+            if (id.includes('framer-motion')) {
+              return 'framer-motion';
             }
             if (id.includes('prismjs')) {
               // Keep Prism.js components together to avoid issues
