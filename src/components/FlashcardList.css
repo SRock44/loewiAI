@@ -1,3 +1,205 @@
+/* New FlashcardList Styles - Modern Design */
+.flashcard-list-container-new {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  justify-content: space-between;
+}
+
+.flashcard-display-container {
+  position: relative;
+  height: 500px;
+  overflow: hidden;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.flashcard-slide-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.flashcard-navigation-new {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 8px 0;
+}
+
+.nav-button-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: #374151;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.nav-button-new:hover:not(:disabled) {
+  color: #111827;
+}
+
+.nav-button-new:disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.nav-center-new {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.nav-counter-new {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.nav-dots-new {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-dot-new {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: #d1d5db;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.nav-dot-new:hover:not(.active) {
+  background-color: #9ca3af;
+}
+
+.nav-dot-new.active {
+  width: 32px;
+  background-color: #111827;
+}
+
+.flashcard-hint-footer {
+  font-size: 12px;
+  text-align: center;
+  color: #9ca3af;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.no-cards-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.no-cards-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.no-cards-message h3 {
+  margin: 0 0 8px 0;
+  color: #374151;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.no-cards-message p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .flashcard-list-container-new {
+    padding: 16px;
+    gap: 20px;
+  }
+
+  .flashcard-display-container {
+    height: 450px;
+  }
+
+  .nav-button-new {
+    padding: 6px 12px;
+    font-size: 13px;
+    gap: 6px;
+  }
+
+  .nav-dot-new {
+    width: 6px;
+    height: 6px;
+  }
+
+  .nav-dot-new.active {
+    width: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .flashcard-list-container-new {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .flashcard-display-container {
+    height: 450px;
+  }
+
+  .nav-button-new {
+    padding: 6px 10px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .nav-button-new span {
+    display: none; /* Hide text on very small screens, show only icons */
+  }
+
+  .nav-dot-new {
+    width: 5px;
+    height: 5px;
+  }
+
+  .nav-dot-new.active {
+    width: 20px;
+  }
+
+  .flashcard-hint-footer {
+    font-size: 11px;
+  }
+}
+
+/* Legacy styles - keeping for backward compatibility */
 .flashcard-list-container {
   width: 100%;
   max-width: 1200px;
@@ -25,11 +227,6 @@
   font-size: 14px;
   line-height: 1.5;
 }
-
-
-/* Filter styles removed - UI no longer shows dropdowns but logic is preserved */
-
-
 
 .flashcard-display {
   display: flex;
@@ -80,7 +277,6 @@
   cursor: not-allowed;
   opacity: 0.6;
 }
-
 
 .card-thumbnails {
   display: flex;
@@ -141,110 +337,3 @@
   line-height: 1;
   z-index: 1;
 }
-
-.no-cards-message {
-  text-align: center;
-  padding: 40px 20px;
-  color: #6b7280;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-
-.no-cards-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.7;
-}
-
-.no-cards-message h3 {
-  margin: 0 0 8px 0;
-  color: #374151;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.no-cards-message p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: #6b7280;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .flashcard-list-container {
-    padding: 16px;
-    margin: 10px;
-  }
-
-  .flashcard-list-header h2 {
-    font-size: 24px;
-  }
-
-
-
-
-  .card-navigation {
-    gap: 12px;
-  }
-
-  .nav-btn {
-    padding: 10px 16px;
-    min-width: 80px;
-    font-size: 13px;
-  }
-
-  .card-thumbnails {
-    gap: 6px;
-  }
-
-  .thumbnail {
-    width: 32px;
-    height: 32px;
-  }
-}
-
-@media (max-width: 480px) {
-  .flashcard-list-container {
-    padding: 12px;
-    margin: 5px;
-  }
-
-  .flashcard-list-header h2 {
-    font-size: 20px;
-  }
-
-  .flashcard-list-header p {
-    font-size: 14px;
-  }
-
-
-  .card-navigation {
-    gap: 8px;
-  }
-
-  .nav-btn {
-    padding: 8px 12px;
-    min-width: 70px;
-    font-size: 12px;
-  }
-
-  .current-card {
-    font-size: 18px;
-  }
-
-  .card-thumbnails {
-    gap: 4px;
-  }
-
-  .thumbnail {
-    width: 28px;
-    height: 28px;
-  }
-
-  .thumbnail-mastery {
-    font-size: 9px;
-  }
-}
-

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import ReactCardFlip from 'react-card-flip';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Flashcard as FlashcardType } from '../types/flashcard';
 import { renderMarkdownSafe } from '../utils/markdownRenderer';
 import './Flashcard.css';
@@ -11,6 +11,8 @@ interface FlashcardProps {
   className?: string;
   isFlipped?: boolean;
   onFlipChange?: (flipped: boolean) => void;
+  number?: number;
+  total?: number;
 }
 
 const Flashcard: React.FC<FlashcardProps> = ({ 
@@ -19,14 +21,40 @@ const Flashcard: React.FC<FlashcardProps> = ({
   showControls = true,
   className = '',
   isFlipped: externalIsFlipped,
-  onFlipChange
+  onFlipChange,
+  number,
+  total
 }) => {
   const [internalIsFlipped, setInternalIsFlipped] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Use external flip state if provided, otherwise use internal state
   const isFlipped = externalIsFlipped !== undefined ? externalIsFlipped : internalIsFlipped;
 
-  const handleFlip = () => {
+  const handleScroll = () => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleFlip = (e: React.MouseEvent) => {
+    // Don't flip if scrolling
+    if (isScrolling) {
+      return;
+    }
     const newFlippedState = !isFlipped;
     if (onFlipChange) {
       onFlipChange(newFlippedState);
@@ -41,151 +69,98 @@ const Flashcard: React.FC<FlashcardProps> = ({
     }
   };
 
-  const getMasteryColor = (level: number) => {
-    if (level === 1) return '#f44336'; // Red - Needs Review
-    if (level === 2) return '#ffeb3b'; // Yellow - Needs Improvement
-    if (level === 3) return '#4caf50'; // Green - Understand
-    return '#e0e0e0'; // Gray - Default/Unassigned
+  const getDifficultyDisplay = (difficulty?: string): 'Easy' | 'Medium' | 'Hard' => {
+    if (!difficulty) return 'Medium';
+    const lower = difficulty.toLowerCase();
+    if (lower === 'easy') return 'Easy';
+    if (lower === 'hard') return 'Hard';
+    return 'Medium';
   };
 
-  const getMasteryLabel = (level: number) => {
-    if (level === 1) return 'Needs Review';
-    if (level === 2) return 'Needs Improvement';
-    if (level === 3) return 'Understand';
-    return 'Unassigned';
+  const difficulty = getDifficultyDisplay(flashcard.difficulty);
+  const difficultyColors = {
+    Easy: 'bg-green-100 text-green-700',
+    Medium: 'bg-yellow-100 text-yellow-700',
+    Hard: 'bg-red-100 text-red-700'
   };
 
-  const getDifficultyColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case 'easy': return '#4caf50';
-      case 'medium': return '#ff9800';
-      case 'hard': return '#f44336';
-      default: return '#9e9e9e';
-    }
-  };
+  const cardNumber = number !== undefined ? number : 1;
+  const cardTotal = total !== undefined ? total : 1;
 
   return (
-    <div className={`flashcard-container ${className}`}>
-      <ReactCardFlip 
-        isFlipped={isFlipped} 
-        flipDirection="horizontal"
-        flipSpeedBackToFront={0.6}
-        flipSpeedFrontToBack={0.6}
+    <div className={`flashcard-wrapper ${className}`}>
+      <motion.div
+        className="flashcard-motion-container"
+        onClick={handleFlip}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ duration: 0.6, type: "spring", stiffness: 100 }}
+        style={{ transformStyle: "preserve-3d" }}
       >
-        {/* Front of card - Question */}
-        <div className="flashcard flashcard-front" onClick={handleFlip}>
-          <div className="flashcard-header">
-            <div className="flashcard-meta">
-              {flashcard.category && (
-                <span className="flashcard-category">{flashcard.category}</span>
-              )}
-              {flashcard.difficulty && (
-                <span 
-                  className="flashcard-difficulty"
-                  style={{ backgroundColor: getDifficultyColor(flashcard.difficulty) }}
-                >
-                  {flashcard.difficulty}
-                </span>
-              )}
-            </div>
-            <div className="flashcard-mastery">
-              <div 
-                className="mastery-indicator"
-                style={{ 
-                  backgroundColor: getMasteryColor(flashcard.masteryLevel),
-                  color: flashcard.masteryLevel === 0 ? '#666' : 'white',
-                  border: flashcard.masteryLevel === 0 ? '1px solid #ddd' : 'none'
-                }}
-              >
-                {getMasteryLabel(flashcard.masteryLevel)}
-              </div>
-            </div>
+        {/* Front Side - Question */}
+        <div
+          className="flashcard flashcard-front"
+          style={{
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+          }}
+        >
+          {/* Header */}
+          <div className="flashcard-header-new">
+            {number !== undefined && total !== undefined && (
+              <span className="flashcard-number">Question {cardNumber} of {cardTotal}</span>
+            )}
+            <span className={`flashcard-difficulty-badge ${difficultyColors[difficulty]}`}>
+              {difficulty}
+            </span>
           </div>
-          
-          <div className="flashcard-content">
-            <h3 className="flashcard-title">Question</h3>
+
+          {/* Question Content */}
+          <div className="flashcard-content-new" onScroll={handleScroll}>
             <div 
-              className="flashcard-text" 
+              className="flashcard-text-new" 
               dangerouslySetInnerHTML={{ __html: renderMarkdownSafe(flashcard.question || '') }}
             />
           </div>
-          
-          <div className="flashcard-footer">
-            <span className="flashcard-hint">Click to reveal answer</span>
+
+          {/* Footer */}
+          <div className="flashcard-footer-new">
+            <span className="flashcard-hint-new">Click to reveal answer</span>
           </div>
         </div>
 
-        {/* Back of card - Answer */}
-        <div className="flashcard flashcard-back" onClick={handleFlip}>
-          <div className="flashcard-header">
-            <div className="flashcard-meta">
-              {flashcard.category && (
-                <span className="flashcard-category">{flashcard.category}</span>
-              )}
-              {flashcard.difficulty && (
-                <span 
-                  className="flashcard-difficulty"
-                  style={{ backgroundColor: getDifficultyColor(flashcard.difficulty) }}
-                >
-                  {flashcard.difficulty}
-                </span>
-              )}
-            </div>
-            <div className="flashcard-mastery">
-              <div 
-                className="mastery-indicator"
-                style={{ 
-                  backgroundColor: getMasteryColor(flashcard.masteryLevel),
-                  color: flashcard.masteryLevel === 0 ? '#666' : 'white',
-                  border: flashcard.masteryLevel === 0 ? '1px solid #ddd' : 'none'
-                }}
-              >
-                {getMasteryLabel(flashcard.masteryLevel)}
-              </div>
-            </div>
+        {/* Back Side - Answer */}
+        <div
+          className="flashcard flashcard-back"
+          style={{
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+          }}
+        >
+          {/* Header */}
+          <div className="flashcard-header-new">
+            {number !== undefined && total !== undefined && (
+              <span className="flashcard-number">Answer {cardNumber} of {cardTotal}</span>
+            )}
+            <span className={`flashcard-difficulty-badge ${difficultyColors[difficulty]}`}>
+              {difficulty}
+            </span>
           </div>
-          
-          <div className="flashcard-content">
-            <h3 className="flashcard-title">Answer</h3>
+
+          {/* Answer Content */}
+          <div className="flashcard-content-new" onScroll={handleScroll}>
             <div 
-              className="flashcard-text" 
+              className="flashcard-text-new" 
               dangerouslySetInnerHTML={{ __html: renderMarkdownSafe(flashcard.answer || '') }}
             />
           </div>
-          
-          <div className="flashcard-footer">
-            {showControls && (
-              <div className="mastery-controls">
-                <span className="mastery-label">How well did you know this?</span>
-                <div className="mastery-buttons">
-                  {[
-                    { level: 1, color: '#f44336' },
-                    { level: 2, color: '#ffeb3b' },
-                    { level: 3, color: '#4caf50' }
-                  ].map(({ level, color }) => (
-                    <button
-                      key={level}
-                      className={`mastery-btn ${flashcard.masteryLevel === level ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMasteryUpdate(level);
-                      }}
-                      style={{ 
-                        backgroundColor: color,
-                        opacity: flashcard.masteryLevel === level ? 1 : 0.6,
-                        border: flashcard.masteryLevel === level ? '2px solid #333' : '2px solid transparent'
-                      }}
-                      title={getMasteryLabel(level)}
-                    >
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <span className="flashcard-hint">Click to see question again</span>
+
+          {/* Footer - Identical to question side */}
+          <div className="flashcard-footer-new">
+            <span className="flashcard-hint-new">Click to see question</span>
           </div>
         </div>
-      </ReactCardFlip>
+      </motion.div>
     </div>
   );
 };

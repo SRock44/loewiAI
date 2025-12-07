@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Flashcard from './Flashcard';
 import { FlashcardSet } from '../types/flashcard';
 import './FlashcardList.css';
@@ -15,32 +16,21 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
   onSetUpdate
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [direction, setDirection] = useState(0);
   // Filter state variables kept for future implementation
   const [filterDifficulty] = useState<string>('all');
   const [filterMastery] = useState<string>('all');
   const [studyMode] = useState<'sequential' | 'random' | 'weak'>('sequential');
-  const [currentCardFlipped, setCurrentCardFlipped] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-
-  const getMasteryColor = (level: number) => {
-    if (level === 1) return '#f44336'; // Red
-    if (level === 2) return '#ffeb3b'; // Yellow
-    if (level === 3) return '#4caf50'; // Green
-    return '#e0e0e0'; // Gray - Default/Unassigned
-  };
 
   // Filter flashcards based on selected criteria
-  // Note: Filter logic is kept for future implementation of difficulty/mastery options
   const filteredFlashcards = useMemo(() => {
     let filtered = [...flashcardSet.flashcards];
 
-    // Filter by difficulty (currently shows all, but logic preserved)
     if (filterDifficulty !== 'all') {
       filtered = filtered.filter(card => card.difficulty === filterDifficulty);
     }
 
-    // Filter by mastery level (currently shows all, but logic preserved)
     if (filterMastery !== 'all') {
       if (filterMastery === 'needs-review') {
         filtered = filtered.filter(card => card.masteryLevel === 1);
@@ -51,7 +41,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
       }
     }
 
-    // Sort based on study mode (currently sequential, but logic preserved)
     switch (studyMode) {
       case 'random':
         return filtered.sort(() => Math.random() - 0.5);
@@ -87,43 +76,51 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
   };
 
   const goToNext = () => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrentCardFlipped(true); // Start flip animation
-    
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % filteredFlashcards.length);
-      setCurrentCardFlipped(false);
-      setIsTransitioning(false);
-    }, 300); // Half of the flip animation duration
+    setDirection(1);
+    setCurrentIndex((prev) => Math.min(prev + 1, filteredFlashcards.length - 1));
+    setIsFlipped(false); // Reset to question side
   };
 
   const goToPrevious = () => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrentCardFlipped(true); // Start flip animation
-    
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev - 1 + filteredFlashcards.length) % filteredFlashcards.length);
-      setCurrentCardFlipped(false);
-      setIsTransitioning(false);
-    }, 300); // Half of the flip animation duration
+    setDirection(-1);
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    setIsFlipped(false); // Reset to question side
   };
 
   const goToCard = (index: number) => {
-    if (isTransitioning || index === currentIndex) return;
-    setIsTransitioning(true);
-    setCurrentCardFlipped(true); // Start flip animation
-    
-    setTimeout(() => {
-      setCurrentIndex(index);
-      setCurrentCardFlipped(false);
-      setIsTransitioning(false);
-    }, 300); // Half of the flip animation duration
+    setDirection(index > currentIndex ? 1 : -1);
+    setCurrentIndex(index);
+    setIsFlipped(false); // Reset to question side
   };
 
+  const slideVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 300 : -300,
+      opacity: 0
+    }),
+    center: {
+      x: 0,
+      opacity: 1
+    },
+    exit: (direction: number) => ({
+      x: direction > 0 ? -300 : 300,
+      opacity: 0
+    })
+  };
 
+  // Chevron Left Icon Component
+  const ChevronLeft = ({ size = 20 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6"/>
+    </svg>
+  );
 
+  // Chevron Right Icon Component
+  const ChevronRight = ({ size = 20 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6"/>
+    </svg>
+  );
 
   if (filteredFlashcards.length === 0) {
     return (
@@ -138,58 +135,78 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
   }
 
   return (
-    <div className="flashcard-list-container">
-
-
-      <div className="flashcard-display">
-        <div className="flashcard-navigation-container">
-          <button 
-            className={`nav-arrow nav-arrow-left ${isTransitioning ? 'transitioning' : ''}`}
-            onClick={goToPrevious}
-            disabled={filteredFlashcards.length <= 1 || isTransitioning}
+    <div className="flashcard-list-container-new">
+      {/* Flashcard Display */}
+      <div className="flashcard-display-container">
+        <AnimatePresence initial={false} custom={direction} mode="wait">
+          <motion.div
+            key={currentIndex}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              duration: 0.15,
+              ease: [0.4, 0.0, 0.2, 1]
+            }}
+            className="flashcard-slide-wrapper"
           >
-            ←
-          </button>
-          
-          {currentFlashcard && (
-            <Flashcard
-              flashcard={currentFlashcard}
-              onMasteryUpdate={handleMasteryUpdate}
-              showControls={true}
-              isFlipped={currentCardFlipped}
-              onFlipChange={setCurrentCardFlipped}
-            />
-          )}
-          
-          <button 
-            className={`nav-arrow nav-arrow-right ${isTransitioning ? 'transitioning' : ''}`}
-            onClick={goToNext}
-            disabled={filteredFlashcards.length <= 1 || isTransitioning}
-          >
-            →
-          </button>
-        </div>
-
-        <div className="card-thumbnails">
-          {filteredFlashcards.map((card, index) => (
-            <button
-              key={card.id}
-              className={`thumbnail ${index === currentIndex ? 'active' : ''} ${isTransitioning ? 'transitioning' : ''}`}
-              onClick={() => goToCard(index)}
-              disabled={isTransitioning}
-              title={`Card ${index + 1}: ${card.question.substring(0, 50)}...`}
-              style={{ 
-                backgroundColor: getMasteryColor(card.masteryLevel),
-                border: card.masteryLevel === 0 ? '2px solid #ddd' : '2px solid transparent'
-              }}
-            >
-              <div className="thumbnail-number">
-                {index + 1}
-              </div>
-            </button>
-          ))}
-        </div>
+            {currentFlashcard && (
+              <Flashcard
+                flashcard={currentFlashcard}
+                onMasteryUpdate={handleMasteryUpdate}
+                showControls={true}
+                isFlipped={isFlipped}
+                onFlipChange={setIsFlipped}
+                number={currentIndex + 1}
+                total={filteredFlashcards.length}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
+
+      {/* Navigation */}
+      <div className="flashcard-navigation-new">
+        <button
+          onClick={goToPrevious}
+          disabled={currentIndex === 0}
+          className="nav-button-new nav-button-prev"
+        >
+          <ChevronLeft size={20} />
+          <span>Previous</span>
+        </button>
+
+        <div className="nav-center-new">
+          <p className="nav-counter-new">
+            {currentIndex + 1} of {filteredFlashcards.length}
+          </p>
+          <div className="nav-dots-new">
+            {filteredFlashcards.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goToCard(index)}
+                className={`nav-dot-new ${index === currentIndex ? 'active' : ''}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={goToNext}
+          disabled={currentIndex === filteredFlashcards.length - 1}
+          className="nav-button-new nav-button-next"
+        >
+          <span>Next</span>
+          <ChevronRight size={20} />
+        </button>
+      </div>
+
+      {/* Keyboard Shortcuts Hint */}
+      <p className="flashcard-hint-footer">
+        Click card to flip • Use arrows to navigate
+      </p>
     </div>
   );
 };
