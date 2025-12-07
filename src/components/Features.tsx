@@ -35,7 +35,7 @@ const Features: React.FC = () => {
     {
       icon: ClipboardList,
       title: "Flashcard Generation",
-      description: "AI-powered flashcard creation from your documents and text. Generate study cards with smooth animations and mastery tracking."
+      description: "AI-powered flashcard creation from your documents and text. Generate study cards with smooth animations."
     },
     {
       icon: Home,

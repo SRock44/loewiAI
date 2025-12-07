@@ -207,68 +207,9 @@
   color: #9ca3af;
 }
 
-/* Mastery controls only appear on answer side, after footer */
-.flashcard-back .flashcard-footer-new {
-  margin-top: auto;
-}
-
-.mastery-controls-new {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  margin-top: 0;
-  padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
-  flex-shrink: 0;
-}
-
-.mastery-label-new {
-  font-size: 14px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.mastery-buttons-new {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-}
-
-.mastery-btn-new {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 18px;
-  position: relative;
-  z-index: 10;
-}
-
-.mastery-btn-new:hover {
-  opacity: 0.8;
-  transform: scale(1.05);
-}
-
-.mastery-btn-new.active {
-  opacity: 1;
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
 /* Focus states for accessibility */
 .flashcard:focus {
   outline: 3px solid rgba(59, 130, 246, 0.5);
-  outline-offset: 2px;
-}
-
-.mastery-btn-new:focus {
-  outline: 2px solid rgba(59, 130, 246, 0.8);
   outline-offset: 2px;
 }
 
@@ -337,11 +278,6 @@
   .flashcard-text-new {
     padding-top: 10px;
     padding-bottom: 16px;
-  }
-
-  .mastery-btn-new {
-    width: 44px;
-    height: 44px;
   }
 }
 

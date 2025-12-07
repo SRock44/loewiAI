@@ -6,7 +6,6 @@ import './FlashcardList.css';
 
 interface FlashcardListProps {
   flashcardSet: FlashcardSet;
-  onMasteryUpdate?: (flashcardId: string, masteryLevel: number) => void;
   onSetUpdate?: (updatedSet: FlashcardSet) => void;
 }
 
@@ -18,8 +17,7 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
   const [direction, setDirection] = useState(0);
   // Filter state variables kept for future implementation
   const [filterDifficulty] = useState<string>('all');
-  const [filterMastery] = useState<string>('all');
-  const [studyMode] = useState<'sequential' | 'random' | 'weak'>('sequential');
+  const [studyMode] = useState<'sequential' | 'random'>('sequential');
 
   // Filter flashcards based on selected criteria
   const filteredFlashcards = useMemo(() => {
@@ -33,25 +31,13 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
       filtered = filtered.filter(card => card.difficulty === filterDifficulty);
     }
 
-    if (filterMastery !== 'all') {
-      if (filterMastery === 'needs-review') {
-        filtered = filtered.filter(card => card.masteryLevel === 1);
-      } else if (filterMastery === 'needs-improvement') {
-        filtered = filtered.filter(card => card.masteryLevel === 2);
-      } else if (filterMastery === 'understand') {
-        filtered = filtered.filter(card => card.masteryLevel === 3);
-      }
-    }
-
     switch (studyMode) {
       case 'random':
         return filtered.sort(() => Math.random() - 0.5);
-      case 'weak':
-        return filtered.sort((a, b) => a.masteryLevel - b.masteryLevel);
       default:
         return filtered;
     }
-  }, [flashcardSet?.flashcards, filterDifficulty, filterMastery, studyMode]);
+  }, [flashcardSet?.flashcards, filterDifficulty, studyMode]);
 
   // Reset index if it's out of bounds
   useEffect(() => {
