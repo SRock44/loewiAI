@@ -210,14 +210,28 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
 
   // Notify parent component when documents are uploaded
+  // Using a ref to track previous uploadedFiles to avoid infinite loops
+  const prevUploadedFilesRef = useRef<string>('');
+  const onDocumentsChangeRef = useRef(onDocumentsChange);
+  
+  // Keep ref in sync with prop
   useEffect(() => {
-    if (onDocumentsChange && uploadedFiles.length > 0) {
+    onDocumentsChangeRef.current = onDocumentsChange;
+  }, [onDocumentsChange]);
+  
+  useEffect(() => {
+    if (onDocumentsChangeRef.current && uploadedFiles.length > 0) {
       const completedDocs = uploadedFiles.filter(f => f.uploadStatus === 'completed');
       if (completedDocs.length > 0) {
-        onDocumentsChange(completedDocs);
+        // Create a stable key to detect actual changes (only trigger on new completions)
+        const completedIds = completedDocs.map(d => d.id).sort().join(',');
+        if (prevUploadedFilesRef.current !== completedIds) {
+          prevUploadedFilesRef.current = completedIds;
+          onDocumentsChangeRef.current(completedDocs);
+        }
       }
     }
-  }, [uploadedFiles, onDocumentsChange]);
+  }, [uploadedFiles]);
 
   const loadSessions = async () => {
     if (!isAuthenticated) {

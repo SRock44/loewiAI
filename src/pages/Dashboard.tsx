@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle, useRef } from 'react';
+import { useState, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ChatInterface, { ChatInterfaceRef } from '../components/ChatInterface';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -28,9 +28,10 @@ const Dashboard = forwardRef<DashboardRef, DashboardProps>(({ onNewSessionCreate
 
   // when documents get uploaded in chat interface, we store them here
   // this lets us pass them to other parts of the app if needed
-  const handleDocumentsUploaded = (documents: DocumentMetadata[]) => {
+  // Using useCallback to prevent infinite loops - this function reference stays stable
+  const handleDocumentsUploaded = useCallback((documents: DocumentMetadata[]) => {
     setUploadedDocuments(documents);
-  };
+  }, []);
 
   // these methods get exposed to parent component via useImperativeHandle
   // parent can call dashboardRef.current.createNewChat() to create a new chat

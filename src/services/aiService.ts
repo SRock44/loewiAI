@@ -4,18 +4,9 @@ import { documentProcessor } from './documentProcessor';
 // Real AI Service with actual document processing
 class RealAIService implements AIService {
   async processDocument(file: File): Promise<DocumentMetadata> {
-    console.log('🤖 Processing document with real AI service:', file.name);
-    
     try {
       // Use the real document processor
       const processedDoc = await documentProcessor.processDocument(file);
-      
-      console.log('✅ Document processed successfully:', {
-        fileName: processedDoc.fileName,
-        contentLength: processedDoc.extractedContent.length,
-        summary: processedDoc.summary,
-        topics: processedDoc.keyTopics
-      });
       
       // Convert ProcessedDocument to DocumentMetadata format
       return {

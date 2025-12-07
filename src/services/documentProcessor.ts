@@ -33,9 +33,6 @@ export class DocumentProcessor {
 
   // main entry point - takes a file and returns processed document with extracted text
   async processDocument(file: File): Promise<ProcessedDocument> {
-    console.log(`📄 Processing document: ${file.name}`);
-    console.log(`📄 File type: ${file.type}, Size: ${file.size} bytes`);
-    
     try {
       let extractedContent = '';
       
@@ -55,7 +52,6 @@ export class DocumentProcessor {
       // if extraction failed or we got almost nothing, generate a fallback based on filename
       // this way the user can still use the document even if extraction didn't work
       if (!extractedContent || extractedContent.trim().length < 50) {
-        console.log('📄 Using intelligent fallback content based on filename');
         extractedContent = this.generateIntelligentFallback(file.name);
       }
 
@@ -81,11 +77,6 @@ export class DocumentProcessor {
         contentLength: extractedContent.length,
         contentPreview: extractedContent.substring(0, 200) + (extractedContent.length > 200 ? '...' : '')
       };
-
-      console.log(`✅ Document processed successfully: ${file.name}`);
-      console.log(`📊 Content length: ${extractedContent.length} characters`);
-      console.log(`📋 Summary: ${summary}`);
-      console.log(`🏷️ Topics: ${keyTopics.join(', ')}`);
       
       return processedDoc;
     } catch (error) {
@@ -97,13 +88,9 @@ export class DocumentProcessor {
   }
 
   private async extractFromPDF(file: File): Promise<string> {
-    console.log('📄 Attempting PDF text extraction with PDF.js...');
-    console.log('📄 PDF.js worker configured at:', pdfjsLib.GlobalWorkerOptions.workerSrc);
-    
     try {
       // Convert file to ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
-      console.log(`📄 File converted to ArrayBuffer: ${arrayBuffer.byteLength} bytes`);
       
       // Load the PDF document
       const loadingTask = pdfjsLib.getDocument({ 
@@ -112,7 +99,6 @@ export class DocumentProcessor {
       });
       
       const pdf = await loadingTask.promise;
-      console.log(`📄 PDF loaded successfully: ${pdf.numPages} pages`);
       
       let fullText = '';
       
@@ -128,7 +114,6 @@ export class DocumentProcessor {
             .join(' ');
           
           fullText += pageText + '\n';
-          console.log(`📄 Extracted text from page ${pageNum}: ${pageText.length} characters`);
         } catch (pageError) {
           console.error(`❌ Error extracting text from page ${pageNum}:`, pageError);
         }
@@ -137,28 +122,17 @@ export class DocumentProcessor {
       const cleanedText = this.cleanText(fullText);
       
       if (cleanedText && cleanedText.length > 50) {
-        console.log(`✅ PDF text extraction successful: ${cleanedText.length} characters`);
-        console.log('📄 Extracted text preview:', cleanedText.substring(0, 200));
         return cleanedText;
       } else {
-        console.log('⚠️ PDF text extraction returned minimal content');
-        console.log('📄 Raw extracted text:', fullText.substring(0, 200));
         return '';
       }
     } catch (error) {
       console.error('❌ PDF extraction failed:', error);
-      console.error('❌ Error details:', {
-        name: (error as Error).name,
-        message: (error as Error).message,
-        stack: (error as Error).stack
-      });
       return '';
     }
   }
 
   private async extractFromWord(file: File): Promise<string> {
-    console.log('📝 Attempting Word document extraction with Mammoth...');
-    
     try {
       // Check if it's a DOCX file (mammoth only supports DOCX)
       if (file.name.toLowerCase().endsWith('.docx')) {
@@ -166,23 +140,18 @@ export class DocumentProcessor {
         const result = await mammoth.extractRawText({ arrayBuffer });
         
         if (result.value && result.value.length > 50) {
-          console.log(`✅ DOCX text extraction successful: ${result.value.length} characters`);
           return this.cleanText(result.value);
         } else {
-          console.log('⚠️ DOCX extraction returned minimal content');
           return '';
         }
       } else if (file.name.toLowerCase().endsWith('.doc')) {
         // For older DOC files, try reading as text (limited success)
-        console.log('⚠️ DOC files not fully supported, attempting basic text extraction...');
         const textContent = await this.readFileAsText(file);
         
         if (textContent && textContent.length > 50) {
-          console.log('✅ DOC text extraction successful via FileReader');
           return this.cleanText(textContent);
         }
         
-        console.log('⚠️ DOC file extraction limited in browser environment');
         return '';
       }
       
@@ -194,8 +163,6 @@ export class DocumentProcessor {
   }
 
   private async extractFromPowerPoint(file: File): Promise<string> {
-    console.log('📊 Attempting PowerPoint extraction with PPTX Parser...');
-    
     try {
       // Check if it's a PPTX file (pptx-parser only supports PPTX)
       if (file.name.toLowerCase().endsWith('.pptx')) {
@@ -209,7 +176,6 @@ export class DocumentProcessor {
         
         // Extract text from all slides
         const slides = parser.slides;
-        console.log(`📊 PPTX loaded: ${slides.length} slides`);
         
         for (let i = 0; i < slides.length; i++) {
           const slide = slides[i];
@@ -231,7 +197,6 @@ export class DocumentProcessor {
             
             if (slideText.trim()) {
               fullText += `Slide ${i + 1}:\n${slideText}\n\n`;
-              console.log(`📊 Extracted text from slide ${i + 1}: ${slideText.length} characters`);
             }
           }
         }
@@ -239,23 +204,18 @@ export class DocumentProcessor {
         const cleanedText = this.cleanText(fullText);
         
         if (cleanedText && cleanedText.length > 50) {
-          console.log(`✅ PPTX text extraction successful: ${cleanedText.length} characters`);
           return cleanedText;
         } else {
-          console.log('⚠️ PPTX extraction returned minimal content');
           return '';
         }
       } else if (file.name.toLowerCase().endsWith('.ppt')) {
         // For older PPT files, try reading as text (limited success)
-        console.log('⚠️ PPT files not fully supported, attempting basic text extraction...');
         const textContent = await this.readFileAsText(file);
         
         if (textContent && textContent.length > 50) {
-          console.log('✅ PPT text extraction successful via FileReader');
           return this.cleanText(textContent);
         }
         
-        console.log('⚠️ PPT file extraction limited in browser environment');
         return '';
       }
       
@@ -267,8 +227,6 @@ export class DocumentProcessor {
   }
 
   private async extractAsText(file: File): Promise<string> {
-    console.log('📄 Extracting as plain text...');
-    
     try {
       const textContent = await this.readFileAsText(file);
       return this.cleanText(textContent);
@@ -590,15 +548,26 @@ Please describe what you need help with from this document, and I'll provide det
 
   // Method to get document content for AI context
   getDocumentContent(documents: ProcessedDocument[], maxLength: number = 4000): string {
+    if (!documents || documents.length === 0) {
+      return '';
+    }
+    
     let context = '';
     
     for (const doc of documents) {
-      if (context.length + doc.extractedContent.length > maxLength) {
+      // Defensive check: ensure doc has extractedContent
+      const extractedContent = doc.extractedContent || doc.extractedText || '';
+      
+      if (!extractedContent || extractedContent.trim().length === 0) {
+        continue;
+      }
+      
+      if (context.length + extractedContent.length > maxLength) {
         const remainingLength = maxLength - context.length;
-        context += `\n\nDocument: ${doc.fileName}\n${doc.extractedContent.substring(0, remainingLength)}...`;
+        context += `\n\nDocument: ${doc.fileName}\n${extractedContent.substring(0, remainingLength)}...`;
         break;
       }
-      context += `\n\nDocument: ${doc.fileName}\n${doc.extractedContent}`;
+      context += `\n\nDocument: ${doc.fileName}\n${extractedContent}`;
     }
     
     return context;
@@ -606,9 +575,17 @@ Please describe what you need help with from this document, and I'll provide det
 
   // Method to get document summaries for context
   getDocumentSummaries(documents: ProcessedDocument[]): string {
-    return documents.map(doc => 
-      `📄 ${doc.fileName}: ${doc.summary} (Topics: ${doc.keyTopics.join(', ')})`
-    ).join('\n');
+    if (!documents || documents.length === 0) {
+      return '';
+    }
+    
+    return documents.map(doc => {
+      const summary = doc.summary || 'Document uploaded';
+      const topics = doc.keyTopics && Array.isArray(doc.keyTopics) && doc.keyTopics.length > 0 
+        ? doc.keyTopics.join(', ') 
+        : 'General';
+      return `📄 ${doc.fileName}: ${summary} (Topics: ${topics})`;
+    }).join('\n');
   }
 }
 
