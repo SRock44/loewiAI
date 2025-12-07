@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { flashcardService } from '../flashcardService'
-import { Flashcard, FlashcardSet } from '../../types/flashcard'
-import { firebaseService } from '../firebaseService'
-import { firebaseAuthService } from '../firebaseAuthService'
-import { UserProfileService } from '../userProfileService'
+import { flashcardService } from '../../src/services/flashcardService'
+import { Flashcard, FlashcardSet } from '../../src/types/flashcard'
+import { firebaseService } from '../../src/services/firebaseService'
+import { firebaseAuthService } from '../../src/services/firebaseAuthService'
+import { UserProfileService } from '../../src/services/userProfileService'
 
 // Mock dependencies
-vi.mock('../firebaseService', () => ({
+vi.mock('../../src/services/firebaseService', () => ({
   firebaseService: {
     getFlashcardSets: vi.fn(),
     saveFlashcardSet: vi.fn(),
@@ -15,14 +15,14 @@ vi.mock('../firebaseService', () => ({
   },
 }))
 
-vi.mock('../firebaseAuthService', () => ({
+vi.mock('../../src/services/firebaseAuthService', () => ({
   firebaseAuthService: {
     getCurrentUser: vi.fn(),
     onAuthStateChange: vi.fn(),
   },
 }))
 
-vi.mock('../userProfileService', () => ({
+vi.mock('../../src/services/userProfileService', () => ({
   UserProfileService: {
     buildPersonalizationContext: vi.fn(),
   },

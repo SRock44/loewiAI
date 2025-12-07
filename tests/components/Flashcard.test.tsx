@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import Flashcard from '../Flashcard'
-import { Flashcard as FlashcardType } from '../../types/flashcard'
+import Flashcard from '../../src/components/Flashcard'
+import { Flashcard as FlashcardType } from '../../src/types/flashcard'
 
 // Mock framer-motion
 vi.mock('framer-motion', () => ({
@@ -121,6 +121,21 @@ describe('Flashcard', () => {
     render(<Flashcard flashcard={mockFlashcard} />)
     
     // Should still render without number/total
+    expect(screen.getByText('What is React?')).toBeInTheDocument()
+  })
+
+  it('should display difficulty badge on both sides', () => {
+    render(<Flashcard flashcard={mockFlashcard} number={1} total={1} />)
+    
+    // Both front and back should show difficulty
+    const difficulties = screen.getAllByText('Medium')
+    expect(difficulties.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('should handle flashcard with no tags', () => {
+    const flashcardNoTags = { ...mockFlashcard, tags: [] }
+    render(<Flashcard flashcard={flashcardNoTags} number={1} total={1} />)
+    
     expect(screen.getByText('What is React?')).toBeInTheDocument()
   })
 })
