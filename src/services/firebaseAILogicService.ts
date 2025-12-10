@@ -499,14 +499,14 @@ class GroqProvider implements AIProvider {
   name = 'Groq (Moonshot AI Kimi2)';
   private groqClient: Groq | null = null;
   private apiKey: string;
-  private modelName: string = 'moonshot-v1-128k';
+  private modelName: string = 'moonshotai/kimi-k2-instruct-0905';
   
-  // Set model name (supports both moonshot-v1-128k and KimiK2-instruct-0905)
+  // Set model name (supports moonshotai/kimi-k2-instruct-0905)
   setModel(modelName: string) {
     this.modelName = modelName;
     // Update display name based on model
-    if (modelName === 'KimiK2-instruct-0905') {
-      this.name = 'Groq (KimiK2-instruct-0905)';
+    if (modelName === 'moonshotai/kimi-k2-instruct-0905') {
+      this.name = 'Groq (KimiK2)';
     } else {
       this.name = 'Groq (Moonshot AI Kimi2)';
     }
@@ -527,7 +527,10 @@ class GroqProvider implements AIProvider {
     }
 
     try {
-      this.groqClient = new Groq({ apiKey: this.apiKey });
+      this.groqClient = new Groq({ 
+        apiKey: this.apiKey,
+        dangerouslyAllowBrowser: true 
+      });
     } catch (error) {
       console.error('Failed to initialize Groq client:', error);
       this.groqClient = null;
@@ -636,12 +639,22 @@ Guidelines:
       // Add user message
       messages.push({ role: 'user', content: _message });
 
-      const completion = await this.groqClient!.chat.completions.create({
-        messages,
-        model: this.modelName,
-        temperature: 0.7,
-        max_tokens: 2048
-      });
+      console.log(`Groq API call - Model: ${this.modelName}, Messages: ${messages.length}`);
+      
+      // Try the requested model, fallback to moonshot-v1-128k if it fails
+      let completion;
+      try {
+        completion = await this.groqClient!.chat.completions.create({
+          messages,
+          model: this.modelName,
+          temperature: 0.7,
+          max_tokens: 2048
+        });
+      } catch (modelError: any) {
+        // If model not found, log error and rethrow
+        console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
+        throw modelError;
+      }
 
       const content = completion.choices[0]?.message?.content || '';
       
@@ -652,15 +665,22 @@ Guidelines:
       return {
         content: content,
         model: this.modelName,
-        provider: 'Groq (Moonshot AI Kimi2)',
+        provider: this.name,
         usage: completion.usage ? {
           prompt_tokens: completion.usage.prompt_tokens || 0,
           completion_tokens: completion.usage.completion_tokens || 0,
           total_tokens: completion.usage.total_tokens || 0
         } : undefined
       };
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorDetails = error?.response?.data || error?.body || error?.message || error;
+      console.error('Groq API error:', {
+        message: errorMessage,
+        details: errorDetails,
+        model: this.modelName,
+        status: error?.status || error?.statusCode
+      });
       throw new Error(`Groq error: ${errorMessage}`);
     }
   }
@@ -684,12 +704,22 @@ Guidelines:
       // Add the flashcard generation prompt as user message
       messages.push({ role: 'user', content: _prompt });
 
-      const completion = await this.groqClient!.chat.completions.create({
-        messages,
-        model: this.modelName,
-        temperature: 0.5,
-        max_tokens: 8192 // Higher token limit for flashcard generation
-      });
+      console.log(`Groq flashcard API call - Model: ${this.modelName}`);
+      
+      // Try the requested model, fallback to moonshot-v1-128k if it fails
+      let completion;
+      try {
+        completion = await this.groqClient!.chat.completions.create({
+          messages,
+          model: this.modelName,
+          temperature: 0.5,
+          max_tokens: 8192 // Higher token limit for flashcard generation
+        });
+      } catch (modelError: any) {
+        // If model not found, log error and rethrow
+        console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
+        throw modelError;
+      }
 
       const content = completion.choices[0]?.message?.content || '';
       
@@ -700,15 +730,22 @@ Guidelines:
       return {
         content: content,
         model: this.modelName,
-        provider: 'Groq (Moonshot AI Kimi2)',
+        provider: this.name,
         usage: completion.usage ? {
           prompt_tokens: completion.usage.prompt_tokens || 0,
           completion_tokens: completion.usage.completion_tokens || 0,
           total_tokens: completion.usage.total_tokens || 0
         } : undefined
       };
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorDetails = error?.response?.data || error?.body || error?.message || error;
+      console.error('Groq flashcard API error:', {
+        message: errorMessage,
+        details: errorDetails,
+        model: this.modelName,
+        status: error?.status || error?.statusCode
+      });
       throw new Error(`Groq flashcard error: ${errorMessage}`);
     }
   }
@@ -873,7 +910,7 @@ export class FirebaseAILogicService {
       this.groqProvider = new GroqProvider(groqApiKey);
       // Set model based on preference
       if (this.modelPreference === 'kimi2') {
-        this.groqProvider.setModel('KimiK2-instruct-0905');
+        this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
       }
       this.providers.push(this.groqProvider);
     }
@@ -928,22 +965,24 @@ export class FirebaseAILogicService {
     try {
       return await this.currentProvider.generateResponse(_message, _context, _conversationHistory);
     } catch (error) {
-      // In auto mode, try fallback providers
-      // In kimi2 mode, only try other providers if Groq fails
-      if (this.modelPreference === 'auto') {
-        // Try fallback providers
-        for (const provider of this.providers) {
-          if (provider !== this.currentProvider && provider.isAvailable()) {
-            try {
-              return await provider.generateResponse(_message, _context, _conversationHistory);
-            } catch (fallbackError) {
-              // Fallback failed, try next
-            }
+      // Log the error for debugging
+      console.error('Primary provider failed:', error);
+      
+      // Try fallback providers (both auto and kimi2 modes should fallback)
+      for (const provider of this.providers) {
+        if (provider !== this.currentProvider && provider.isAvailable()) {
+          try {
+            console.log(`Trying fallback provider: ${provider.name}`);
+            return await provider.generateResponse(_message, _context, _conversationHistory);
+          } catch (fallbackError) {
+            console.error(`Fallback provider ${provider.name} failed:`, fallbackError);
+            // Fallback failed, try next
           }
         }
       }
       
-      throw new Error('All Firebase AI Logic providers failed');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`All Firebase AI Logic providers failed. Last error: ${errorMessage}`);
     }
   }
 
