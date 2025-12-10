@@ -182,7 +182,7 @@ export const renderMarkdownSafe = (text: string): string => {
     try {
       return sanitizeHtml(cleanFlashcardContent(text));
     } catch {
-      return text || '';
+    return text || '';
     }
   }
 };

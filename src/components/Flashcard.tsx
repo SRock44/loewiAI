@@ -94,12 +94,12 @@ const Flashcard: React.FC<FlashcardProps> = ({
           <div className="flashcard-header-new">
             {number !== undefined && total !== undefined && (
               <span className="flashcard-number">Question {cardNumber} of {cardTotal}</span>
-            )}
+              )}
             <span className={`flashcard-difficulty-badge ${difficultyColors[difficulty]}`}>
               {difficulty}
-            </span>
+                </span>
           </div>
-
+          
           {/* Question Content */}
           <div className="flashcard-content-new" onScroll={handleScroll}>
             <div 
@@ -107,7 +107,7 @@ const Flashcard: React.FC<FlashcardProps> = ({
               dangerouslySetInnerHTML={{ __html: renderMarkdownSafe(flashcard.question || '') }}
             />
           </div>
-
+          
           {/* Footer */}
           <div className="flashcard-footer-new">
             <span className="flashcard-hint-new">Click to reveal answer</span>
@@ -122,12 +122,12 @@ const Flashcard: React.FC<FlashcardProps> = ({
           <div className="flashcard-header-new">
             {number !== undefined && total !== undefined && (
               <span className="flashcard-number">Answer {cardNumber} of {cardTotal}</span>
-            )}
+              )}
             <span className={`flashcard-difficulty-badge ${difficultyColors[difficulty]}`}>
               {difficulty}
-            </span>
+                </span>
           </div>
-
+          
           {/* Answer Content */}
           <div className="flashcard-content-new" onScroll={handleScroll}>
             <div 
@@ -135,7 +135,7 @@ const Flashcard: React.FC<FlashcardProps> = ({
               dangerouslySetInnerHTML={{ __html: renderMarkdownSafe(flashcard.answer || '') }}
             />
           </div>
-
+          
           {/* Footer - Identical to question side */}
           <div className="flashcard-footer-new">
             <span className="flashcard-hint-new">Click to see question</span>

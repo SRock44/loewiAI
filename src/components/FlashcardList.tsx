@@ -64,7 +64,7 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
 
   const goToCard = (index: number) => {
     setDirection(index > currentIndex ? 1 : -1);
-    setCurrentIndex(index);
+      setCurrentIndex(index);
     setIsFlipped(false); // Reset to question side
   };
 
@@ -136,29 +136,29 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
             }}
             className="flashcard-slide-wrapper"
           >
-            {currentFlashcard && (
-              <Flashcard
-                flashcard={currentFlashcard}
+          {currentFlashcard && (
+            <Flashcard
+              flashcard={currentFlashcard}
                 isFlipped={isFlipped}
                 onFlipChange={setIsFlipped}
                 number={currentIndex + 1}
                 total={filteredFlashcards.length}
-              />
-            )}
+            />
+          )}
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Navigation */}
       <div className="flashcard-navigation-new">
-        <button
+          <button 
           onClick={goToPrevious}
           disabled={currentIndex === 0}
           className="nav-button-new nav-button-prev"
         >
           <ChevronLeft size={20} />
           <span>Previous</span>
-        </button>
+          </button>
 
         <div className="nav-center-new">
           <p className="nav-counter-new">
@@ -175,14 +175,14 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
           </div>
         </div>
 
-        <button
+            <button
           onClick={goToNext}
           disabled={currentIndex === filteredFlashcards.length - 1}
           className="nav-button-new nav-button-next"
         >
           <span>Next</span>
           <ChevronRight size={20} />
-        </button>
+            </button>
       </div>
 
       {/* Keyboard Shortcuts Hint */}

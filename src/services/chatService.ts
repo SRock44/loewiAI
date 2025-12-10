@@ -202,7 +202,7 @@ Would you like me to help you with anything else about the code, such as explain
         documentContext,
         conversationContext
       );
-      
+
       // Log error if AI returns empty response
       if (!aiResponse || !aiResponse.content || aiResponse.content.trim().length === 0) {
         console.error('❌ AI returned empty response!', { message });
@@ -737,15 +737,15 @@ Please provide the corrected version with the same formatting and structure, but
 
     // Build rich context from processed document content
     try {
-      const documentSummaries = documentProcessor.getDocumentSummaries(processedDocuments);
-      const documentContent = documentProcessor.getDocumentContent(processedDocuments, 3000);
+    const documentSummaries = documentProcessor.getDocumentSummaries(processedDocuments);
+    const documentContent = documentProcessor.getDocumentContent(processedDocuments, 3000);
 
       // Check if we actually got content
       if (!documentContent || documentContent.trim().length === 0) {
         return `The user has uploaded ${processedDocuments.length} document(s), but the content could not be extracted. Please ask the user to describe what they need help with.`;
       }
 
-      return `The user has uploaded ${processedDocuments.length} document(s) with the following content:
+    return `The user has uploaded ${processedDocuments.length} document(s) with the following content:
 
 ${documentSummaries}
 

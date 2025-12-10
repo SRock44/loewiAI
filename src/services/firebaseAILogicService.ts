@@ -882,9 +882,10 @@ export class FirebaseAILogicService {
     
     // Update Groq model if preference is kimi2
     if (preference === 'kimi2' && this.groqProvider) {
-      this.groqProvider.setModel('KimiK2-instruct-0905');
+      this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
     } else if (preference === 'auto' && this.groqProvider) {
-      this.groqProvider.setModel('moonshot-v1-128k');
+      // In auto mode, still use the correct KimiK2 model name
+      this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
     }
     
     // Re-select provider based on preference
@@ -941,13 +942,13 @@ export class FirebaseAILogicService {
       // In auto mode, try fallback providers
       // In kimi2 mode, only try other providers if Groq fails
       if (this.modelPreference === 'auto') {
-        // Try fallback providers
-        for (const provider of this.providers) {
-          if (provider !== this.currentProvider && provider.isAvailable()) {
-            try {
-              return await provider.generateFlashcards(prompt);
-            } catch (fallbackError) {
-              // Fallback failed, try next
+      // Try fallback providers
+      for (const provider of this.providers) {
+        if (provider !== this.currentProvider && provider.isAvailable()) {
+          try {
+            return await provider.generateFlashcards(prompt);
+          } catch (fallbackError) {
+            // Fallback failed, try next
             }
           }
         }

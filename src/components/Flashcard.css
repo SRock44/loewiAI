@@ -218,16 +218,16 @@
   .flashcard-motion-container {
     height: 450px;
   }
-
+  
   .flashcard {
     padding: 32px;
     border-radius: 12px;
   }
-
+  
   .flashcard-text-new {
     font-size: 20px;
   }
-
+  
   .flashcard-header-new {
     margin-bottom: 0;
     padding-bottom: 12px;
@@ -236,7 +236,7 @@
   .flashcard-footer-new {
     padding-top: 12px;
   }
-
+  
   .flashcard-text-new {
     padding-top: 12px;
     padding-bottom: 20px;
@@ -247,25 +247,25 @@
   .flashcard-motion-container {
     height: 450px;
   }
-
+  
   .flashcard {
     padding: 24px;
     border-radius: 10px;
   }
-
+  
   .flashcard-text-new {
     font-size: 18px;
   }
-
+  
   .flashcard-header-new {
     margin-bottom: 0;
     padding-bottom: 10px;
   }
-
+  
   .flashcard-number {
     font-size: 12px;
   }
-
+  
   .flashcard-difficulty-badge {
     padding: 3px 10px;
     font-size: 11px;
@@ -274,7 +274,7 @@
   .flashcard-footer-new {
     padding-top: 10px;
   }
-
+  
   .flashcard-text-new {
     padding-top: 10px;
     padding-bottom: 16px;
