@@ -469,8 +469,11 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
             <button 
               className="floating-close-btn" 
               onClick={() => setShowFlashcardList(false)}
+              aria-label="Close"
             >
-              ✕
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
             <div className="flashcard-list-content">
               <div className="modal-section-label">Flashcard History</div>
@@ -505,8 +508,11 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                           className="delete-flashcard-btn"
                           onClick={(e) => handleDeleteFlashcard(set, e)}
                           title="Delete flashcard set"
+                          aria-label="Delete flashcard set"
                         >
-                          🗑️
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                         </button>
                       </div>
                     ))}
@@ -529,14 +535,20 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                 setShowFlashcardList(true);
               }}
               title="Back to flashcard history"
+              aria-label="Back to flashcard history"
             >
-              ←
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
             <button 
               className="floating-close-btn" 
               onClick={() => setShowIndividualFlashcard(false)}
+              aria-label="Close"
             >
-              ✕
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </button>
             <div className="flashcard-list-content">
               <Suspense fallback={<div className="loading-spinner">Loading Flashcards...</div>}>

@@ -101,7 +101,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
     return (
       <div className="flashcard-list-container-new">
         <div className="no-cards-message">
-          <div className="no-cards-icon">📚</div>
           <h3>No flashcards available</h3>
           <p>No flashcards in this set.</p>
         </div>
@@ -113,7 +112,6 @@ const FlashcardList: React.FC<FlashcardListProps> = ({
     return (
       <div className="flashcard-list-container-new">
         <div className="no-cards-message">
-          <div className="no-cards-icon">📚</div>
           <h3>Loading flashcard...</h3>
         </div>
       </div>
