@@ -22,6 +22,7 @@
     "firebase": "^12.3.0",
     "framer-motion": "^12.23.25",
     "google-auth-library": "^9.4.1",
+    "groq-sdk": "^0.37.0",
     "katex": "^0.16.22",
     "mammoth": "^1.11.0",
     "pdfjs-dist": "^5.4.149",

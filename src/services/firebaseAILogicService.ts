@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { UserProfileService } from './userProfileService';
 
 export interface AIResponse {
@@ -173,9 +174,21 @@ class FirebaseAILogicProvider implements AIProvider {
           model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
-      } catch (error) {
-        // Check if this is a quota exhaustion error (not just rate limiting)
+      } catch (error: any) {
+        // Check for fallback-worthy error codes (400, 403, 404, 429, 500, 503, 504)
+        const errorCode = error?.status || error?.code || error?.statusCode;
         const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Check if this is a fallback-worthy error (rate limit, quota, server errors)
+        const isFallbackError = [400, 403, 404, 429, 500, 503, 504].includes(errorCode) ||
+                                errorMessage.includes('429') ||
+                                errorMessage.includes('403') ||
+                                errorMessage.includes('500') ||
+                                errorMessage.includes('503') ||
+                                errorMessage.toLowerCase().includes('quota') ||
+                                errorMessage.toLowerCase().includes('rate limit');
+        
+        // Check if this is a quota exhaustion error (not just rate limiting)
         const isQuotaExhausted = errorMessage.includes('quota') && 
                                  (errorMessage.includes('limit: 0') || 
                                   errorMessage.includes('exceeded your current quota') ||
@@ -228,7 +241,8 @@ class FirebaseAILogicProvider implements AIProvider {
         }
         
         // if it's a rate limit or service overload error, wait and retry with exponential backoff
-        if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
+        // but if we've exhausted retries, throw to trigger fallback
+        if (isFallbackError && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
           // Wait longer for flashcard generation to ensure server has time to process
           const extendedDelay = delay * 2; // Double the delay for flashcard generation
@@ -241,6 +255,11 @@ class FirebaseAILogicProvider implements AIProvider {
           const delay = baseDelay * Math.pow(2, attempt - 1) * 3; // Triple the delay for incomplete responses
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
+        }
+        
+        // If it's a fallback-worthy error and we've exhausted retries, throw to trigger fallback
+        if (isFallbackError && attempt >= maxRetries) {
+          throw new Error(`Firebase AI Logic error (${errorCode || 'unknown'}): ${errorMessage}`);
         }
         
         throw new Error(`Firebase AI Logic flashcard error: ${error}`);
@@ -280,9 +299,21 @@ class FirebaseAILogicProvider implements AIProvider {
           model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
-      } catch (error) {
-        // Check if this is a quota exhaustion error (not just rate limiting)
+      } catch (error: any) {
+        // Check for fallback-worthy error codes (429, 403, 500, 503)
+        const errorCode = error?.status || error?.code || error?.statusCode;
         const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Check if this is a fallback-worthy error (rate limit, quota, server errors)
+        const isFallbackError = [429, 403, 500, 503].includes(errorCode) ||
+                                errorMessage.includes('429') ||
+                                errorMessage.includes('403') ||
+                                errorMessage.includes('500') ||
+                                errorMessage.includes('503') ||
+                                errorMessage.toLowerCase().includes('quota') ||
+                                errorMessage.toLowerCase().includes('rate limit');
+        
+        // Check if this is a quota exhaustion error (not just rate limiting)
         const isQuotaExhausted = errorMessage.includes('quota') && 
                                  (errorMessage.includes('limit: 0') || 
                                   errorMessage.includes('exceeded your current quota') ||
@@ -341,10 +372,16 @@ class FirebaseAILogicProvider implements AIProvider {
         
         // if it's a rate limit or service overload error (but not quota exhaustion), wait and retry
         // exponential backoff means we wait 1s, then 2s, then 4s
-        if (error instanceof Error && (error.message.includes('503') || error.message.includes('429')) && attempt < maxRetries) {
+        // but if we've exhausted retries, throw to trigger fallback
+        if (isFallbackError && attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
+        }
+        
+        // If it's a fallback-worthy error and we've exhausted retries, throw to trigger fallback
+        if (isFallbackError && attempt >= maxRetries) {
+          throw new Error(`Firebase AI Logic error (${errorCode || 'unknown'}): ${errorMessage}`);
         }
         
         throw new Error(`Firebase AI Logic error: ${error}`);
@@ -457,6 +494,226 @@ Guidelines:
   }
 }
 
+// Groq Provider (Fallback for Gemini)
+class GroqProvider implements AIProvider {
+  name = 'Groq (Moonshot AI Kimi2)';
+  private groqClient: Groq | null = null;
+  private apiKey: string;
+  private modelName: string = 'moonshot-v1-128k';
+  
+  // Set model name (supports both moonshot-v1-128k and KimiK2-instruct-0905)
+  setModel(modelName: string) {
+    this.modelName = modelName;
+    // Update display name based on model
+    if (modelName === 'KimiK2-instruct-0905') {
+      this.name = 'Groq (KimiK2-instruct-0905)';
+    } else {
+      this.name = 'Groq (Moonshot AI Kimi2)';
+    }
+  }
+  
+  getModel(): string {
+    return this.modelName;
+  }
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+    this.initializeGroq();
+  }
+
+  private initializeGroq() {
+    if (!this.apiKey) {
+      return;
+    }
+
+    try {
+      this.groqClient = new Groq({ apiKey: this.apiKey });
+    } catch (error) {
+      console.error('Failed to initialize Groq client:', error);
+      this.groqClient = null;
+    }
+  }
+
+  isAvailable(): boolean {
+    return this.groqClient !== null;
+  }
+
+  private async buildGroqPrompt(context?: string, conversationHistory?: string, _userMessage?: string): Promise<string> {
+    // Reuse the same prompt building logic as Gemini for consistency
+    const promptStart = `You are Newton 1.0, an intelligent next-generation academic AI prototype. You provide:
+
+1. **Clear explanations** of complex academic concepts
+2. **Step-by-step guidance** for assignments and projects  
+3. **Study strategies** and learning techniques
+4. **Research assistance** and source evaluation
+5. **Academic writing** support and feedback
+6. **Problem-solving** approaches for coursework
+
+FORMATTING GUIDELINES:
+- **Code blocks**: Always wrap code in triple backticks with language specification (e.g., \`\`\`python, \`\`\`javascript, \`\`\`sql)
+  - IMPORTANT: Use actual newlines in code blocks, NOT HTML tags like <br/> or <br>
+  - Use proper markdown formatting with triple backticks
+  - Preserve indentation using spaces, not HTML entities
+- **Math problems**: Use clear step-by-step format with numbered steps and proper mathematical notation
+- **Inline code**: Use single backticks for short code snippets or variable names
+- **Lists**: Use numbered lists for step-by-step solutions, bullet points for general lists
+- **Emphasis**: Use **bold** for important concepts and *italics* for emphasis
+- **CRITICAL**: Never use HTML tags (<br/>, <br>, &nbsp;, etc.) in your responses. Use plain markdown only.
+
+MATH PROBLEM FORMAT:
+When solving math problems, use this structure:
+1. **Given**: State what's given in the problem
+2. **Find**: State what needs to be found
+3. **Solution**:
+   Step 1: [First step with explanation]
+   Step 2: [Second step with explanation]
+   ...
+4. **Answer**: [Final answer with units if applicable]
+
+CODE FORMATTING:
+- Always specify the programming language in code blocks
+- Include comments explaining complex logic
+- Use proper indentation and formatting
+- For algorithms, explain the approach before showing code
+- Include test cases and examples when appropriate
+- Write executable code snippets that demonstrate the concept
+
+RESPONSE EFFICIENCY:
+- **Be concise and direct** - aim for quality over quantity
+- **Get to the point quickly** - start with the core answer, then add context if needed
+- **Avoid unnecessary elaboration** - explain clearly but briefly
+- **Use lists and formatting** to convey information efficiently
+- **Prioritize essential information** - focus on what the user needs to know
+- **Keep responses focused** - avoid tangents or excessive background unless specifically requested
+
+Guidelines:
+- Be encouraging and supportive
+- Break down complex topics into understandable parts (but concisely)
+- Provide examples when helpful (keep them brief)
+- Ask clarifying questions when needed
+- Maintain an academic tone while being approachable
+- Focus on learning and understanding over just answers
+- **Always reference previous topics when relevant** - if the user asks follow-up questions, acknowledge what was discussed before
+- **Build upon previous explanations** - don't repeat information unless asked
+- **Maintain conversation continuity** - use phrases like "As we discussed earlier..." or "Building on your previous question about..."
+- **Handle ambiguous references** - if the user says "what about X?" or "how about Y?", refer to the conversation history to understand the context
+- **Code execution requests** - if users ask to run/execute code, explain that they should use IDEs like VS Code, Cursor, or online compilers like Replit`;
+
+    // Get user profile information for personalization
+    const userProfileContext = await UserProfileService.buildPersonalizationContext();
+    
+    let fullPrompt = promptStart;
+    
+    // Add personalization context if available
+    if (userProfileContext) {
+      fullPrompt += `\n\n${userProfileContext}`;
+    }
+    
+    if (context) {
+      fullPrompt += `\n\nAdditional Context: ${context}`;
+    }
+    
+    if (conversationHistory) {
+      fullPrompt += conversationHistory;
+    }
+    
+    return fullPrompt;
+  }
+
+  async generateResponse(_message: string, _context?: string, _conversationHistory?: string): Promise<AIResponse> {
+    if (!this.isAvailable()) {
+      throw new Error('Groq is not available');
+    }
+
+    try {
+      const systemPrompt = await this.buildGroqPrompt(_context, _conversationHistory, _message);
+      
+      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
+      
+      // Add system prompt
+      messages.push({ role: 'system', content: systemPrompt });
+      
+      // Add user message
+      messages.push({ role: 'user', content: _message });
+
+      const completion = await this.groqClient!.chat.completions.create({
+        messages,
+        model: this.modelName,
+        temperature: 0.7,
+        max_tokens: 2048
+      });
+
+      const content = completion.choices[0]?.message?.content || '';
+      
+      if (!content || content.trim().length === 0) {
+        throw new Error('Empty response from Groq');
+      }
+
+      return {
+        content: content,
+        model: this.modelName,
+        provider: 'Groq (Moonshot AI Kimi2)',
+        usage: completion.usage ? {
+          prompt_tokens: completion.usage.prompt_tokens || 0,
+          completion_tokens: completion.usage.completion_tokens || 0,
+          total_tokens: completion.usage.total_tokens || 0
+        } : undefined
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Groq error: ${errorMessage}`);
+    }
+  }
+
+  async generateFlashcards(_prompt: string): Promise<AIResponse> {
+    if (!this.isAvailable()) {
+      throw new Error('Groq is not available');
+    }
+
+    try {
+      // For flashcards, use the prompt directly as user message
+      // The prompt already contains all necessary instructions
+      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
+      
+      // Add system message for flashcard generation
+      messages.push({ 
+        role: 'system', 
+        content: 'You are an expert educational content creator. Generate high-quality flashcards in JSON format based on the user\'s request.'
+      });
+      
+      // Add the flashcard generation prompt as user message
+      messages.push({ role: 'user', content: _prompt });
+
+      const completion = await this.groqClient!.chat.completions.create({
+        messages,
+        model: this.modelName,
+        temperature: 0.5,
+        max_tokens: 8192 // Higher token limit for flashcard generation
+      });
+
+      const content = completion.choices[0]?.message?.content || '';
+      
+      if (!content || content.trim().length < 10) {
+        throw new Error('Empty or incomplete response from Groq');
+      }
+
+      return {
+        content: content,
+        model: this.modelName,
+        provider: 'Groq (Moonshot AI Kimi2)',
+        usage: completion.usage ? {
+          prompt_tokens: completion.usage.prompt_tokens || 0,
+          completion_tokens: completion.usage.completion_tokens || 0,
+          total_tokens: completion.usage.total_tokens || 0
+        } : undefined
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Groq flashcard error: ${errorMessage}`);
+    }
+  }
+}
+
 // Mock Provider (Fallback)
 class MockProvider implements AIProvider {
   name = 'Mock Academic Assistant (Firebase AI Logic Fallback)';
@@ -550,29 +807,89 @@ class MockProvider implements AIProvider {
   }
 }
 
+// Model preference type
+export type ModelPreference = 'auto' | 'kimi2';
+
 // Firebase AI Logic Service Manager
 export class FirebaseAILogicService {
   private providers: AIProvider[] = [];
   private currentProvider: AIProvider | null = null;
+  private geminiProvider: FirebaseAILogicProvider | null = null;
+  private groqProvider: GroqProvider | null = null;
+  private modelPreference: ModelPreference = 'auto';
 
   constructor() {
+    this.loadModelPreference();
     this.initializeProviders();
     this.selectBestProvider();
   }
+  
+  private loadModelPreference() {
+    try {
+      const saved = localStorage.getItem('newton_ai_model_preference');
+      if (saved === 'kimi2' || saved === 'auto') {
+        this.modelPreference = saved;
+      }
+    } catch (error) {
+      // localStorage not available, use default
+    }
+  }
+  
+  setModelPreference(preference: ModelPreference) {
+    this.modelPreference = preference;
+    try {
+      localStorage.setItem('newton_ai_model_preference', preference);
+    } catch (error) {
+      // localStorage not available, ignore
+    }
+    
+    // Update Groq model if preference is kimi2
+    if (preference === 'kimi2' && this.groqProvider) {
+      this.groqProvider.setModel('KimiK2-instruct-0905');
+    } else if (preference === 'auto' && this.groqProvider) {
+      this.groqProvider.setModel('moonshot-v1-128k');
+    }
+    
+    // Re-select provider based on preference
+    this.selectBestProvider();
+  }
+  
+  getModelPreference(): ModelPreference {
+    return this.modelPreference;
+  }
 
   private initializeProviders() {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
     
-    // Add Firebase AI Logic provider if API key is available
-    if (apiKey) {
-      this.providers.push(new FirebaseAILogicProvider(apiKey));
+    // Add Firebase AI Logic provider (Gemini) if API key is available - PRIMARY
+    if (geminiApiKey) {
+      this.geminiProvider = new FirebaseAILogicProvider(geminiApiKey);
+      this.providers.push(this.geminiProvider);
     }
 
-    // Always add mock as fallback
+    // Add Groq provider as fallback for Gemini - SECONDARY
+    if (groqApiKey) {
+      this.groqProvider = new GroqProvider(groqApiKey);
+      // Set model based on preference
+      if (this.modelPreference === 'kimi2') {
+        this.groqProvider.setModel('KimiK2-instruct-0905');
+      }
+      this.providers.push(this.groqProvider);
+    }
+
+    // Always add mock as final fallback - TERTIARY
     this.providers.push(new MockProvider());
   }
 
   private selectBestProvider() {
+    // If user prefers Kimi2, use Groq directly (if available)
+    if (this.modelPreference === 'kimi2' && this.groqProvider && this.groqProvider.isAvailable()) {
+      this.currentProvider = this.groqProvider;
+      return;
+    }
+    
+    // Otherwise, use Gemini (auto mode) or first available provider
     this.currentProvider = this.providers.find(provider => provider.isAvailable()) || null;
   }
 
@@ -584,13 +901,17 @@ export class FirebaseAILogicService {
     try {
       return await this.currentProvider.generateFlashcards(prompt);
     } catch (error) {
-      // Try fallback providers
-      for (const provider of this.providers) {
-        if (provider !== this.currentProvider && provider.isAvailable()) {
-          try {
-            return await provider.generateFlashcards(prompt);
-          } catch (fallbackError) {
-            // Fallback failed, try next
+      // In auto mode, try fallback providers
+      // In kimi2 mode, only try other providers if Groq fails
+      if (this.modelPreference === 'auto') {
+        // Try fallback providers
+        for (const provider of this.providers) {
+          if (provider !== this.currentProvider && provider.isAvailable()) {
+            try {
+              return await provider.generateFlashcards(prompt);
+            } catch (fallbackError) {
+              // Fallback failed, try next
+            }
           }
         }
       }
@@ -607,13 +928,17 @@ export class FirebaseAILogicService {
     try {
       return await this.currentProvider.generateResponse(_message, _context, _conversationHistory);
     } catch (error) {
-      // Try fallback providers
-      for (const provider of this.providers) {
-        if (provider !== this.currentProvider && provider.isAvailable()) {
-          try {
-            return await provider.generateResponse(_message, _context, _conversationHistory);
-          } catch (fallbackError) {
-            // Fallback failed, try next
+      // In auto mode, try fallback providers
+      // In kimi2 mode, only try other providers if Groq fails
+      if (this.modelPreference === 'auto') {
+        // Try fallback providers
+        for (const provider of this.providers) {
+          if (provider !== this.currentProvider && provider.isAvailable()) {
+            try {
+              return await provider.generateResponse(_message, _context, _conversationHistory);
+            } catch (fallbackError) {
+              // Fallback failed, try next
+            }
           }
         }
       }
@@ -648,7 +973,7 @@ export class FirebaseAILogicService {
       currentProvider: this.getCurrentProvider(),
       availableProviders: this.getAvailableProviders(),
       isFirebaseAIEnabled: this.providers.some(p => p.name.includes('Firebase AI Logic')),
-      isFallbackActive: this.currentProvider?.name.includes('Mock') || false
+      isFallbackActive: this.currentProvider?.name.includes('Mock') || this.currentProvider?.name.includes('Groq') || false
     };
   }
 }

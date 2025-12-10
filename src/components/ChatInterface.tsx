@@ -9,6 +9,8 @@ import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
+import { firebaseAILogicService, ModelPreference } from '../services/firebaseAILogicService';
+import { ModelSelector } from './ModelSelector';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -47,6 +49,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [showFlashcardList, setShowFlashcardList] = useState(false);  // show flashcard list sidebar?
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
   const [typingText, setTypingText] = useState('');  // for typing animation effect
+  const [modelPreference, setModelPreference] = useState<ModelPreference>(() => {
+    // Load from service on mount
+    return firebaseAILogicService.getModelPreference();
+  });  // selected AI model preference
   const messagesEndRef = useRef<HTMLDivElement>(null);  // ref to scroll to bottom of messages
   const lastAssistantMessageRef = useRef<HTMLDivElement>(null);  // ref to last assistant message for scrolling
   const fileInputRef = useRef<HTMLInputElement>(null);  // ref to hidden file input
@@ -169,6 +175,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           index--;
           typingTimeoutRef.current = setTimeout(erase, 50);
         } else if (isTypingRef.current) {
+          // Clear typing text so default placeholder shows
+          setTypingText('');
           // Wait a bit, then start typing a new prompt
           typingTimeoutRef.current = setTimeout(() => {
             if (isTypingRef.current) {
@@ -289,6 +297,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     if (currentFlashcardSet?.id === updatedSet.id) {
       setCurrentFlashcardSet(updatedSet);
     }
+  };
+
+  const handleModelChange = (newPreference: ModelPreference) => {
+    setModelPreference(newPreference);
+    firebaseAILogicService.setModelPreference(newPreference);
   };
 
   const handleFiles = useCallback(async (files: FileList) => {
@@ -764,7 +777,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={inputValue === '' && !isLoading && typingText ? typingText : "Ask me anything about your studies..."}
+                placeholder={inputValue === '' && !isLoading && typingText && typingText.length > 0 ? typingText : ''}
                 disabled={isLoading}
                 rows={1}
                 onKeyDown={(e) => {
@@ -817,6 +830,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                     <ArrowRight size={16} />
                   )}
                 </button>
+              </div>
+              <div className="input-actions-left">
+                <ModelSelector
+                  selectedModel={modelPreference}
+                  onModelChange={handleModelChange}
+                  disabled={isLoading}
+                />
               </div>
             </div>
             

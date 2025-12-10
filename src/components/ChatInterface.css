@@ -489,16 +489,16 @@
 
 .input-wrapper textarea {
   flex: 1;
-  border: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
-  padding: 1rem 4rem 1rem 1rem;
+  padding: 1rem 4rem 1rem 7.5rem;
   font-size: 1rem;
   font-family: inherit;
   resize: none;
   min-height: 50px;
   max-height: 120px;
   transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   color: #2d3748;
 }
@@ -535,7 +535,7 @@
 
 .typing-cursor {
   position: absolute;
-  right: 1rem;
+  left: 7.5rem;
   top: 50%;
   transform: translateY(-50%);
   color: #667eea;
@@ -557,6 +557,23 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.input-actions-left {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  z-index: 10;
+  padding-right: 0.5rem;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  height: calc(100% - 1.5rem);
+  top: 0.75rem;
+  width: auto;
+  min-width: 0;
 }
 
 .attach-btn, .test-btn {
@@ -833,6 +850,7 @@
   color: white;
   transform: scale(1.1);
 }
+
 
 .input-hint {
   font-size: 0.8rem;
