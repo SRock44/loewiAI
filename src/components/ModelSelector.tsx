@@ -20,6 +20,16 @@ const availableModels: AIModel[] = [
     id: 'kimi2',
     name: 'KimiK2',
     description: 'Direct Groq KimiK2 model for fast responses'
+  },
+  {
+    id: 'llama-3.3-70b-versatile',
+    name: 'Llama 3.3 70B',
+    description: 'Direct Groq Llama 3.3 70B Versatile model'
+  },
+  {
+    id: 'openai/gpt-oss-120b',
+    name: 'GPT-OSS 120B',
+    description: 'Direct Groq GPT-OSS 120B model'
   }
 ];
 

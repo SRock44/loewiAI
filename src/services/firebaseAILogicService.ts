@@ -501,14 +501,18 @@ class GroqProvider implements AIProvider {
   private apiKey: string;
   private modelName: string = 'moonshotai/kimi-k2-instruct-0905';
   
-  // Set model name (supports moonshotai/kimi-k2-instruct-0905)
+  // Set model name (supports multiple Groq models)
   setModel(modelName: string) {
     this.modelName = modelName;
     // Update display name based on model
     if (modelName === 'moonshotai/kimi-k2-instruct-0905') {
       this.name = 'Groq (KimiK2)';
+    } else if (modelName === 'llama-3.3-70b-versatile') {
+      this.name = 'Groq (Llama 3.3 70B Versatile)';
+    } else if (modelName === 'openai/gpt-oss-120b') {
+      this.name = 'Groq (GPT-OSS 120B)';
     } else {
-      this.name = 'Groq (Moonshot AI Kimi2)';
+      this.name = `Groq (${modelName})`;
     }
   }
   
@@ -845,7 +849,21 @@ class MockProvider implements AIProvider {
 }
 
 // Model preference type
-export type ModelPreference = 'auto' | 'kimi2';
+export type ModelPreference =
+  | 'auto'
+  | 'kimi2'
+  | 'llama-3.3-70b-versatile'
+  | 'openai/gpt-oss-120b';
+
+const GROQ_MODEL_BY_PREFERENCE: Record<Exclude<ModelPreference, 'auto'>, string> = {
+  kimi2: 'moonshotai/kimi-k2-instruct-0905',
+  'llama-3.3-70b-versatile': 'llama-3.3-70b-versatile',
+  'openai/gpt-oss-120b': 'openai/gpt-oss-120b'
+};
+
+function isDirectGroqPreference(preference: ModelPreference): preference is Exclude<ModelPreference, 'auto'> {
+  return preference !== 'auto';
+}
 
 // Firebase AI Logic Service Manager
 export class FirebaseAILogicService {
@@ -864,7 +882,12 @@ export class FirebaseAILogicService {
   private loadModelPreference() {
     try {
       const saved = localStorage.getItem('newton_ai_model_preference');
-      if (saved === 'kimi2' || saved === 'auto') {
+      if (
+        saved === 'auto' ||
+        saved === 'kimi2' ||
+        saved === 'llama-3.3-70b-versatile' ||
+        saved === 'openai/gpt-oss-120b'
+      ) {
         this.modelPreference = saved;
       }
     } catch (error) {
@@ -880,12 +903,13 @@ export class FirebaseAILogicService {
       // localStorage not available, ignore
     }
     
-    // Update Groq model if preference is kimi2
-    if (preference === 'kimi2' && this.groqProvider) {
-      this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
-    } else if (preference === 'auto' && this.groqProvider) {
-      // In auto mode, still use the correct KimiK2 model name
-      this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
+    // Update Groq model (auto uses KimiK2 as the fallback model; direct modes select explicitly)
+    if (this.groqProvider) {
+      if (preference === 'auto') {
+        this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
+      } else {
+        this.groqProvider.setModel(GROQ_MODEL_BY_PREFERENCE[preference]);
+      }
     }
     
     // Re-select provider based on preference
@@ -910,8 +934,11 @@ export class FirebaseAILogicService {
     if (groqApiKey) {
       this.groqProvider = new GroqProvider(groqApiKey);
       // Set model based on preference
-      if (this.modelPreference === 'kimi2') {
+      if (this.modelPreference === 'auto') {
+        // In auto mode, use KimiK2 as the Groq fallback model (existing behavior)
         this.groqProvider.setModel('moonshotai/kimi-k2-instruct-0905');
+      } else {
+        this.groqProvider.setModel(GROQ_MODEL_BY_PREFERENCE[this.modelPreference]);
       }
       this.providers.push(this.groqProvider);
     }
@@ -921,8 +948,8 @@ export class FirebaseAILogicService {
   }
 
   private selectBestProvider() {
-    // If user prefers Kimi2, use Groq directly (if available)
-    if (this.modelPreference === 'kimi2' && this.groqProvider && this.groqProvider.isAvailable()) {
+    // If user prefers a direct Groq model, use Groq directly (if available)
+    if (isDirectGroqPreference(this.modelPreference) && this.groqProvider && this.groqProvider.isAvailable()) {
       this.currentProvider = this.groqProvider;
       return;
     }

@@ -58,6 +58,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const fileInputRef = useRef<HTMLInputElement>(null);  // ref to hidden file input
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);  // timeout for typing animation
   const isTypingRef = useRef(false);  // track if typing animation is running
+  const inputWrapperRef = useRef<HTMLDivElement>(null);
+  const inputActionsLeftRef = useRef<HTMLDivElement>(null);
 
   // Example prompts to cycle through
   const examplePrompts = [
@@ -216,6 +218,36 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   }, [isAuthenticated]);
 
+  // Keep textarea caret + animated placeholder aligned with the actual model selector width.
+  // This prevents overlap when the selected model label is long.
+  useEffect(() => {
+    const wrapper = inputWrapperRef.current;
+    const left = inputActionsLeftRef.current;
+    if (!wrapper || !left) return;
+
+    const update = () => {
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const leftRect = left.getBoundingClientRect();
+      // Place textarea text start just after the left control area + a small gap.
+      const gapPx = 12;
+      const leftPadPx = Math.max(0, Math.round(leftRect.right - wrapperRect.left + gapPx));
+      wrapper.style.setProperty('--chat-input-left-pad', `${leftPadPx}px`);
+    };
+
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(wrapper);
+    ro.observe(left);
+
+    // Font loads or layout shifts can change widths without resize events in some browsers.
+    const raf = requestAnimationFrame(update);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [modelPreference, isAuthenticated]);
 
   // Notify parent component when documents are uploaded
   // Using a ref to track previous uploadedFiles to avoid infinite loops
@@ -249,14 +281,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     await chatService.reloadForUser();
     const existingSessions = chatService.getSessions();
     setSessions(existingSessions);
-    
-    if (existingSessions.length > 0) {
-      setCurrentSession(existingSessions[0]);
-      setMessages(existingSessions[0].messages);
-    } else {
-      // Create initial session for authenticated users
-      createNewSession();
-    }
+
+    // Always start users in a fresh blank chat when they return.
+    // Prior chats remain accessible via the sidebar.
+    createNewSession();
   };
 
   const createNewSession = async () => {
@@ -431,6 +459,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       window.dispatchEvent(new CustomEvent('sessionUpdated'));
     }
 
+    const wasEmptySession = session.messages.length === 0;
+
     // add user message to UI immediately so it feels responsive
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
@@ -462,6 +492,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       const response = await chatService.sendMessage(content.trim(), context);
       setMessages(prev => [...prev, response]);
       
+      // If this was the first message in a brand-new blank session, notify parent
+      // so the sidebar highlight can follow the active session once it becomes real.
+      if (wasEmptySession && onNewSession) {
+        onNewSession(session);
+      }
+
       // chat service automatically saves sessions to firebase (if logged in) or memory
       // the layout component listens for session updates to show them in the sidebar
       
@@ -773,7 +809,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           )}
 
           <div className="input-container">
-            <div className="input-wrapper">
+            <div className="input-wrapper" ref={inputWrapperRef}>
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
@@ -831,7 +867,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   )}
                 </button>
               </div>
-              <div className="input-actions-left">
+              <div className="input-actions-left" ref={inputActionsLeftRef}>
                 <ModelSelector
                   selectedModel={modelPreference}
                   onModelChange={handleModelChange}

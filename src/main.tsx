@@ -3,19 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-// Defer non-critical service initialization for better performance
-const initializeServices = async () => {
-  // Only initialize cleanup services after the app has loaded
-  const { automaticCleanupService } = await import('./services/automaticCleanupService');
-  await import('./services/cleanupService');
-  await import('./services/databaseCleanupService');
-  
-  // Start automatic cleanup service for 24-hour deletion
-  automaticCleanupService.startAutomaticCleanup();
-};
-
-// Initialize services after a short delay to prioritize app loading
-setTimeout(initializeServices, 1000);
+// NOTE: Intentionally no background cleanup jobs.
+// We keep all chat/flashcard data permanently, and we already avoid persisting empty chat sessions.
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>

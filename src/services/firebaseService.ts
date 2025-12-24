@@ -46,139 +46,49 @@ export class FirebaseService {
   // Chat Sessions
   async saveChatSession(session: ChatSession, userId: string): Promise<string> {
     try {
-      // Check if session already exists in Firebase
-      if (session.id && session.id.startsWith('firebase_')) {
-        // Session already exists in Firebase, update it
-        const sessionRef = doc(db, 'chatSessions', session.id.replace('firebase_', ''));
-        const cleanSession = this.deepCleanObject(session);
-        await updateDoc(sessionRef, {
-          ...cleanSession,
-          userId,
-          updatedAt: serverTimestamp(),
-          lastActivityAt: serverTimestamp()
-        });
+      // IMPORTANT:
+      // - We always use the Firestore document ID as the session ID (no "firebase_" prefix).
+      // - We do NOT attempt "duplicate session" detection/merging (that caused data loss and broken references).
+      if (!session?.id) {
+        throw new Error('ChatSession.id is required to save a session');
+      }
+
+      // Never persist empty sessions (no meaningful user/assistant messages).
+      // This prevents "New Chat" from creating junk documents if something calls save early.
+      const hasMeaningfulMessage = Array.isArray(session.messages) && session.messages.some((m) =>
+        (m?.role === 'user' || m?.role === 'assistant') &&
+        typeof m?.content === 'string' &&
+        m.content.trim().length > 0
+      );
+      if (!hasMeaningfulMessage) {
         return session.id;
       }
 
-      // Aggressive duplicate prevention - check for ANY similar session
-      const existingSession = await this.findDuplicateSession(session, userId);
-      if (existingSession) {
-        // Update existing session instead of creating duplicate
-        const sessionRef = doc(db, 'chatSessions', existingSession.id);
-        const cleanSession = this.deepCleanObject(session);
-        await updateDoc(sessionRef, {
-          ...cleanSession,
-          userId,
-          updatedAt: serverTimestamp(),
-          lastActivityAt: serverTimestamp()
-        });
-        return `firebase_${existingSession.id}`;
-      }
+      const sessionRef = doc(db, 'chatSessions', session.id);
 
-      // Additional check: Look for sessions with same title and recent activity
-      const recentDuplicate = await this.findRecentDuplicateSession(session, userId);
-      if (recentDuplicate) {
-        const sessionRef = doc(db, 'chatSessions', recentDuplicate.id);
-        const cleanSession = this.deepCleanObject(session);
-        await updateDoc(sessionRef, {
-          ...cleanSession,
-          userId,
-          updatedAt: serverTimestamp(),
-          lastActivityAt: serverTimestamp()
-        });
-        return `firebase_${recentDuplicate.id}`;
-      }
+      // Do not persist a nested `id` field; Firestore doc ID is the canonical ID.
+      // Also strip undefined values to avoid Firestore errors.
+      const rest: any = { ...(session as any) };
+      delete rest.id;
+      const cleanSession = this.deepCleanObject(rest);
 
-      // Create new session only if no duplicates found
-      const cleanSession = this.deepCleanObject(session);
-      const docRef = await addDoc(collection(db, 'chatSessions'), {
+      const toSave: Record<string, unknown> = {
         ...cleanSession,
         userId,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastActivityAt: serverTimestamp()
-      });
-      return `firebase_${docRef.id}`;
+      };
+
+      // Only set createdAt if the document doesn't already have one
+      if (!cleanSession.createdAt) {
+        toSave.createdAt = serverTimestamp();
+      }
+
+      await setDoc(sessionRef, toSave, { merge: true });
+      return session.id;
     } catch (error) {
       console.error('Error saving chat session:', error);
       throw error;
-    }
-  }
-
-  private async findDuplicateSession(session: ChatSession, userId: string): Promise<{ id: string } | null> {
-    try {
-      // Query for sessions with same title and similar message content
-      const sessionsQuery = query(
-        collection(db, 'chatSessions'),
-        where('userId', '==', userId),
-        where('title', '==', session.title)
-      );
-      
-      const snapshot = await getDocs(sessionsQuery);
-      
-      for (const doc of snapshot.docs) {
-        const data = doc.data();
-        // Check if messages are similar (same number and similar content)
-        if (data.messages && session.messages && 
-            data.messages.length === session.messages.length) {
-          // Simple duplicate check: compare first few messages
-          const isDuplicate = this.areMessagesSimilar(data.messages, session.messages);
-          if (isDuplicate) {
-            return { id: doc.id };
-          }
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      // Error checking for duplicates
-      return null;
-    }
-  }
-
-  private areMessagesSimilar(messages1: ChatMessage[], messages2: ChatMessage[]): boolean {
-    if (messages1.length !== messages2.length) return false;
-    
-    // Check first 3 messages for similarity
-    const checkCount = Math.min(3, messages1.length);
-    for (let i = 0; i < checkCount; i++) {
-      const msg1 = messages1[i];
-      const msg2 = messages2[i];
-      
-      if (msg1.role !== msg2.role || 
-          msg1.content !== msg2.content) {
-        return false;
-      }
-    }
-    
-    return true;
-  }
-
-  private async findRecentDuplicateSession(session: ChatSession, userId: string): Promise<{ id: string } | null> {
-    try {
-      // Look for sessions with same title created in the last hour
-      const oneHourAgo = new Date();
-      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-      
-      const sessionsQuery = query(
-        collection(db, 'chatSessions'),
-        where('userId', '==', userId),
-        where('title', '==', session.title),
-        where('createdAt', '>', oneHourAgo),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const snapshot = await getDocs(sessionsQuery);
-      
-      if (!snapshot.empty) {
-        // Return the most recent session with same title
-        return { id: snapshot.docs[0].id };
-      }
-      
-      return null;
-    } catch (error) {
-      // Error checking for recent duplicates
-      return null;
     }
   }
 
@@ -193,9 +103,19 @@ export class FirebaseService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => {
         const data = doc.data();
+        // Ignore any stored local `id` field in the document; doc.id is source of truth.
+        const dataWithoutId: any = { ...(data as any) };
+        delete dataWithoutId.id;
+        const messages = Array.isArray((data as any).messages)
+          ? ((data as any).messages as any[]).map((m) => ({
+              ...m,
+              timestamp: m?.timestamp?.toDate ? m.timestamp.toDate() : m?.timestamp
+            }))
+          : [];
         return {
           id: doc.id,
-          ...data,
+          ...dataWithoutId,
+          messages,
           // Convert Firestore Timestamps to Date objects
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
@@ -281,10 +201,25 @@ export class FirebaseService {
     );
     
     return onSnapshot(q, (snapshot) => {
-      const sessions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatSession[];
+      const sessions = snapshot.docs.map(docSnap => {
+        const data = docSnap.data() as any;
+        const dataWithoutId: any = { ...(data as any) };
+        delete dataWithoutId.id;
+        const messages = Array.isArray(data.messages)
+          ? (data.messages as any[]).map((m) => ({
+              ...m,
+              timestamp: m?.timestamp?.toDate ? m.timestamp.toDate() : m?.timestamp
+            }))
+          : [];
+        return {
+          id: docSnap.id,
+          ...dataWithoutId,
+          messages,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
+          lastActivityAt: data.lastActivityAt?.toDate ? data.lastActivityAt.toDate() : data.lastActivityAt
+        } as ChatSession;
+      });
       callback(sessions);
     });
   }
@@ -723,20 +658,11 @@ export class FirebaseService {
     duplicatesRemoved: number;
   }> {
     try {
-      
-      // Run cleanup operations in parallel
-      const [expiredSessions, expiredFlashcards, duplicatesRemoved] = await Promise.all([
-        this.cleanupExpiredSessions(),
-        this.cleanupExpiredFlashcards(),
-        this.cleanupDuplicateSessions('all') // Clean all users
-      ]);
-      
-      // Cleanup completed silently
-      
+      // No-op: we keep everything permanently.
       return {
-        expiredSessions,
-        expiredFlashcards,
-        duplicatesRemoved
+        expiredSessions: 0,
+        expiredFlashcards: 0,
+        duplicatesRemoved: 0
       };
     } catch (error) {
       console.error('Error in automatic cleanup:', error);

@@ -134,6 +134,32 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const { flashcardSets, updateFlashcardSet, removeFlashcardSet, forceReload } = useAllFlashcards();
 
+  const getChatThumbnailText = (session: ChatSession): string => {
+    const title = (session.title || '').trim();
+    if (title.length > 0) return title.slice(0, 1).toUpperCase();
+    const firstUser = session.messages.find(m => m.role === 'user');
+    if (firstUser?.content) return firstUser.content.trim().slice(0, 1).toUpperCase();
+    return 'C';
+  };
+
+  const getChatThumbnailStyle = (sessionId: string): React.CSSProperties => {
+    // Deterministic gradient based on sessionId so chats have stable “avatars”.
+    const palettes: Array<[string, string]> = [
+      ['#6366f1', '#8b5cf6'], // indigo -> violet
+      ['#0ea5e9', '#22c55e'], // sky -> green
+      ['#f97316', '#ef4444'], // orange -> red
+      ['#14b8a6', '#0ea5e9'], // teal -> sky
+      ['#a855f7', '#ec4899'], // purple -> pink
+      ['#22c55e', '#f59e0b'], // green -> amber
+    ];
+    let hash = 0;
+    for (let i = 0; i < sessionId.length; i++) {
+      hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
+    }
+    const [a, b] = palettes[hash % palettes.length];
+    return { background: `linear-gradient(135deg, ${a}, ${b})` };
+  };
+
   // Function to generate chat topic description
   const generateChatTopic = (session: ChatSession): string => {
     const firstMessage = session.messages.find(m => m.role === 'user');
@@ -377,7 +403,10 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               {chatSessions.slice(0, 10).map((session, index) => {
                 const firstMessage = session.messages.find(m => m.role === 'user');
                 const summary = firstMessage ? `Chat about: ${firstMessage.content.substring(0, 100)}${firstMessage.content.length > 100 ? '...' : ''}` : 'New conversation';
-                const chatTopic = generateChatTopic(session);
+                const chatTopic = (session.title && session.title.trim().length > 0)
+                  ? session.title
+                  : generateChatTopic(session);
+                const preview = firstMessage?.content ? firstMessage.content.trim() : 'New conversation';
                 
                 return (
                   <div key={session.id} className="chat-history-item-container">
@@ -386,12 +415,17 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                       onClick={() => handleChatSelect(session.id)}
                       title={summary}
                     >
-                      <span className="nav-icon chat-number">
-                        {index + 1}
+                      <span
+                        className="chat-thumbnail"
+                        style={getChatThumbnailStyle(session.id)}
+                        aria-hidden="true"
+                      >
+                        {getChatThumbnailText(session)}
                       </span>
                       {isSidebarExpanded && (
-                        <span className="nav-label chat-topic">
-                          {chatTopic}
+                        <span className="chat-history-text">
+                          <span className="chat-history-title">{chatTopic}</span>
+                          <span className="chat-history-preview">{preview}</span>
                         </span>
                       )}
                     </button>

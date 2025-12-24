@@ -491,7 +491,8 @@
   flex: 1;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
-  padding: 1rem 4rem 1rem 7.5rem;
+  /* Left padding must account for the model selector width (variable-length labels). */
+  padding: 1rem 4rem 1rem var(--chat-input-left-pad, 7.5rem);
   font-size: 1rem;
   font-family: inherit;
   resize: none;
@@ -535,7 +536,7 @@
 
 .typing-cursor {
   position: absolute;
-  left: 7.5rem;
+  left: var(--chat-input-left-pad, 7.5rem);
   top: 50%;
   transform: translateY(-50%);
   color: #667eea;
@@ -950,7 +951,7 @@
   }
   
   .input-wrapper textarea {
-    padding: 0.875rem 3.5rem 0.875rem 0.875rem;
+    padding: 0.875rem 3.5rem 0.875rem var(--chat-input-left-pad, 0.875rem);
     font-size: 0.95rem;
     min-height: 44px;
     max-height: 100px;
@@ -1084,7 +1085,7 @@
   }
   
   .input-wrapper textarea {
-    padding: 0.75rem 3rem 0.75rem 0.75rem;
+    padding: 0.75rem 3rem 0.75rem var(--chat-input-left-pad, 0.75rem);
     font-size: 0.9rem;
     min-height: 40px;
     max-height: 80px;
@@ -1158,7 +1159,7 @@
   }
   
   .input-wrapper textarea {
-    padding: 0.5rem 2.5rem 0.5rem 0.5rem;
+    padding: 0.5rem 2.5rem 0.5rem var(--chat-input-left-pad, 0.5rem);
     font-size: 0.85rem;
     min-height: 36px;
     max-height: 70px;

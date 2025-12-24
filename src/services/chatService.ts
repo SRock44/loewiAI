@@ -8,7 +8,6 @@ import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import { codeValidator, CodeValidationResult } from './codeValidator';
 import { codeExecutor } from './codeExecutor';
 import { firebaseService } from './firebaseService';
-import { automaticCleanupService } from './automaticCleanupService';
 
 // this is the main chat service - handles all chat logic, AI integration, and session management
 // it's a singleton that gets created once when the app starts
@@ -25,10 +24,6 @@ class GeminiChatService implements ChatService {
   constructor() {
     // listen for when user signs in/out so we can load their sessions
     this.setupAuthStateListener();
-    
-    // start the automatic cleanup service that deletes old data every hour
-    // this keeps the database clean and respects privacy (24 hour expiration)
-    automaticCleanupService.startAutomaticCleanup();
   }
 
   // this listens for auth changes - when user signs in, we load their chat sessions
@@ -65,12 +60,11 @@ class GeminiChatService implements ChatService {
     try {
       const firebaseSessions = await firebaseService.getChatSessions(this.currentUserId);
       
-      // Sort sessions by updatedAt (newest first) and limit to 6
+      // Sort sessions by updatedAt (newest first)
       const validSessions = firebaseSessions.filter(session => this.hasValidConversation(session));
       
       const sortedSessions = validSessions
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 6); // Limit to 6 sessions
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
       
       // Convert to Map
       this.sessions = new Map();
@@ -103,8 +97,7 @@ class GeminiChatService implements ChatService {
         // Filter and sort sessions
         const sortedSessions = sessions
           .filter(session => this.hasValidConversation(session))
-          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-          .slice(0, 6); // Limit to 6 sessions
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         
         // Update local sessions
         this.sessions = new Map();
@@ -242,60 +235,15 @@ Would you like me to help you with anything else about the code, such as explain
         // Update session title based on first message if it's generic
         this.updateSessionTitleIfNeeded(session, message);
         
-        // Save session to Firebase
+        // Persist session (including messages array) to Firestore for signed-in users.
+        // We intentionally avoid a separate "messages" collection here because it was
+        // causing ID mismatches and duplicate writes.
         if (this.currentUserId) {
           try {
-            const firebaseSessionId = await firebaseService.saveChatSession(session, this.currentUserId);
-            
-            // Update session with Firebase ID if it's a new session
-            if (firebaseSessionId !== session.id) {
-              const oldId = session.id;
-              session.id = firebaseSessionId;
-              this.sessions.delete(oldId);
-              this.sessions.set(firebaseSessionId, session);
-            }
-            
-            // Dispatch event to notify UI components
+            await firebaseService.saveChatSession(session, this.currentUserId);
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
           } catch (error) {
             console.error('Failed to save session to Firebase:', error);
-          }
-        }
-        
-        // Save messages to Firebase for cross-device sync
-        const user = firebaseAuthService.getCurrentUser();
-        if (user) {
-          try {
-            // Check if this is the first message in the session
-            const isFirstMessage = session.messages.length === 2; // user + assistant message
-            
-            if (isFirstMessage) {
-              // Save the entire session to Firebase for the first time
-              const firebaseSessionId = await firebaseService.saveChatSession(session, user.id);
-              
-              // Update local session with Firebase ID for consistency
-              session.id = firebaseSessionId;
-              this.sessions.set(firebaseSessionId, session);
-              this.sessions.delete(context.sessionId); // Remove old local ID
-              
-              // Update the context session ID for future messages
-              context.sessionId = firebaseSessionId;
-            } else {
-              // Save individual messages to existing Firebase session
-              await firebaseService.saveMessage(context.sessionId, userMessage);
-              await firebaseService.saveMessage(context.sessionId, assistantMessage);
-              
-              // Update session timestamp in Firebase for cleanup tracking
-              await firebaseService.updateChatSession(context.sessionId, { 
-                updatedAt: new Date(),
-                lastActivityAt: new Date(), // Track last activity for cleanup
-                messages: session.messages // Update the full messages array
-              });
-            }
-            
-            // Messages saved to Firebase for cross-device sync
-          } catch (error) {
-            // Continue execution even if Firebase save fails
           }
         }
       }
@@ -339,54 +287,10 @@ Would you like me to help you with anything else about the code, such as explain
   }
 
   async createNewSession(title?: string): Promise<ChatSession> {
-    // First, save any existing session with messages to Firebase before creating a new one
-    if (this.currentUserId) {
-      const currentSessions = Array.from(this.sessions.values());
-      const sessionsWithMessages = currentSessions.filter(session => 
-        this.hasValidConversation(session) && !session.id.startsWith('firebase_')
-      );
-      
-      // Save all sessions with messages to Firebase
-      for (const session of sessionsWithMessages) {
-        try {
-          const firebaseSessionId = await firebaseService.saveChatSession(session, this.currentUserId);
-          
-          // Update session with Firebase ID
-          const oldId = session.id;
-          session.id = firebaseSessionId;
-          this.sessions.delete(oldId); // Remove old local ID
-          this.sessions.set(firebaseSessionId, session); // Add with Firebase ID
-        } catch (error) {
-          console.error('❌ Failed to save existing session to Firebase:', error);
-        }
-      }
-      
-      // Dispatch event to notify UI components that sessions have been updated
-      if (sessionsWithMessages.length > 0) {
-        window.dispatchEvent(new CustomEvent('sessionUpdated'));
-      }
-    }
-    
-    // Check if there's already an empty session that we can reuse
-    const existingEmptySession = Array.from(this.sessions.values()).find(session => 
-      !this.hasValidConversation(session)
-    );
-    
-    if (existingEmptySession) {
-      // Return the existing empty session instead of creating a new one
-      return existingEmptySession;
-    }
-    
-    // Double-check: if we already have an empty session, don't create another one
-    const allSessions = Array.from(this.sessions.values());
-    const emptySessions = allSessions.filter(session => !this.hasValidConversation(session));
-    
-    if (emptySessions.length > 0) {
-      // Return the first empty session
-      return emptySessions[0];
-    }
-    
-    const sessionId = `session_${Date.now()}`;
+    const sessionId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `session_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const defaultTitle = title || this.generateSessionTitle();
     
     const session: ChatSession = {
@@ -400,8 +304,7 @@ Would you like me to help you with anything else about the code, such as explain
 
     this.sessions.set(sessionId, session);
     
-    // Don't save session to Firebase until it has messages
-    // The session will be saved when the first message is sent
+    // We intentionally don't save empty sessions to Firestore.
     
     return session;
   }
@@ -486,29 +389,13 @@ Would you like me to help you with anything else about the code, such as explain
     }
     
     try {
-      // Check if this is a Firebase session or local session
-      const isFirebaseSession = sessionId.startsWith('firebase_');
-      const firebaseDocId = isFirebaseSession ? sessionId.replace('firebase_', '') : sessionId;
-      console.log('🗑️ Starting deletion process:', { sessionId, firebaseDocId, isFirebaseSession });
-      
-      if (isFirebaseSession) {
-        // This is a Firebase session, delete from Firebase first
-        console.log('🗑️ Step 1: Deleting session messages...');
-        await firebaseService.deleteSessionMessages(firebaseDocId);
-        console.log('✅ Step 1: Session messages deleted successfully');
-        
-        console.log('🗑️ Step 2: Deleting chat session...');
-        await firebaseService.deleteChatSession(firebaseDocId);
-        console.log('✅ Step 2: Chat session deleted successfully');
-        
-        // Reload sessions from Firebase to ensure complete synchronization
-        console.log('🗑️ Step 3: Reloading sessions from Firebase...');
+      console.log('🗑️ Starting deletion process:', { sessionId });
+
+      // If signed in, delete from Firestore.
+      // (Messages are stored on the session document itself.)
+      if (userId) {
+        await firebaseService.deleteChatSession(sessionId);
         await this.loadSessionsFromFirebase();
-        console.log('✅ Step 3: Sessions reloaded from Firebase');
-        console.log('📋 Current sessions after reload:', Array.from(this.sessions.keys()));
-      } else {
-        // This is a local session that was never saved to Firebase
-        console.log('🗑️ Deleting local session (not in Firebase)');
       }
       
       // Remove from local memory (for both Firebase and local sessions)
@@ -552,8 +439,7 @@ Would you like me to help you with anything else about the code, such as explain
         const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : new Date(a.updatedAt).getTime();
         const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : new Date(b.updatedAt).getTime();
         return bTime - aTime;
-      })
-      .slice(0, 6); // Limit to 6 sessions
+      });
   }
 
   // Check if a session has valid conversation content

@@ -10,16 +10,20 @@ service cloud.firestore {
     
     // Chat sessions - users can only access their own sessions
     match /chatSessions/{sessionId} {
-      allow read, write, delete: if request.auth != null;
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.userId;
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
     }
     
     // Messages - users can only access messages from their own sessions
     match /messages/{messageId} {
-      allow read, write, delete: if request.auth != null;
-      allow create: if request.auth != null && 
+      // NOTE: The app primarily stores messages inside the session document.
+      // This collection is kept for backward compatibility only.
+      allow create: if request.auth != null &&
         request.auth.uid == get(/databases/$(database)/documents/chatSessions/$(request.resource.data.sessionId)).data.userId;
+      allow read, update, delete: if request.auth != null &&
+        request.auth.uid == get(/databases/$(database)/documents/chatSessions/$(resource.data.sessionId)).data.userId;
     }
     
     // Flashcard sets - users can only access their own flashcard sets
