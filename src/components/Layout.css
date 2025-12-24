@@ -302,12 +302,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #2d3748;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.3px;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.chat-history-item:hover .chat-thumbnail {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 
 .chat-history-text {

@@ -143,21 +143,23 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   };
 
   const getChatThumbnailStyle = (sessionId: string): React.CSSProperties => {
-    // Deterministic gradient based on sessionId so chats have stable “avatars”.
-    const palettes: Array<[string, string]> = [
-      ['#6366f1', '#8b5cf6'], // indigo -> violet
-      ['#0ea5e9', '#22c55e'], // sky -> green
-      ['#f97316', '#ef4444'], // orange -> red
-      ['#14b8a6', '#0ea5e9'], // teal -> sky
-      ['#a855f7', '#ec4899'], // purple -> pink
-      ['#22c55e', '#f59e0b'], // green -> amber
+    // Deterministic, theme-friendly gradients based on sessionId so chats have stable “avatars”.
+    // Keep these subtle to match the app’s soft slate/indigo aesthetic.
+    const palettes: Array<{ a: string; b: string }> = [
+      { a: 'rgba(102, 126, 234, 0.18)', b: 'rgba(118, 75, 162, 0.12)' }, // indigo -> purple
+      { a: 'rgba(45, 55, 72, 0.10)', b: 'rgba(148, 163, 184, 0.18)' }, // slate -> gray
+      { a: 'rgba(102, 126, 234, 0.14)', b: 'rgba(45, 55, 72, 0.08)' }, // indigo -> slate
+      { a: 'rgba(203, 213, 224, 0.22)', b: 'rgba(102, 126, 234, 0.10)' }, // light gray -> indigo hint
+      { a: 'rgba(160, 174, 192, 0.18)', b: 'rgba(118, 75, 162, 0.10)' }, // gray -> muted purple
     ];
     let hash = 0;
     for (let i = 0; i < sessionId.length; i++) {
       hash = (hash * 31 + sessionId.charCodeAt(i)) >>> 0;
     }
-    const [a, b] = palettes[hash % palettes.length];
-    return { background: `linear-gradient(135deg, ${a}, ${b})` };
+    const { a, b } = palettes[hash % palettes.length];
+    return {
+      background: `linear-gradient(135deg, ${a}, ${b})`
+    };
   };
 
   // Function to generate chat topic description
@@ -400,7 +402,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
           {/* Chat History - directly below New Chat button */}
           {location.pathname === '/dashboard' && chatSessions.length > 0 && (
             <>
-              {chatSessions.slice(0, 10).map((session, index) => {
+              {chatSessions.slice(0, 10).map((session) => {
                 const firstMessage = session.messages.find(m => m.role === 'user');
                 const summary = firstMessage ? `Chat about: ${firstMessage.content.substring(0, 100)}${firstMessage.content.length > 100 ? '...' : ''}` : 'New conversation';
                 const chatTopic = (session.title && session.title.trim().length > 0)
