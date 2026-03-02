@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import Flashcard from '../../src/components/Flashcard'
 import { Flashcard as FlashcardType } from '../../src/types/flashcard'
 

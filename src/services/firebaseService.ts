@@ -387,7 +387,7 @@ export class FirebaseService {
           }
           
           // Always use the Firebase document ID, ignore any stored local ID
-          const { id: _, ...dataWithoutId } = data;
+          const { id: _storedId, ...dataWithoutId } = data;
           const flashcardSet = {
             id: doc.id, // Always use the Firebase document ID
             ...dataWithoutId,
@@ -657,21 +657,12 @@ export class FirebaseService {
     expiredFlashcards: number;
     duplicatesRemoved: number;
   }> {
-    try {
-      // No-op: we keep everything permanently.
-      return {
-        expiredSessions: 0,
-        expiredFlashcards: 0,
-        duplicatesRemoved: 0
-      };
-    } catch (error) {
-      console.error('Error in automatic cleanup:', error);
-      return {
-        expiredSessions: 0,
-        expiredFlashcards: 0,
-        duplicatesRemoved: 0
-      };
-    }
+    // No-op: we keep everything permanently.
+    return {
+      expiredSessions: 0,
+      expiredFlashcards: 0,
+      duplicatesRemoved: 0
+    };
   }
 
   // Override cleanupDuplicateSessions to handle 'all' users

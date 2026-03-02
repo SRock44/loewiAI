@@ -573,14 +573,11 @@ FINAL REMINDER:
         
         // Since we can't find the exact match, delete ALL flashcard sets to clean up
         // Local ID not found in Firebase, performing complete cleanup
-        let deletedCount = 0;
         for (const set of allSets) {
           try {
             await firebaseService.deleteFlashcardSet(set.id, userId);
-            // Deleted set successfully
-            deletedCount++;
-          } catch (error) {
-            // Failed to delete set
+          } catch {
+            // Failed to delete set, continue with remaining
           }
         }
         // Cleanup completed
