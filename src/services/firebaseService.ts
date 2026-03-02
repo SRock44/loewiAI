@@ -387,6 +387,7 @@ export class FirebaseService {
           }
           
           // Always use the Firebase document ID, ignore any stored local ID
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { id: _storedId, ...dataWithoutId } = data;
           const flashcardSet = {
             id: doc.id, // Always use the Firebase document ID

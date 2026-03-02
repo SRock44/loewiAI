@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react' // eslint-disable-line @typescript-eslint/no-redeclare
 import FlashcardList from '../../src/components/FlashcardList'
 import { FlashcardSet } from '../../src/types/flashcard'
 
