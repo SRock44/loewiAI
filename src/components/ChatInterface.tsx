@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
-import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList, FileText, PresentationGraph } from '@solar-icons/react';
+import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import { firebaseAILogicService, ModelPreference } from '../services/firebaseAILogicService';
 import { ModelSelector } from './ModelSelector';
@@ -648,12 +648,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const renderFileTypeIcon = (fileType: string, size = 20) => {
     if (fileType.startsWith('image/')) return null;
     if (fileType.includes('presentation') || fileType.includes('powerpoint'))
-      return <PresentationGraph size={size} />;
-    if (fileType.includes('pdf'))
-      return <DocumentIcon size={size} />;
-    if (fileType.includes('word') || fileType.includes('document'))
-      return <FileText size={size} />;
-    return <FileText size={size} />;
+      return <ClipboardList size={size} />;
+    return <DocumentIcon size={size} />;
   };
 
   return (
