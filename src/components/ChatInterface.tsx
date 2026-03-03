@@ -920,7 +920,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.docx,.doc,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.webp"
+              accept=".pdf,.docx,.doc,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.webp,.heic,.md"
               onChange={(e) => {
                 if (e.target.files) {
                   handleFiles(e.target.files);

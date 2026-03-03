@@ -40,6 +40,17 @@ vi.mock('pptx-parser', () => ({
   })),
 }))
 
+// Mock firebaseAILogicService for image OCR
+vi.mock('../../src/services/firebaseAILogicService', () => ({
+  firebaseAILogicService: {
+    extractTextFromImage: vi.fn().mockResolvedValue('OCR extracted text from image'),
+    generateResponse: vi.fn(),
+    getCurrentProvider: vi.fn().mockReturnValue('mock'),
+    getAvailableProviders: vi.fn().mockReturnValue(['mock']),
+    testConnection: vi.fn().mockResolvedValue(true),
+  },
+}))
+
 describe('documentProcessor', () => {
   // Helper to create mock File with arrayBuffer method
   const createMockFile = (name: string, type: string, content: string = 'test content'): File => {
@@ -248,6 +259,148 @@ describe('documentProcessor', () => {
 
       // Should have normalized whitespace
       expect(result.extractedContent).not.toContain('   ')
+    })
+  })
+
+  describe('Image File Detection and Processing', () => {
+    it('should detect JPEG as an image file', async () => {
+      const file = createMockFile('photo.jpg', 'image/jpeg', 'fake-image-data')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.fileName).toBe('photo.jpg')
+      expect(result.fileType).toBe('image/jpeg')
+    })
+
+    it('should detect PNG as an image file', async () => {
+      const file = createMockFile('screenshot.png', 'image/png', 'fake-image-data')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.fileName).toBe('screenshot.png')
+    })
+
+    it('should detect HEIC as an image file', async () => {
+      const file = createMockFile('iphone-photo.heic', 'image/heic', 'fake-image-data')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.fileName).toBe('iphone-photo.heic')
+      expect(result.fileType).toBe('image/heic')
+    })
+
+    it('should detect GIF as an image file', async () => {
+      const file = createMockFile('animation.gif', 'image/gif', 'fake-image-data')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.fileName).toBe('animation.gif')
+    })
+
+    it('should detect WebP as an image file', async () => {
+      const file = createMockFile('image.webp', 'image/webp', 'fake-image-data')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.fileName).toBe('image.webp')
+    })
+
+    it('should handle image OCR extraction failure gracefully', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const { firebaseAILogicService } = await import('../../src/services/firebaseAILogicService')
+      vi.mocked(firebaseAILogicService.extractTextFromImage).mockRejectedValueOnce(new Error('OCR failed'))
+
+      const file = createMockFile('broken.jpg', 'image/jpeg', 'fake-image-data')
+      const result = await documentProcessor.processDocument(file)
+
+      // Should fall back gracefully
+      expect(result.processed).toBe(true)
+      expect(result.extractedContent).toBeTruthy()
+
+      consoleSpy.mockRestore()
+    })
+  })
+
+  describe('Markdown / Text File Extraction', () => {
+    it('should process markdown files as text', async () => {
+      const mdContent = '# Chapter 1\n\nThis is a markdown document with **bold** text.'
+      const file = createMockFile('notes.md', 'text/markdown', mdContent)
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.fileName).toBe('notes.md')
+      // Markdown files go through extractAsText → readFileAsText → cleanText
+      expect(result.extractedContent).toBeTruthy()
+    })
+
+    it('should process unknown text-based file types as text', async () => {
+      const textContent = 'This is plain text content for testing.'
+      const file = createMockFile('readme.txt', 'text/plain', textContent)
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.processed).toBe(true)
+      expect(result.extractedContent).toBeTruthy()
+    })
+  })
+
+  describe('Fallback Document Generation', () => {
+    it('should generate fallback for exam documents', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const file = createMockFile('midterm_exam.pdf', 'application/pdf', '')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.summary).toContain('assessment')
+      expect(result.keyTopics).toContain('Exam')
+
+      consoleSpy.mockRestore()
+    })
+
+    it('should generate fallback for lecture notes', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const file = createMockFile('lecture_notes_week3.pdf', 'application/pdf', '')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.summary).toContain('lecture notes')
+      expect(result.keyTopics).toContain('Lecture Notes')
+
+      consoleSpy.mockRestore()
+    })
+
+    it('should assess difficulty as advanced for graduate-level content', async () => {
+      const advancedContent = {
+        items: [{ str: 'This is an advanced graduate level course on quantum mechanics' }],
+      }
+
+      const mockPage = { getTextContent: vi.fn().mockResolvedValue(advancedContent) }
+      const mockPdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(mockPage) }
+      const mockLoadingTask = { promise: Promise.resolve(mockPdf) }
+
+      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as ReturnType<typeof pdfjsLib.getDocument>)
+
+      const file = createMockFile('advanced_course.pdf', 'application/pdf', 'advanced graduate')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.difficulty).toBe('advanced')
+    })
+
+    it('should assess difficulty as beginner for introductory content', async () => {
+      const beginnerContent = {
+        items: [{ str: 'This is a basic introduction to computer science fundamentals' }],
+      }
+
+      const mockPage = { getTextContent: vi.fn().mockResolvedValue(beginnerContent) }
+      const mockPdf = { numPages: 1, getPage: vi.fn().mockResolvedValue(mockPage) }
+      const mockLoadingTask = { promise: Promise.resolve(mockPdf) }
+
+      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as ReturnType<typeof pdfjsLib.getDocument>)
+
+      const file = createMockFile('intro_cs.pdf', 'application/pdf', 'basic introduction')
+      const result = await documentProcessor.processDocument(file)
+
+      expect(result.difficulty).toBe('beginner')
     })
   })
 

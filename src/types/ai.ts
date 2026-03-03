@@ -72,7 +72,9 @@ export const SUPPORTED_FILE_TYPES = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/gif': '.gif',
-  'image/webp': '.webp'
+  'image/webp': '.webp',
+  'image/heic': '.heic',
+  'text/markdown': '.md'
 } as const;
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB

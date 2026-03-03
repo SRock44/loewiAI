@@ -60,8 +60,72 @@ describe('fileValidation', () => {
     it('should accept empty files within size limit', () => {
       const file = new File([], 'empty.pdf', { type: 'application/pdf' })
       const result = validateFile(file)
-      
+
       expect(result.isValid).toBe(true)
+    })
+
+    it('should validate HEIC image files', () => {
+      const file = new File(['content'], 'photo.heic', { type: 'image/heic' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(true)
+      expect(result.fileType).toBe('image/heic')
+    })
+
+    it('should validate markdown files', () => {
+      const file = new File(['# Hello'], 'notes.md', { type: 'text/markdown' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(true)
+      expect(result.fileType).toBe('text/markdown')
+    })
+
+    it('should validate JPEG image files', () => {
+      const file = new File(['content'], 'photo.jpg', { type: 'image/jpeg' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(true)
+      expect(result.fileType).toBe('image/jpeg')
+    })
+
+    it('should validate PNG image files', () => {
+      const file = new File(['content'], 'screenshot.png', { type: 'image/png' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(true)
+      expect(result.fileType).toBe('image/png')
+    })
+
+    it('should validate GIF image files', () => {
+      const file = new File(['content'], 'animation.gif', { type: 'image/gif' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(true)
+      expect(result.fileType).toBe('image/gif')
+    })
+
+    it('should validate WebP image files', () => {
+      const file = new File(['content'], 'image.webp', { type: 'image/webp' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(true)
+      expect(result.fileType).toBe('image/webp')
+    })
+
+    it('should reject CSV files', () => {
+      const file = new File(['a,b,c'], 'data.csv', { type: 'text/csv' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(false)
+      expect(result.error).toContain('Unsupported file type')
+    })
+
+    it('should reject executable files', () => {
+      const file = new File(['content'], 'app.exe', { type: 'application/x-msdownload' })
+      const result = validateFile(file)
+
+      expect(result.isValid).toBe(false)
+      expect(result.error).toContain('Unsupported file type')
     })
   })
 
@@ -83,6 +147,19 @@ describe('fileValidation', () => {
     it('should return default icon for unknown file types', () => {
       expect(getFileIcon('application/unknown')).toBe('📎')
       expect(getFileIcon('')).toBe('📎')
+    })
+
+    it('should return image icon for image file types', () => {
+      expect(getFileIcon('image/jpeg')).toBe('🖼️')
+      expect(getFileIcon('image/png')).toBe('🖼️')
+      expect(getFileIcon('image/gif')).toBe('🖼️')
+      expect(getFileIcon('image/webp')).toBe('🖼️')
+      expect(getFileIcon('image/heic')).toBe('🖼️')
+    })
+
+    it('should return correct icons for old Office format types', () => {
+      expect(getFileIcon('application/msword')).toBe('📝')
+      expect(getFileIcon('application/vnd.ms-powerpoint')).toBe('📊')
     })
   })
 
