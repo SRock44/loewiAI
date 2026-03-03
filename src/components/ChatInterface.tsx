@@ -138,6 +138,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     return () => {
       stopTypingAnimation();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- startTypingAnimation is stable (uses refs internally), adding it would cause infinite re-renders
   }, [messages.length, isLoading, inputValue]);
 
   const startTypingAnimation = () => {
@@ -216,6 +217,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setMessages([]);
       setCurrentSession(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSessions should only run when auth state changes, not on every render
   }, [isAuthenticated]);
 
   // Keep textarea caret + animated placeholder aligned with the actual model selector width.
@@ -440,7 +442,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         setMessages(prev => [...prev, errorMessage]);
       }
     }
-  }, [onDocumentsChange]);
+  }, []);
 
   // this is called when user hits enter or clicks send
   // it sends the message to the chat service which handles AI communication

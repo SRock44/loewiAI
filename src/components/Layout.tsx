@@ -266,7 +266,8 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
       const sessions = chatService.getSessions();
       setChatSessions(sessions);
     }
-  }, []); // Run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount, auth changes handled by the effect above
+  }, []);
 
   const handleChatSelect = (chatId: string) => {
     // Don't switch if the user is already in this chat
