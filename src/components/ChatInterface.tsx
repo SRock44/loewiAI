@@ -477,13 +477,15 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     setInputValue('');  // clear input field
     setIsLoading(true);
 
-    try {
-      // get all the processed documents that are ready
-      // these get sent to the AI as context so it knows what documents to reference
-      const processedDocs = uploadedFiles
-        .filter(f => f.uploadStatus === 'completed' && f.processedDocument)
-        .map(f => f.processedDocument!);
+    // Capture processed docs before clearing the attachment tray
+    const processedDocs = uploadedFiles
+      .filter(f => f.uploadStatus === 'completed' && f.processedDocument)
+      .map(f => f.processedDocument!);
 
+    // Clear attached files immediately so the input area feels responsive
+    setUploadedFiles([]);
+
+    try {
       // build context object - includes session id, document ids, and full processed documents
       // the chat service uses this to build the prompt for the AI
       const context: ChatContext = {
@@ -527,8 +529,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      // Clear attached files — they've been consumed by the message
-      setUploadedFiles([]);
     }
   };
 
