@@ -109,6 +109,8 @@ describe('documentProcessor', () => {
 
   describe('Word Document Extraction', () => {
     it('should handle DOCX extraction errors gracefully', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       vi.mocked(mammoth.extractRawText).mockRejectedValue(new Error('DOCX parsing failed'))
 
       const file = createMockFile('corrupted.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'corrupted')
@@ -116,6 +118,8 @@ describe('documentProcessor', () => {
 
       expect(result.processed).toBe(true)
       expect(result.extractedContent).toBeTruthy()
+
+      consoleSpy.mockRestore()
     })
 
     it('should handle empty DOCX file', async () => {
@@ -135,6 +139,8 @@ describe('documentProcessor', () => {
 
   describe('PowerPoint Extraction', () => {
     it('should handle PPTX extraction errors gracefully', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const mockParser = {
         parse: vi.fn().mockRejectedValue(new Error('PPTX parsing failed')),
         slides: [],
@@ -147,32 +153,46 @@ describe('documentProcessor', () => {
 
       expect(result.processed).toBe(true)
       expect(result.extractedContent).toBeTruthy()
+
+      consoleSpy.mockRestore()
     })
   })
 
   describe('Text Processing', () => {
     it('should generate summary for homework documents', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const file = createMockFile('homework.pdf', 'application/pdf', 'homework content')
       const result = await documentProcessor.processDocument(file)
 
       expect(result.summary).toContain('homework assignment')
       expect(result.keyTopics).toContain('Homework')
+
+      consoleSpy.mockRestore()
     })
 
     it('should generate summary for syllabus documents', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const file = createMockFile('syllabus.pdf', 'application/pdf', 'syllabus content')
       const result = await documentProcessor.processDocument(file)
 
       expect(result.summary).toContain('syllabus')
       expect(result.keyTopics).toContain('Syllabus')
+
+      consoleSpy.mockRestore()
     })
 
     it('should extract key topics from document', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const file = createMockFile('statistics_homework.pdf', 'application/pdf', 'statistics content')
       const result = await documentProcessor.processDocument(file)
 
       expect(result.keyTopics).toContain('Statistics')
       expect(result.keyTopics).toContain('Homework')
+
+      consoleSpy.mockRestore()
     })
 
     it('should chunk text appropriately', async () => {
