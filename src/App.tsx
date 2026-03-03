@@ -64,13 +64,13 @@ function App() {
           >
             <Routes>
                      <Route path="/" element={
-                       <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                       <Suspense fallback={<div className="loading-spinner" />}>
                          <Hero />
                          <Features />
                        </Suspense>
                      } />
                      <Route path="/dashboard" element={
-                       <Suspense fallback={<div className="loading-spinner">Loading Dashboard...</div>}>
+                       <Suspense fallback={<div className="loading-spinner" />}>
                          <Dashboard ref={dashboardRef} onNewSessionCreated={handleNewSessionCreated} />
                        </Suspense>
                      } />

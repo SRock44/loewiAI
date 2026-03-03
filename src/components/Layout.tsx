@@ -491,7 +491,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
       {/* User Settings Modal */}
       {showSettings && (
-        <Suspense fallback={<div className="loading-spinner">Loading Settings...</div>}>
+        <Suspense fallback={<div className="loading-spinner" />}>
           <UserSettings
             isOpen={showSettings}
             onClose={() => setShowSettings(false)}
@@ -589,7 +589,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               </svg>
             </button>
             <div className="flashcard-list-content">
-              <Suspense fallback={<div className="loading-spinner">Loading Flashcards...</div>}>
+              <Suspense fallback={<div className="loading-spinner" />}>
                 <FlashcardList
                   flashcardSet={currentFlashcardSet}
                   onSetUpdate={handleFlashcardSetUpdate}
