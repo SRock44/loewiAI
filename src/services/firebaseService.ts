@@ -1,11 +1,11 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  getDocs, 
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
   getDoc,
   setDoc,
-  updateDoc, 
+  updateDoc,
   deleteDoc,
   query,
   where,
@@ -14,7 +14,8 @@ import {
   writeBatch,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../firebase-config';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '../firebase-config';
 import { ChatSession, ChatMessage } from '../types/chat';
 import { FlashcardSet, Flashcard } from '../types/flashcard';
 import { User } from '../types/auth';
@@ -172,10 +173,28 @@ export class FirebaseService {
     }
   }
 
+  async deleteStorageFiles(paths: string[]): Promise<void> {
+    await Promise.all(
+      paths.map(path =>
+        deleteObject(ref(storage, path)).catch(() => { /* already deleted or missing — ignore */ })
+      )
+    );
+  }
+
   async deleteChatSession(sessionId: string): Promise<void> {
     try {
       console.log('🗑️ Firebase: Deleting chat session:', sessionId);
-      await deleteDoc(doc(db, 'chatSessions', sessionId));
+      const sessionRef = doc(db, 'chatSessions', sessionId);
+      const sessionSnap = await getDoc(sessionRef);
+      if (sessionSnap.exists()) {
+        const data = sessionSnap.data();
+        const messages: Array<{ storagePaths?: string[] }> = Array.isArray(data.messages) ? data.messages : [];
+        const allPaths = messages.flatMap(m => m.storagePaths ?? []);
+        if (allPaths.length > 0) {
+          await this.deleteStorageFiles(allPaths);
+        }
+      }
+      await deleteDoc(sessionRef);
       console.log('✅ Firebase: Chat session deleted successfully');
     } catch (error) {
       console.error('❌ Firebase: Error deleting chat session:', error);
@@ -804,6 +823,16 @@ export class FirebaseService {
         duplicatesFound: 0
       };
     }
+  }
+
+  // Chat Image Storage
+  async uploadChatFile(userId: string, blob: Blob, fileName: string, mimeType: string): Promise<{ url: string; path: string }> {
+    const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `chatImages/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, blob, { contentType: mimeType });
+    const url = await getDownloadURL(storageRef);
+    return { url, path };
   }
 
   // User Profile

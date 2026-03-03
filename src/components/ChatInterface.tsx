@@ -3,7 +3,7 @@ import { ChatMessage, ChatSession, ChatContext, QuickAction, QUICK_ACTIONS } fro
 import { chatService } from '../services/chatService';
 import { DocumentMetadata } from '../types/ai';
 import { validateFile, formatFileSize } from '../utils/fileValidation';
-import { createThumbnail } from '../utils/imageUtils';
+import { createThumbnail, readFileAsDataUrl, compressImage } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
@@ -11,6 +11,8 @@ import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import { firebaseAILogicService, ModelPreference } from '../services/firebaseAILogicService';
+import { firebaseService } from '../services/firebaseService';
+import { firebaseAuthService } from '../services/firebaseAuthService';
 import { ModelSelector } from './ModelSelector';
 import './ChatInterface.css';
 
@@ -31,6 +33,9 @@ interface UploadedFile extends DocumentMetadata {
   error?: string;
   processedDocument?: ProcessedDocument;
   thumbnailUrl?: string;
+  fullImageUrl?: string;   // data URL — in-session lightbox (in-memory, not persisted)
+  storageUrl?: string;     // Firebase Storage download URL — cross-session lightbox (persisted to Firestore)
+  storagePath?: string;    // Firebase Storage path — used for cleanup on session delete
 }
 
 // this is the main chat interface - handles all user interaction
@@ -48,6 +53,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);  // current chat session
   const [, setSessions] = useState<ChatSession[]>([]);  // all chat sessions (for sidebar)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);  // files being uploaded/processed
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showFlashcardList, setShowFlashcardList] = useState(false);  // show flashcard list sidebar?
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
   const [typingText, setTypingText] = useState('');  // for typing animation effect
@@ -125,6 +131,14 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     return () => document.removeEventListener('click', handleCopyClick);
   }, []);
 
+
+  // Close lightbox on Escape
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxUrl]);
 
   // Typing animation effect
   useEffect(() => {
@@ -368,16 +382,30 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
       setUploadedFiles(prev => [...prev, uploadedFile]);
 
-      // Generate thumbnail early so it's visible during upload/processing
+      // Generate thumbnail + full-quality data URL early for immediate display
       let thumbnailUrl: string | undefined;
+      let fullImageUrl: string | undefined;
       if (file.type.startsWith('image/')) {
         try {
-          thumbnailUrl = await createThumbnail(file);
+          [thumbnailUrl, fullImageUrl] = await Promise.all([
+            createThumbnail(file),
+            readFileAsDataUrl(file),
+          ]);
           setUploadedFiles(prev => prev.map(f =>
-            f.id === uploadedFile.id ? { ...f, thumbnailUrl } : f
+            f.id === uploadedFile.id ? { ...f, thumbnailUrl, fullImageUrl } : f
           ));
+          // Upload compressed version to Firebase Storage in background (for cross-session persistence)
+          const userId = firebaseAuthService.getCurrentUser()?.id;
+          if (userId) {
+            compressImage(file)
+              .then(blob => firebaseService.uploadChatFile(userId, blob, file.name, 'image/jpeg'))
+              .then(({ url: storageUrl, path: storagePath }) => setUploadedFiles(prev => prev.map(f =>
+                f.id === uploadedFile.id ? { ...f, storageUrl, storagePath } : f
+              )))
+              .catch(() => { /* silent — data URL lightbox still works for current session */ });
+          }
         } catch {
-          // Thumbnail generation failed — continue without it
+          // continue without
         }
       }
 
@@ -399,7 +427,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
             : f
         ));
 
-        // Use documentProcessor directly to get full ProcessedDocument
         const processedDocument = await documentProcessor.processDocument(file);
 
         // Update with processed data
@@ -412,7 +439,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   processedDocument: processedDocument,
                   uploadStatus: 'completed' as const,
                   uploadProgress: 100,
-                  thumbnailUrl
+                  thumbnailUrl,
+                  fullImageUrl,
                 }
               : f
           );
@@ -459,10 +487,17 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
     const wasEmptySession = session.messages.length === 0;
 
-    // Collect image thumbnails from attached files
+    // Collect image thumbnails and URLs from attached files
     const imageUrls = uploadedFiles
       .filter(f => f.uploadStatus === 'completed' && f.thumbnailUrl)
       .map(f => f.thumbnailUrl!);
+    // Prefer Storage URL (persists across sessions); fall back to data URL (current session only)
+    const fullImageUrls = uploadedFiles
+      .filter(f => f.uploadStatus === 'completed' && (f.storageUrl ?? f.fullImageUrl))
+      .map(f => (f.storageUrl ?? f.fullImageUrl)!);
+    const storagePaths = uploadedFiles
+      .filter(f => f.uploadStatus === 'completed' && f.storagePath)
+      .map(f => f.storagePath!);
 
     // add user message to UI immediately so it feels responsive
     const userMessage: ChatMessage = {
@@ -470,7 +505,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
-      ...(imageUrls.length > 0 ? { imageUrls } : {})
+      ...(imageUrls.length > 0 ? { imageUrls } : {}),
+      ...(fullImageUrls.length > 0 ? { fullImageUrls } : {}),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -493,7 +529,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         documentIds: documents.map(doc => doc.id),
         currentTopic: 'general',
         processedDocuments: processedDocs,
-        ...(imageUrls.length > 0 ? { imageUrls } : {})
+        ...(imageUrls.length > 0 ? { imageUrls } : {}),
+        ...(fullImageUrls.length > 0 ? { fullImageUrls } : {}),
+        ...(storagePaths.length > 0 ? { storagePaths } : {}),
       };
       // send to chat service - it handles AI communication and returns the response
       const response = await chatService.sendMessage(content.trim(), context);
@@ -748,8 +786,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                           <img
                             key={i}
                             src={url}
-                            alt="Uploaded image thumbnail"
+                            alt="Uploaded image"
                             className="message-thumbnail"
+                            onClick={() => setLightboxUrl(message.fullImageUrls?.[i] ?? url)}
                           />
                         ))}
                       </div>
@@ -954,6 +993,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div className="lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+          <button className="lightbox-close" onClick={() => setLightboxUrl(null)}>✕</button>
+          <img
+            src={lightboxUrl}
+            alt="Full size image"
+            className="lightbox-image"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

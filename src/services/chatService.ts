@@ -140,7 +140,9 @@ class GeminiChatService implements ChatService {
       role: 'user',
       content: message,
       timestamp: new Date(),
-      ...(context.imageUrls && context.imageUrls.length > 0 ? { imageUrls: context.imageUrls } : {})
+      ...(context.imageUrls && context.imageUrls.length > 0 ? { imageUrls: context.imageUrls } : {}),
+      ...(context.fullImageUrls && context.fullImageUrls.length > 0 ? { fullImageUrls: context.fullImageUrls } : {}),
+      ...(context.storagePaths && context.storagePaths.length > 0 ? { storagePaths: context.storagePaths } : {}),
     };
 
     try {
