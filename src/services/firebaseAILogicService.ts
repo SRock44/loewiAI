@@ -701,13 +701,39 @@ Guidelines:
     }
   }
 
-  // Vision OCR - uses Llama 4 Scout to extract text from images
-  async extractTextFromImage(imageBase64: string, mimeType: string): Promise<string> {
+  // Vision analysis - uses Llama 4 Scout to fully analyze any type of image
+  async analyzeImage(imageBase64: string, mimeType: string): Promise<string> {
     if (!this.isAvailable()) {
       throw new Error('Groq is not available');
     }
 
     const visionModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+    const prompt = `You are an expert image analyst. Analyze this image thoroughly.
+
+First, identify which ONE of these types best describes it:
+- TEXT: Typed or printed text (document, article, book page)
+- HANDWRITING: Handwritten notes or annotations
+- MATH: Mathematical equations, formulas, or problem sets (typed or handwritten)
+- DIAGRAM: Flowchart, graph, chart, plot, or scientific figure
+- TABLE: Data table, spreadsheet, or structured grid data
+- SLIDE: Presentation slide or projected screen content
+- PHOTO: Real-world photograph, scene, or object
+- MIXED: Clear combination of two or more of the above
+
+Then extract everything useful based on what you found:
+- TEXT or HANDWRITING → Transcribe ALL text verbatim, preserving layout and structure.
+- MATH → Extract all equations; use LaTeX notation (e.g. $x^2 + y^2 = z^2$) where appropriate. Transcribe any surrounding text too.
+- DIAGRAM → Describe what it represents, extract all labels, axis titles, legend entries, and key data values. Explain the relationships or trends shown.
+- TABLE → Reproduce the full table in markdown format, preserving all rows, columns, and values.
+- SLIDE → Extract the title, all bullet points, and describe any figures, charts, or images on the slide.
+- PHOTO → Describe the scene in detail: objects present, any visible text, setting, and anything academically or contextually relevant.
+- MIXED → Handle each component using the appropriate method above, clearly separating each section.
+
+Respond in exactly this format:
+IMAGE TYPE: [type]
+CONTENT:
+[your full extraction or description]`;
 
     const completion = await this.groqClient!.chat.completions.create({
       model: visionModel,
@@ -717,7 +743,7 @@ Guidelines:
           content: [
             {
               type: 'text',
-              text: 'Extract ALL text from this image. Return only the extracted text, nothing else. If the image contains handwritten notes, do your best to transcribe them. If there is no text, describe the visual content briefly.'
+              text: prompt
             },
             {
               type: 'image_url',
@@ -1061,12 +1087,12 @@ export class FirebaseAILogicService {
     }
   }
 
-  // Extract text from an image using Groq's vision model (Llama 4 Scout)
-  async extractTextFromImage(imageBase64: string, mimeType: string): Promise<string> {
+  // Analyze an image using Groq's vision model (Llama 4 Scout)
+  async analyzeImage(imageBase64: string, mimeType: string): Promise<string> {
     if (this.groqProvider && this.groqProvider.isAvailable()) {
-      return this.groqProvider.extractTextFromImage(imageBase64, mimeType);
+      return this.groqProvider.analyzeImage(imageBase64, mimeType);
     }
-    throw new Error('Vision OCR requires Groq provider (Llama 4 Scout) but it is not available');
+    throw new Error('Image analysis requires Groq provider (Llama 4 Scout) but it is not available');
   }
 
   getCurrentProvider(): string {

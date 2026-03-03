@@ -226,8 +226,8 @@ export class DocumentProcessor {
       }
       const base64 = btoa(binary);
 
-      // use Groq's Llama 4 Scout vision model to extract text
-      const extractedText = await firebaseAILogicService.extractTextFromImage(base64, file.type);
+      // use Groq's Llama 4 Scout vision model to analyze the image
+      const extractedText = await firebaseAILogicService.analyzeImage(base64, file.type);
       return this.cleanText(extractedText);
     } catch (error) {
       console.error('❌ Image OCR extraction failed:', error);

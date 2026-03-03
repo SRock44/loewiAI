@@ -43,7 +43,7 @@ vi.mock('pptx-parser', () => ({
 // Mock firebaseAILogicService for image OCR
 vi.mock('../../src/services/firebaseAILogicService', () => ({
   firebaseAILogicService: {
-    extractTextFromImage: vi.fn().mockResolvedValue('OCR extracted text from image'),
+    analyzeImage: vi.fn().mockResolvedValue('IMAGE TYPE: TEXT\nCONTENT:\nOCR extracted text from image'),
     generateResponse: vi.fn(),
     getCurrentProvider: vi.fn().mockReturnValue('mock'),
     getAvailableProviders: vi.fn().mockReturnValue(['mock']),
@@ -309,7 +309,7 @@ describe('documentProcessor', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
       const { firebaseAILogicService } = await import('../../src/services/firebaseAILogicService')
-      vi.mocked(firebaseAILogicService.extractTextFromImage).mockRejectedValueOnce(new Error('OCR failed'))
+      vi.mocked(firebaseAILogicService.analyzeImage).mockRejectedValueOnce(new Error('OCR failed'))
 
       const file = createMockFile('broken.jpg', 'image/jpeg', 'fake-image-data')
       const result = await documentProcessor.processDocument(file)
