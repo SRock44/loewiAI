@@ -201,7 +201,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".pdf,.docx,.doc,.pptx,.ppt"
+        accept=".pdf,.docx,.doc,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.webp"
         onChange={handleFileInput}
         style={{ display: 'none' }}
       />

@@ -94,17 +94,28 @@ class GeminiChatService implements ChatService {
 
       // Subscribe to real-time updates for chat sessions
       const unsubscribe = firebaseService.subscribeToChatSessions(this.currentUserId, (sessions) => {
-        // Filter and sort sessions
-        const sortedSessions = sessions
+        // Build a set of IDs coming from Firestore
+        const firestoreIds = new Set(sessions.map(s => s.id));
+
+        // Preserve local-only sessions (created but not yet saved to Firestore)
+        const localOnlySessions: ChatSession[] = [];
+        for (const [id, session] of this.sessions) {
+          if (!firestoreIds.has(id)) {
+            localOnlySessions.push(session);
+          }
+        }
+
+        // Rebuild the map: Firestore sessions (filtered) + local-only sessions
+        const merged = new Map<string, ChatSession>();
+
+        sessions
           .filter(session => this.hasValidConversation(session))
-          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        
-        // Update local sessions
-        this.sessions = new Map();
-        sortedSessions.forEach(session => {
-          this.sessions.set(session.id, session);
-        });
-        
+          .forEach(session => merged.set(session.id, session));
+
+        localOnlySessions.forEach(session => merged.set(session.id, session));
+
+        this.sessions = merged;
+
         // Notify UI components of the update
         window.dispatchEvent(new CustomEvent('sessionUpdated'));
       });
@@ -128,7 +139,8 @@ class GeminiChatService implements ChatService {
       id: `msg_${Date.now()}_${++this.messageCounter}`,
       role: 'user',
       content: message,
-      timestamp: new Date()
+      timestamp: new Date(),
+      ...(context.imageUrls && context.imageUrls.length > 0 ? { imageUrls: context.imageUrls } : {})
     };
 
     try {
@@ -442,6 +454,30 @@ Would you like me to help you with anything else about the code, such as explain
       });
   }
 
+  // Add messages to an existing session (used by ChatInterface to persist upload messages)
+  addMessagesToSession(sessionId: string, messages: ChatMessage[]): void {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.messages.push(...messages);
+      session.updatedAt = new Date();
+    }
+  }
+
+  // Save a session to Firestore immediately (used after image uploads so thumbnails persist)
+  async saveSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    if (this.currentUserId) {
+      try {
+        await firebaseService.saveChatSession(session, this.currentUserId);
+        window.dispatchEvent(new CustomEvent('sessionUpdated'));
+      } catch (error) {
+        console.error('Failed to save session to Firebase:', error);
+      }
+    }
+  }
+
   // Check if a session has valid conversation content
   private hasValidConversation(session: ChatSession): boolean {
     if (!session.messages || session.messages.length === 0) {
@@ -624,7 +660,7 @@ Please provide the corrected version with the same formatting and structure, but
     // Build rich context from processed document content
     try {
     const documentSummaries = documentProcessor.getDocumentSummaries(processedDocuments);
-    const documentContent = documentProcessor.getDocumentContent(processedDocuments, 3000);
+    const documentContent = documentProcessor.getDocumentContent(processedDocuments, 6000);
 
       // Check if we actually got content
       if (!documentContent || documentContent.trim().length === 0) {

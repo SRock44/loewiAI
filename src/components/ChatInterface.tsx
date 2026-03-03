@@ -2,12 +2,13 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import { ChatMessage, ChatSession, ChatContext, QuickAction, QUICK_ACTIONS } from '../types/chat';
 import { chatService } from '../services/chatService';
 import { DocumentMetadata } from '../types/ai';
-import { validateFile, getFileIcon, formatFileSize } from '../utils/fileValidation';
+import { validateFile, formatFileSize } from '../utils/fileValidation';
+import { createThumbnail } from '../utils/imageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
-import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
+import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList, FileText, PresentationGraph } from '@solar-icons/react';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import { firebaseAILogicService, ModelPreference } from '../services/firebaseAILogicService';
 import { ModelSelector } from './ModelSelector';
@@ -29,6 +30,7 @@ interface UploadedFile extends DocumentMetadata {
   uploadStatus: 'uploading' | 'processing' | 'completed' | 'error';
   error?: string;
   processedDocument?: ProcessedDocument;
+  thumbnailUrl?: string;
 }
 
 // this is the main chat interface - handles all user interaction
@@ -336,12 +338,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
   const handleFiles = useCallback(async (files: FileList) => {
     const fileArray = Array.from(files);
-    
+
     for (const file of fileArray) {
       const validation = validateFile(file);
-      
+
       if (!validation.isValid) {
-        // Show error message to user
+        // Show error message to user (validation errors still shown in chat)
         const errorMessage: ChatMessage = {
           id: `error_${Date.now()}`,
           role: 'assistant',
@@ -366,67 +368,61 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
       setUploadedFiles(prev => [...prev, uploadedFile]);
 
-      // Show upload message
-      const uploadMessage: ChatMessage = {
-        id: `upload_${Date.now()}`,
-        role: 'user',
-        content: `📎 Uploading ${file.name}...`,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, uploadMessage]);
+      // Generate thumbnail early so it's visible during upload/processing
+      let thumbnailUrl: string | undefined;
+      if (file.type.startsWith('image/')) {
+        try {
+          thumbnailUrl = await createThumbnail(file);
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === uploadedFile.id ? { ...f, thumbnailUrl } : f
+          ));
+        } catch {
+          // Thumbnail generation failed — continue without it
+        }
+      }
 
       try {
         // Simulate upload progress
         for (let progress = 0; progress <= 100; progress += 10) {
           await new Promise(resolve => setTimeout(resolve, 50));
-          setUploadedFiles(prev => prev.map(f => 
-            f.id === uploadedFile.id 
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === uploadedFile.id
               ? { ...f, uploadProgress: progress }
               : f
           ));
         }
 
         // Process with document processor
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === uploadedFile.id 
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === uploadedFile.id
             ? { ...f, uploadStatus: 'processing' }
             : f
         ));
 
         // Use documentProcessor directly to get full ProcessedDocument
         const processedDocument = await documentProcessor.processDocument(file);
-        
-        // Store processed document data for use in chat context
-        
+
         // Update with processed data
         setUploadedFiles(prev => {
-          return prev.map(f => 
-            f.id === uploadedFile.id 
-              ? { 
-                  ...f, 
+          return prev.map(f =>
+            f.id === uploadedFile.id
+              ? {
+                  ...f,
                   ...processedDocument,
                   processedDocument: processedDocument,
                   uploadStatus: 'completed' as const,
-                  uploadProgress: 100
+                  uploadProgress: 100,
+                  thumbnailUrl
                 }
               : f
           );
         });
 
-        // Show success message
-        const successMessage: ChatMessage = {
-          id: `success_${Date.now()}`,
-          role: 'assistant',
-          content: `Successfully uploaded and processed "${file.name}". I can now help you with questions about this document.`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, successMessage]);
-
-      } catch (error) {
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === uploadedFile.id 
-            ? { 
-                ...f, 
+      } catch {
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === uploadedFile.id
+            ? {
+                ...f,
                 uploadStatus: 'error',
                 error: 'Failed to process document'
               }
@@ -463,12 +459,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
     const wasEmptySession = session.messages.length === 0;
 
+    // Collect image thumbnails from attached files
+    const imageUrls = uploadedFiles
+      .filter(f => f.uploadStatus === 'completed' && f.thumbnailUrl)
+      .map(f => f.thumbnailUrl!);
+
     // add user message to UI immediately so it feels responsive
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
       content: content.trim(),
-      timestamp: new Date()
+      timestamp: new Date(),
+      ...(imageUrls.length > 0 ? { imageUrls } : {})
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -488,7 +490,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         sessionId: session.id,
         documentIds: documents.map(doc => doc.id),
         currentTopic: 'general',
-        processedDocuments: processedDocs
+        processedDocuments: processedDocs,
+        ...(imageUrls.length > 0 ? { imageUrls } : {})
       };
       // send to chat service - it handles AI communication and returns the response
       const response = await chatService.sendMessage(content.trim(), context);
@@ -524,6 +527,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      // Clear attached files — they've been consumed by the message
+      setUploadedFiles([]);
     }
   };
 
@@ -640,6 +645,17 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   };
 
+  const renderFileTypeIcon = (fileType: string, size = 20) => {
+    if (fileType.startsWith('image/')) return null;
+    if (fileType.includes('presentation') || fileType.includes('powerpoint'))
+      return <PresentationGraph size={size} />;
+    if (fileType.includes('pdf'))
+      return <DocumentIcon size={size} />;
+    if (fileType.includes('word') || fileType.includes('document'))
+      return <FileText size={size} />;
+    return <FileText size={size} />;
+  };
+
   return (
     <div className="chat-interface">
       
@@ -730,6 +746,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                       setShowFlashcardList(true);
                     } : undefined}
                   >
+                    {message.imageUrls && message.imageUrls.length > 0 && (
+                      <div className="message-images">
+                        {message.imageUrls.map((url, i) => (
+                          <img
+                            key={i}
+                            src={url}
+                            alt="Uploaded image thumbnail"
+                            className="message-thumbnail"
+                          />
+                        ))}
+                      </div>
+                    )}
                     <div className="message-text">
                       <div
                         dangerouslySetInnerHTML={{
@@ -772,16 +800,16 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
         <form className="chat-input-form" onSubmit={handleSubmit}>
           {/* Attached Files Display */}
-          {uploadedFiles.filter(f => f.uploadStatus === 'completed').length > 0 && (
+          {uploadedFiles.filter(f => f.uploadStatus !== 'error').length > 0 && (
             <div className="attached-files">
               <div className="attached-files-header">
                 <span className="attached-files-title">
                   <Paperclip size={14} style={{ marginRight: '6px' }} />
                   Attached Files
                 </span>
-                <button 
+                <button
                   className="clear-files-btn"
-                  onClick={() => setUploadedFiles(prev => prev.filter(f => f.uploadStatus !== 'completed'))}
+                  onClick={() => setUploadedFiles([])}
                   title="Remove all attached files"
                 >
                   ✕
@@ -789,15 +817,28 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               </div>
               <div className="attached-files-list">
                 {uploadedFiles
-                  .filter(f => f.uploadStatus === 'completed')
+                  .filter(f => f.uploadStatus !== 'error')
                   .map((file) => (
                     <div key={file.id} className="attached-file-item">
-                      <div className="file-icon">{getFileIcon(file.fileType)}</div>
+                      <div className="attached-file-thumbnail-wrapper">
+                        {file.thumbnailUrl ? (
+                          <img src={file.thumbnailUrl} alt={file.fileName} className={`attached-file-thumbnail${file.uploadStatus !== 'completed' ? ' loading' : ''}`} />
+                        ) : (
+                          <div className={`attached-file-icon-box${file.uploadStatus !== 'completed' ? ' loading' : ''}`}>
+                            {renderFileTypeIcon(file.fileType)}
+                          </div>
+                        )}
+                        {file.uploadStatus !== 'completed' && (
+                          <div className="attached-file-spinner-overlay">
+                            <div className="thumbnail-spinner"></div>
+                          </div>
+                        )}
+                      </div>
                       <div className="file-info">
                         <span className="file-name" title={file.fileName}>{file.fileName}</span>
                         <span className="file-size">{formatFileSize(file.fileSize)}</span>
                       </div>
-                      <button 
+                      <button
                         className="remove-file-btn"
                         onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))}
                         title="Remove file"
@@ -883,7 +924,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.docx,.doc,.pptx,.ppt"
+              accept=".pdf,.docx,.doc,.pptx,.ppt,.jpg,.jpeg,.png,.gif,.webp"
               onChange={(e) => {
                 if (e.target.files) {
                   handleFiles(e.target.files);
@@ -892,40 +933,6 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
               style={{ display: 'none' }}
             />
           </div>
-          
-          {/* Uploaded Files Preview */}
-          {uploadedFiles.filter(f => f.uploadStatus !== 'completed').length > 0 && (
-            <div className="upload-preview">
-              {uploadedFiles
-                .filter(file => file.uploadStatus !== 'completed')
-                .map((file) => (
-                <div key={file.id} className={`upload-item ${file.uploadStatus}`}>
-                  <div className="upload-icon">{getFileIcon(file.fileType)}</div>
-                  <div className="upload-info">
-                    <span className="upload-name">{file.fileName}</span>
-                    <div className="upload-progress">
-                      <div className="progress-bar">
-                        <div 
-                          className="progress-fill" 
-                          style={{ width: `${file.uploadProgress}%` }}
-                        ></div>
-                      </div>
-                      <span className="progress-text">{file.uploadProgress}%</span>
-                    </div>
-                  </div>
-                  <button 
-                    className="remove-upload-btn"
-                    onClick={() => {
-                      setUploadedFiles(prev => prev.filter(f => f.id !== file.id));
-                    }}
-                    title="Remove file"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
           
           <div className="input-hint">
             Press Enter to send, Shift+Enter for new line • Drag & drop files or click <Paperclip size={12} style={{ display: 'inline', margin: '0 2px' }} /> to attach

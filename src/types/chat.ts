@@ -20,6 +20,7 @@ export interface ChatMessage {
   isTyping?: boolean;
   flashcardSet?: FlashcardSet; // FlashcardSet generated from this message
   validationResults?: CodeValidationResult[]; // CodeValidationResult[] from code validation
+  imageUrls?: string[]; // base64 data URLs of image thumbnails
 }
 
 export interface ChatSession {
@@ -37,6 +38,7 @@ export interface ChatContext {
   documentIds: string[];
   currentTopic?: string;
   processedDocuments?: ProcessedDocument[]; // Processed documents in this chat context
+  imageUrls?: string[]; // Thumbnail data URLs to attach to the persisted user message
   userPreferences?: {
     responseStyle: 'concise' | 'detailed' | 'conversational';
     expertiseLevel: 'beginner' | 'intermediate' | 'advanced';

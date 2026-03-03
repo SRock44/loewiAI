@@ -701,6 +701,40 @@ Guidelines:
     }
   }
 
+  // Vision OCR - uses Llama 4 Scout to extract text from images
+  async extractTextFromImage(imageBase64: string, mimeType: string): Promise<string> {
+    if (!this.isAvailable()) {
+      throw new Error('Groq is not available');
+    }
+
+    const visionModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+    const completion = await this.groqClient!.chat.completions.create({
+      model: visionModel,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extract ALL text from this image. Return only the extracted text, nothing else. If the image contains handwritten notes, do your best to transcribe them. If there is no text, describe the visual content briefly.'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 4096
+    });
+
+    return completion.choices[0]?.message?.content || '';
+  }
+
   async generateFlashcards(_prompt: string): Promise<AIResponse> {
     if (!this.isAvailable()) {
       throw new Error('Groq is not available');
@@ -1025,6 +1059,14 @@ export class FirebaseAILogicService {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`All Firebase AI Logic providers failed. Last error: ${errorMessage}`);
     }
+  }
+
+  // Extract text from an image using Groq's vision model (Llama 4 Scout)
+  async extractTextFromImage(imageBase64: string, mimeType: string): Promise<string> {
+    if (this.groqProvider && this.groqProvider.isAvailable()) {
+      return this.groqProvider.extractTextFromImage(imageBase64, mimeType);
+    }
+    throw new Error('Vision OCR requires Groq provider (Llama 4 Scout) but it is not available');
   }
 
   getCurrentProvider(): string {

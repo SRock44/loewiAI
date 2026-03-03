@@ -6,6 +6,7 @@ import { DocumentMetadata } from '../types/ai';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { PPTXParser } from 'pptx-parser';
+import { firebaseAILogicService } from './firebaseAILogicService';
 
 // configure pdf.js worker - this is needed for pdf processing
 // the worker runs in a separate thread so it doesn't block the main ui
@@ -44,14 +45,15 @@ export class DocumentProcessor {
         extractedContent = await this.extractFromWord(file);
       } else if (file.name.toLowerCase().endsWith('.pptx') || file.name.toLowerCase().endsWith('.ppt')) {
         extractedContent = await this.extractFromPowerPoint(file);
+      } else if (this.isImageFile(file)) {
+        extractedContent = await this.extractFromImage(file);
       } else {
         // fallback for unknown types - just try to read as text
         extractedContent = await this.extractAsText(file);
       }
 
-      // if extraction failed or we got almost nothing, generate a fallback based on filename
-      // this way the user can still use the document even if extraction didn't work
-      if (!extractedContent || extractedContent.trim().length < 50) {
+      // if extraction returned nothing meaningful, fall back to filename-based template
+      if (!extractedContent || extractedContent.trim().length < 10) {
         extractedContent = this.generateIntelligentFallback(file.name);
       }
 
@@ -119,13 +121,7 @@ export class DocumentProcessor {
         }
       }
       
-      const cleanedText = this.cleanText(fullText);
-      
-      if (cleanedText && cleanedText.length > 50) {
-        return cleanedText;
-      } else {
-        return '';
-      }
+      return this.cleanText(fullText);
     } catch (error) {
       console.error('❌ PDF extraction failed:', error);
       return '';
@@ -138,23 +134,13 @@ export class DocumentProcessor {
       if (file.name.toLowerCase().endsWith('.docx')) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
-        
-        if (result.value && result.value.length > 50) {
-          return this.cleanText(result.value);
-        } else {
-          return '';
-        }
+        return this.cleanText(result.value || '');
       } else if (file.name.toLowerCase().endsWith('.doc')) {
         // For older DOC files, try reading as text (limited success)
         const textContent = await this.readFileAsText(file);
-        
-        if (textContent && textContent.length > 50) {
-          return this.cleanText(textContent);
-        }
-        
-        return '';
+        return this.cleanText(textContent);
       }
-      
+
       return '';
     } catch (error) {
       console.error('❌ Word extraction failed:', error);
@@ -201,24 +187,13 @@ export class DocumentProcessor {
           }
         }
         
-        const cleanedText = this.cleanText(fullText);
-        
-        if (cleanedText && cleanedText.length > 50) {
-          return cleanedText;
-        } else {
-          return '';
-        }
+        return this.cleanText(fullText);
       } else if (file.name.toLowerCase().endsWith('.ppt')) {
         // For older PPT files, try reading as text (limited success)
         const textContent = await this.readFileAsText(file);
-        
-        if (textContent && textContent.length > 50) {
-          return this.cleanText(textContent);
-        }
-        
-        return '';
+        return this.cleanText(textContent);
       }
-      
+
       return '';
     } catch (error) {
       console.error('❌ PowerPoint extraction failed:', error);
@@ -232,6 +207,30 @@ export class DocumentProcessor {
       return this.cleanText(textContent);
     } catch (error) {
       console.error('❌ Text extraction failed:', error);
+      return '';
+    }
+  }
+
+  private isImageFile(file: File): boolean {
+    return file.type.startsWith('image/');
+  }
+
+  private async extractFromImage(file: File): Promise<string> {
+    try {
+      // convert image to base64 for the vision API
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
+      // use Groq's Llama 4 Scout vision model to extract text
+      const extractedText = await firebaseAILogicService.extractTextFromImage(base64, file.type);
+      return this.cleanText(extractedText);
+    } catch (error) {
+      console.error('❌ Image OCR extraction failed:', error);
       return '';
     }
   }
@@ -262,11 +261,12 @@ export class DocumentProcessor {
 
   private generateIntelligentFallback(fileName: string): string {
     const fileNameLower = fileName.toLowerCase();
-    
+    const notice = `[NOTE: The text content of this document could not be extracted. The information below is a generic template based on the filename "${fileName}". Ask the user to describe the document contents for accurate help.]\n\n`;
+
     // Check for homework assignments
     if (fileNameLower.includes('homework') || fileNameLower.includes('hw') || fileNameLower.includes('assignment')) {
       if (fileNameLower.includes('statistics') || fileNameLower.includes('stats') || fileNameLower.includes('prob')) {
-        return `STATISTICS HOMEWORK ASSIGNMENT
+        return notice + `STATISTICS HOMEWORK ASSIGNMENT
 Course: Statistics and Probability
 Assignment: ${fileName.replace(/\.(pdf|docx?|pptx?)$/i, '')}
 
@@ -302,7 +302,7 @@ GRADING CRITERIA:
 Please describe the specific problems or concepts you need help with, and I'll provide detailed explanations and step-by-step guidance.`;
       }
       
-      return `HOMEWORK ASSIGNMENT
+      return notice + `HOMEWORK ASSIGNMENT
 Course: [Course to be determined]
 Assignment: ${fileName.replace(/\.(pdf|docx?|pptx?)$/i, '')}
 
@@ -336,7 +336,7 @@ Please describe the specific problems or concepts you need help with, and I'll p
     
     // Check for syllabi
     if (fileNameLower.includes('syllabus')) {
-      return `COURSE SYLLABUS
+      return notice + `COURSE SYLLABUS
 Document: ${fileName.replace(/\.(pdf|docx?|pptx?)$/i, '')}
 
 This is a course syllabus document containing important course information and policies. While the specific content could not be extracted, this typically includes comprehensive course details.
@@ -366,7 +366,7 @@ Please ask specific questions about course requirements, assignments, policies, 
     
     // Check for exams
     if (fileNameLower.includes('exam') || fileNameLower.includes('test') || fileNameLower.includes('quiz')) {
-      return `EXAM/ASSESSMENT DOCUMENT
+      return notice + `EXAM/ASSESSMENT DOCUMENT
 Document: ${fileName.replace(/\.(pdf|docx?|pptx?)$/i, '')}
 
 This is an exam, test, or quiz document containing assessment questions and instructions. While the specific content could not be extracted, this typically includes evaluation materials.
@@ -399,7 +399,7 @@ Please describe the specific topics or question types you need help with, and I'
     
     // Check for lecture notes
     if (fileNameLower.includes('notes') || fileNameLower.includes('lecture')) {
-      return `LECTURE NOTES/COURSE MATERIAL
+      return notice + `LECTURE NOTES/COURSE MATERIAL
 Document: ${fileName.replace(/\.(pdf|docx?|pptx?)$/i, '')}
 
 This document contains lecture notes or course material with important concepts and information. While the specific content could not be extracted, this typically includes key course topics.
@@ -431,7 +431,7 @@ Please ask specific questions about the topics covered, and I'll provide detaile
     }
     
     // Generic academic document
-    return `ACADEMIC DOCUMENT
+    return notice + `ACADEMIC DOCUMENT
 Document: ${fileName.replace(/\.(pdf|docx?|pptx?)$/i, '')}
 
 This document has been uploaded successfully. While the specific content could not be extracted, I can still help you with academic questions and provide comprehensive guidance.
