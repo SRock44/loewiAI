@@ -29,9 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check source branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [ "${{ github.head_ref }}" != "dev" ]; then
-            echo "::error::PRs to main must come from the dev branch. Source branch: ${{ github.head_ref }}"
+          if [ "$HEAD_REF" != "dev" ]; then
+            echo "::error::PRs to main must come from the dev branch. Source branch: $HEAD_REF"
             exit 1
           fi
           echo "Source branch is dev — OK"
