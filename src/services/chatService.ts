@@ -1,7 +1,7 @@
 import { ChatMessage, ChatSession, ChatContext, ChatService } from '../types/chat';
 import { firebaseAuthService } from './firebaseAuthService';
 import { firebaseAILogicService, AIResponse } from './firebaseAILogicService';
-import { documentProcessor } from './documentProcessor';
+import { documentProcessor, ProcessedDocument } from './documentProcessor';
 import { flashcardService } from './flashcardService';
 import { FlashcardGenerationRequest } from '../types/flashcard';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
@@ -613,7 +613,7 @@ Please provide the corrected version with the same formatting and structure, but
     return context;
   }
 
-  private buildDocumentContext(documentIds: string[], processedDocuments?: any[]): string {
+  private buildDocumentContext(documentIds: string[], processedDocuments?: ProcessedDocument[]): string {
     if (documentIds.length === 0) return '';
 
     // Use processed documents if available, otherwise fallback to basic context

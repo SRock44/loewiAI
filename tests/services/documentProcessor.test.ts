@@ -47,7 +47,7 @@ describe('documentProcessor', () => {
     const file = new File([content], name, { type })
     // Mock arrayBuffer method
     if (!file.arrayBuffer) {
-      (file as any).arrayBuffer = async () => {
+      (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = async () => {
         return buffer
       }
     }
@@ -77,7 +77,7 @@ describe('documentProcessor', () => {
         promise: Promise.resolve(mockPdf),
       }
 
-      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as any)
+      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as ReturnType<typeof pdfjsLib.getDocument>)
 
       const file = createMockFile('empty.pdf', 'application/pdf', '')
       const result = await documentProcessor.processDocument(file)
@@ -93,7 +93,7 @@ describe('documentProcessor', () => {
       
       vi.mocked(pdfjsLib.getDocument).mockReturnValue({
         promise: Promise.reject(new Error('PDF parsing failed')),
-      } as any)
+      } as ReturnType<typeof pdfjsLib.getDocument>)
 
       const file = createMockFile('corrupted.pdf', 'application/pdf', 'corrupted')
       const result = await documentProcessor.processDocument(file)
@@ -146,7 +146,7 @@ describe('documentProcessor', () => {
         slides: [],
       }
 
-      vi.mocked(PPTXParser).mockImplementation(() => mockParser as any)
+      vi.mocked(PPTXParser).mockImplementation(() => mockParser as unknown as PPTXParser)
 
       const file = createMockFile('corrupted.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'corrupted')
       const result = await documentProcessor.processDocument(file)
@@ -214,7 +214,7 @@ describe('documentProcessor', () => {
         promise: Promise.resolve(mockPdf),
       }
 
-      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as any)
+      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as ReturnType<typeof pdfjsLib.getDocument>)
 
       const file = createMockFile('long.pdf', 'application/pdf', longText)
       const result = await documentProcessor.processDocument(file)
@@ -241,7 +241,7 @@ describe('documentProcessor', () => {
         promise: Promise.resolve(mockPdf),
       }
 
-      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as any)
+      vi.mocked(pdfjsLib.getDocument).mockReturnValue(mockLoadingTask as ReturnType<typeof pdfjsLib.getDocument>)
 
       const file = createMockFile('messy.pdf', 'application/pdf', 'messy content')
       const result = await documentProcessor.processDocument(file)

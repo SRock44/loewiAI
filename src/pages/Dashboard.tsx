@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ChatInterface, { ChatInterfaceRef } from '../components/ChatInterface';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { DocumentMetadata } from '../types/ai';
+import { ChatSession } from '../types/chat';
 import './Dashboard.css';
 
 // this interface lets the parent App component call methods on Dashboard
@@ -13,7 +14,7 @@ export interface DashboardRef {
 }
 
 interface DashboardProps {
-  onNewSessionCreated?: (session: any) => void;
+  onNewSessionCreated?: (session: ChatSession) => void;
 }
 
 const Dashboard = forwardRef<DashboardRef, DashboardProps>(({ onNewSessionCreated }, ref) => {

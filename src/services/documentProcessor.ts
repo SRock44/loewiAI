@@ -110,7 +110,7 @@ export class DocumentProcessor {
           
           // Combine text items from the page
           const pageText = textContent.items
-            .map((item: any) => item.str)
+            .map((item) => ('str' in item ? item.str : ''))
             .join(' ');
           
           fullText += pageText + '\n';
@@ -183,9 +183,9 @@ export class DocumentProcessor {
           // Extract text from slide content
           if (slide.content && slide.content.length > 0) {
             const slideText = slide.content
-              .map((item: any) => {
+              .map((item: { type?: string; text?: string } | string) => {
                 // Handle different content types
-                if (item.type === 'text' && item.text) {
+                if (typeof item === 'object' && item.type === 'text' && item.text) {
                   return item.text;
                 } else if (typeof item === 'string') {
                   return item;

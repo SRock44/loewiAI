@@ -56,7 +56,7 @@ class ApiService {
   }
 
   // Get document status
-  async getDocumentStatus(documentId: string): Promise<ApiResponse<any>> {
+  async getDocumentStatus(documentId: string): Promise<ApiResponse<unknown>> {
     try {
       const response = await fetch(`${this.baseUrl}/documents/${documentId}/status`, {
         headers: {
@@ -83,7 +83,7 @@ class ApiService {
   }
 
   // AI analysis endpoint
-  async analyzeDocument(documentId: string): Promise<ApiResponse<any>> {
+  async analyzeDocument(documentId: string): Promise<ApiResponse<unknown>> {
     try {
       const response = await fetch(`${this.baseUrl}/documents/${documentId}/analyze`, {
         method: 'POST',
@@ -112,7 +112,7 @@ class ApiService {
   }
 
   // Query document endpoint
-  async queryDocument(documentId: string, question: string): Promise<ApiResponse<any>> {
+  async queryDocument(documentId: string, question: string): Promise<ApiResponse<unknown>> {
     try {
       const response = await fetch(`${this.baseUrl}/documents/${documentId}/query`, {
         method: 'POST',
@@ -142,7 +142,7 @@ class ApiService {
   }
 
   // Get user's documents
-  async getUserDocuments(): Promise<ApiResponse<any[]>> {
+  async getUserDocuments(): Promise<ApiResponse<unknown[]>> {
     try {
       const response = await fetch(`${this.baseUrl}/documents`, {
         headers: {

@@ -82,7 +82,7 @@ export class DatabaseCleanupService {
         const messages = sessionData.messages || [];
         
         // Check if session is empty (no messages or only empty messages)
-        const hasValidMessages = messages.some((msg: any) => 
+        const hasValidMessages = messages.some((msg: { content?: string }) =>
           msg.content && msg.content.trim().length > 0
         );
 
@@ -194,7 +194,7 @@ export class DatabaseCleanupService {
         const sessionData = sessionDoc.data();
         const messages = sessionData.messages || [];
         
-        const hasValidMessages = messages.some((msg: any) => 
+        const hasValidMessages = messages.some((msg: { content?: string }) =>
           msg.content && msg.content.trim().length > 0
         );
 
@@ -262,7 +262,7 @@ export class DatabaseCleanupService {
         const messages = sessionData.messages || [];
         
         // Check if session is empty
-        const hasValidMessages = messages.some((msg: any) => 
+        const hasValidMessages = messages.some((msg: { content?: string }) =>
           msg.content && msg.content.trim().length > 0
         );
 

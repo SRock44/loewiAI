@@ -2,6 +2,7 @@ import { useRef, useState, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from './components/Layout'
+import { ChatSession } from './types/chat'
 import './App.css'
 
 // lazy load components for better performance - these only load when needed
@@ -27,7 +28,7 @@ function App() {
   };
 
   // callback when a new chat session gets created - we track it so sidebar can highlight it
-  const handleNewSessionCreated = (session: any) => {
+  const handleNewSessionCreated = (session: ChatSession) => {
     setCurrentChatId(session.id);
   };
 

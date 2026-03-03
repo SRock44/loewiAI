@@ -2,6 +2,15 @@ import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/g
 import Groq from 'groq-sdk';
 import { UserProfileService } from './userProfileService';
 
+interface AIServiceError {
+  status?: number;
+  code?: string | number;
+  statusCode?: number;
+  message?: string;
+  body?: unknown;
+  response?: { data?: unknown };
+}
+
 export interface AIResponse {
   content: string;
   model: string;
@@ -174,9 +183,10 @@ class FirebaseAILogicProvider implements AIProvider {
           model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as AIServiceError;
         // Check for fallback-worthy error codes (400, 403, 404, 429, 500, 503, 504)
-        const errorCode = error?.status || error?.code || error?.statusCode;
+        const errorCode = Number(err?.status || err?.code || err?.statusCode);
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Check if this is a fallback-worthy error (rate limit, quota, server errors)
@@ -299,9 +309,10 @@ class FirebaseAILogicProvider implements AIProvider {
           model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as AIServiceError;
         // Check for fallback-worthy error codes (429, 403, 500, 503)
-        const errorCode = error?.status || error?.code || error?.statusCode;
+        const errorCode = Number(err?.status || err?.code || err?.statusCode);
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Check if this is a fallback-worthy error (rate limit, quota, server errors)
@@ -654,7 +665,7 @@ Guidelines:
           temperature: 0.7,
           max_tokens: 2048
         });
-      } catch (modelError: any) {
+      } catch (modelError: unknown) {
         // If model not found, log error and rethrow
         console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
         throw modelError;
@@ -676,14 +687,15 @@ Guidelines:
           total_tokens: completion.usage.total_tokens || 0
         } : undefined
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = error?.response?.data || error?.body || error?.message || error;
+      const errorDetails = err?.response?.data || err?.body || err?.message || error;
       console.error('Groq API error:', {
         message: errorMessage,
         details: errorDetails,
         model: this.modelName,
-        status: error?.status || error?.statusCode
+        status: err?.status || err?.statusCode
       });
       throw new Error(`Groq error: ${errorMessage}`);
     }
@@ -719,7 +731,7 @@ Guidelines:
           temperature: 0.5,
           max_tokens: 8192 // Higher token limit for flashcard generation
         });
-      } catch (modelError: any) {
+      } catch (modelError: unknown) {
         // If model not found, log error and rethrow
         console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
         throw modelError;
@@ -741,14 +753,15 @@ Guidelines:
           total_tokens: completion.usage.total_tokens || 0
         } : undefined
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = error?.response?.data || error?.body || error?.message || error;
+      const errorDetails = err?.response?.data || err?.body || err?.message || error;
       console.error('Groq flashcard API error:', {
         message: errorMessage,
         details: errorDetails,
         model: this.modelName,
-        status: error?.status || error?.statusCode
+        status: err?.status || err?.statusCode
       });
       throw new Error(`Groq flashcard error: ${errorMessage}`);
     }

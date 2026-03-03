@@ -19,25 +19,36 @@ import { ChatSession, ChatMessage } from '../types/chat';
 import { FlashcardSet, Flashcard } from '../types/flashcard';
 import { User } from '../types/auth';
 
+// Firestore returns Timestamp objects that have a toDate() method.
+// This type represents fields that may be either a Timestamp or a Date.
+interface FirestoreTimestamp {
+  toDate: () => Date;
+}
+
+type FirestoreField = string | number | boolean | null | undefined | Date | FirestoreTimestamp | FirestoreData | FirestoreField[];
+interface FirestoreData {
+  [key: string]: FirestoreField;
+}
+
 export class FirebaseService {
   // Utility method to deep clean objects and remove undefined values
-  private deepCleanObject(obj: any): any {
+  private deepCleanObject<T>(obj: T): T {
     if (obj === null || obj === undefined) {
       return obj;
     }
-    
+
     if (Array.isArray(obj)) {
-      return obj.map(item => this.deepCleanObject(item)).filter(item => item !== undefined);
+      return obj.map(item => this.deepCleanObject(item)).filter(item => item !== undefined) as T;
     }
-    
-    if (typeof obj === 'object' && obj.constructor === Object) {
-      const cleaned: any = {};
-      for (const [key, value] of Object.entries(obj)) {
+
+    if (typeof obj === 'object' && (obj as object).constructor === Object) {
+      const cleaned: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
         if (value !== undefined) {
           cleaned[key] = this.deepCleanObject(value);
         }
       }
-      return cleaned;
+      return cleaned as T;
     }
     
     return obj;
@@ -68,8 +79,8 @@ export class FirebaseService {
 
       // Do not persist a nested `id` field; Firestore doc ID is the canonical ID.
       // Also strip undefined values to avoid Firestore errors.
-      const rest: any = { ...(session as any) };
-      delete rest.id;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _sessionId, ...rest } = session as ChatSession & Record<string, unknown>;
       const cleanSession = this.deepCleanObject(rest);
 
       const toSave: Record<string, unknown> = {
@@ -102,14 +113,14 @@ export class FirebaseService {
       
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => {
-        const data = doc.data();
+        const data = doc.data() as FirestoreData;
         // Ignore any stored local `id` field in the document; doc.id is source of truth.
-        const dataWithoutId: any = { ...(data as any) };
-        delete dataWithoutId.id;
-        const messages = Array.isArray((data as any).messages)
-          ? ((data as any).messages as any[]).map((m) => ({
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _docId, ...dataWithoutId } = data;
+        const messages = Array.isArray(data.messages)
+          ? (data.messages as FirestoreData[]).map((m) => ({
               ...m,
-              timestamp: m?.timestamp?.toDate ? m.timestamp.toDate() : m?.timestamp
+              timestamp: (m?.timestamp as FirestoreTimestamp)?.toDate ? (m.timestamp as FirestoreTimestamp).toDate() : m?.timestamp
             }))
           : [];
         return {
@@ -117,9 +128,9 @@ export class FirebaseService {
           ...dataWithoutId,
           messages,
           // Convert Firestore Timestamps to Date objects
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
-          lastActivityAt: data.lastActivityAt?.toDate ? data.lastActivityAt.toDate() : data.lastActivityAt
+          createdAt: (data.createdAt as FirestoreTimestamp)?.toDate ? (data.createdAt as FirestoreTimestamp).toDate() : data.createdAt,
+          updatedAt: (data.updatedAt as FirestoreTimestamp)?.toDate ? (data.updatedAt as FirestoreTimestamp).toDate() : data.updatedAt,
+          lastActivityAt: (data.lastActivityAt as FirestoreTimestamp)?.toDate ? (data.lastActivityAt as FirestoreTimestamp).toDate() : data.lastActivityAt
         } as ChatSession;
       });
     } catch (error) {
@@ -202,22 +213,22 @@ export class FirebaseService {
     
     return onSnapshot(q, (snapshot) => {
       const sessions = snapshot.docs.map(docSnap => {
-        const data = docSnap.data() as any;
-        const dataWithoutId: any = { ...(data as any) };
-        delete dataWithoutId.id;
+        const data = docSnap.data() as FirestoreData;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _docId, ...dataWithoutId } = data;
         const messages = Array.isArray(data.messages)
-          ? (data.messages as any[]).map((m) => ({
+          ? (data.messages as FirestoreData[]).map((m) => ({
               ...m,
-              timestamp: m?.timestamp?.toDate ? m.timestamp.toDate() : m?.timestamp
+              timestamp: (m?.timestamp as FirestoreTimestamp)?.toDate ? (m.timestamp as FirestoreTimestamp).toDate() : m?.timestamp
             }))
           : [];
         return {
           id: docSnap.id,
           ...dataWithoutId,
           messages,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
-          lastActivityAt: data.lastActivityAt?.toDate ? data.lastActivityAt.toDate() : data.lastActivityAt
+          createdAt: (data.createdAt as FirestoreTimestamp)?.toDate ? (data.createdAt as FirestoreTimestamp).toDate() : data.createdAt,
+          updatedAt: (data.updatedAt as FirestoreTimestamp)?.toDate ? (data.updatedAt as FirestoreTimestamp).toDate() : data.updatedAt,
+          lastActivityAt: (data.lastActivityAt as FirestoreTimestamp)?.toDate ? (data.lastActivityAt as FirestoreTimestamp).toDate() : data.lastActivityAt
         } as ChatSession;
       });
       callback(sessions);
@@ -381,11 +392,11 @@ export class FirebaseService {
       
       const flashcardSets = snapshot.docs
         .map(doc => {
-          const data = doc.data();
+          const data = doc.data() as FirestoreData;
           if (!data) {
             return null;
           }
-          
+
           // Always use the Firebase document ID, ignore any stored local ID
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { id: _storedId, ...dataWithoutId } = data;
@@ -393,10 +404,10 @@ export class FirebaseService {
             id: doc.id, // Always use the Firebase document ID
             ...dataWithoutId,
             // Convert Firestore Timestamps to Date objects
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
-            lastActivityAt: data.lastActivityAt?.toDate ? data.lastActivityAt.toDate() : data.lastActivityAt,
-            expiresAt: data.expiresAt?.toDate ? data.expiresAt.toDate() : data.expiresAt
+            createdAt: (data.createdAt as FirestoreTimestamp)?.toDate ? (data.createdAt as FirestoreTimestamp).toDate() : data.createdAt,
+            updatedAt: (data.updatedAt as FirestoreTimestamp)?.toDate ? (data.updatedAt as FirestoreTimestamp).toDate() : data.updatedAt,
+            lastActivityAt: (data.lastActivityAt as FirestoreTimestamp)?.toDate ? (data.lastActivityAt as FirestoreTimestamp).toDate() : data.lastActivityAt,
+            expiresAt: (data.expiresAt as FirestoreTimestamp)?.toDate ? (data.expiresAt as FirestoreTimestamp).toDate() : data.expiresAt
           } as FlashcardSet;
           
           // Loaded flashcard set from Firebase
@@ -488,7 +499,7 @@ export class FirebaseService {
       // Group by user
       const userSessions = new Map<string, (ChatSession & { id: string; userId: string })[]>();
       sessions.forEach(session => {
-        const userId = (session as any).userId;
+        const userId = (session as ChatSession & { userId: string }).userId;
         if (!userSessions.has(userId)) {
           userSessions.set(userId, []);
         }
@@ -517,8 +528,8 @@ export class FirebaseService {
           if (group.length > 1) {
             // Sort by createdAt, keep newest
             group.sort((a, b) => {
-              const aTime = (a.createdAt as any)?.toDate?.() || a.createdAt || new Date(0);
-              const bTime = (b.createdAt as any)?.toDate?.() || b.createdAt || new Date(0);
+              const aTime = (a.createdAt as unknown as { toDate?: () => Date })?.toDate?.() || a.createdAt || new Date(0);
+              const bTime = (b.createdAt as unknown as { toDate?: () => Date })?.toDate?.() || b.createdAt || new Date(0);
               return new Date(bTime).getTime() - new Date(aTime).getTime();
             });
             
@@ -699,8 +710,8 @@ export class FirebaseService {
         if (group.length > 1) {
           // Sort by createdAt, keep the newest
           group.sort((a, b) => {
-            const aTime = (a.createdAt as any)?.toDate?.() || a.createdAt || new Date(0);
-            const bTime = (b.createdAt as any)?.toDate?.() || b.createdAt || new Date(0);
+            const aTime = (a.createdAt as unknown as { toDate?: () => Date })?.toDate?.() || a.createdAt || new Date(0);
+            const bTime = (b.createdAt as unknown as { toDate?: () => Date })?.toDate?.() || b.createdAt || new Date(0);
             return new Date(bTime).getTime() - new Date(aTime).getTime();
           });
           // Mark all but the first (newest) for deletion
@@ -848,9 +859,9 @@ export class FirebaseService {
         major: settings.major,
         updatedAt: serverTimestamp()
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If user doesn't exist, create them with settings
-      if (error.code === 'not-found') {
+      if ((error as { code?: string }).code === 'not-found') {
         await setDoc(doc(db, 'users', userId), {
           id: userId,
           educationLevel: settings.educationLevel,
