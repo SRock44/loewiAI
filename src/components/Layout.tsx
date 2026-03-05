@@ -5,6 +5,7 @@ import { Home, ChatSquare, AddSquare, Card, Document as DocumentIcon } from '@so
 import { useAllFlashcards } from '../hooks/useAllFlashcards';
 import { chatService } from '../services/chatService';
 import { ChatSession } from '../types/chat';
+import { Flashcard, FlashcardSet } from '../types/flashcard';
 import './Layout.css';
 
 // Lazy load heavy components
@@ -14,7 +15,7 @@ const FlashcardList = lazy(() => import('./FlashcardList'));
 // Remove the custom ChatHistoryItem interface - we'll use ChatSession directly
 
 // Topic detection utility function
-const detectTopicFromFlashcards = (flashcards: any[]): string => {
+const detectTopicFromFlashcards = (flashcards: Flashcard[]): string => {
   if (!flashcards || flashcards.length === 0) {
     return 'General';
   }
@@ -123,9 +124,9 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   const [showSettings, setShowSettings] = useState(false);
   const [showFlashcardList, setShowFlashcardList] = useState(false);
   const [showIndividualFlashcard, setShowIndividualFlashcard] = useState(false);
-  const [currentFlashcardSet, setCurrentFlashcardSet] = useState<any>(null);
+  const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [flashcardToDelete, setFlashcardToDelete] = useState<any>(null);
+  const [flashcardToDelete, setFlashcardToDelete] = useState<FlashcardSet | null>(null);
   const [isGridScrollable, setIsGridScrollable] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -197,7 +198,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
   
   
   // Wrapper function to update both global flashcard sets and current flashcard set
-  const handleFlashcardSetUpdate = (updatedSet: any) => {
+  const handleFlashcardSetUpdate = (updatedSet: FlashcardSet) => {
     // Update the global flashcard sets
     updateFlashcardSet(updatedSet);
     
@@ -265,7 +266,8 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
       const sessions = chatService.getSessions();
       setChatSessions(sessions);
     }
-  }, []); // Run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount, auth changes handled by the effect above
+  }, []);
 
   const handleChatSelect = (chatId: string) => {
     // Don't switch if the user is already in this chat
@@ -301,7 +303,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
     }
   };
 
-  const handleDeleteFlashcard = (flashcardSet: any, event: React.MouseEvent) => {
+  const handleDeleteFlashcard = (flashcardSet: FlashcardSet, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent opening the flashcard set
     setFlashcardToDelete(flashcardSet);
     setShowDeleteConfirm(true);
@@ -489,7 +491,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
       {/* User Settings Modal */}
       {showSettings && (
-        <Suspense fallback={<div className="loading-spinner">Loading Settings...</div>}>
+        <Suspense fallback={<div className="loading-spinner" />}>
           <UserSettings
             isOpen={showSettings}
             onClose={() => setShowSettings(false)}
@@ -587,7 +589,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
               </svg>
             </button>
             <div className="flashcard-list-content">
-              <Suspense fallback={<div className="loading-spinner">Loading Flashcards...</div>}>
+              <Suspense fallback={<div className="loading-spinner" />}>
                 <FlashcardList
                   flashcardSet={currentFlashcardSet}
                   onSetUpdate={handleFlashcardSetUpdate}

@@ -10,7 +10,8 @@ export interface AIModel {
   description: string;
 }
 
-const availableModels: AIModel[] = [
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant needed by other components
+export const availableModels: AIModel[] = [
   {
     id: 'auto',
     name: 'Gemini',
@@ -119,5 +120,4 @@ export function ModelSelector({ selectedModel, onModelChange, disabled = false }
   );
 }
 
-export { availableModels };
 

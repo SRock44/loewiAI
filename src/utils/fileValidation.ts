@@ -29,6 +29,7 @@ export function getFileIcon(fileType: string): string {
   // Check for presentation before document (since 'presentationml' contains 'document')
   if (fileType.includes('presentation') || fileType.includes('powerpoint')) return '📊';
   if (fileType.includes('word') || fileType.includes('document')) return '📝';
+  if (fileType.startsWith('image/')) return '🖼️';
   return '📎';
 }
 

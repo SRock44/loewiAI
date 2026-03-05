@@ -2,6 +2,15 @@ import { GoogleGenerativeAI, GenerativeModel, GenerationConfig } from '@google/g
 import Groq from 'groq-sdk';
 import { UserProfileService } from './userProfileService';
 
+interface AIServiceError {
+  status?: number;
+  code?: string | number;
+  statusCode?: number;
+  message?: string;
+  body?: unknown;
+  response?: { data?: unknown };
+}
+
 export interface AIResponse {
   content: string;
   model: string;
@@ -174,9 +183,10 @@ class FirebaseAILogicProvider implements AIProvider {
           model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as AIServiceError;
         // Check for fallback-worthy error codes (400, 403, 404, 429, 500, 503, 504)
-        const errorCode = error?.status || error?.code || error?.statusCode;
+        const errorCode = Number(err?.status || err?.code || err?.statusCode);
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Check if this is a fallback-worthy error (rate limit, quota, server errors)
@@ -299,9 +309,10 @@ class FirebaseAILogicProvider implements AIProvider {
           model: this.currentModelName || 'gemini-2.5-flash',
           provider: 'Firebase AI Logic'
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as AIServiceError;
         // Check for fallback-worthy error codes (429, 403, 500, 503)
-        const errorCode = error?.status || error?.code || error?.statusCode;
+        const errorCode = Number(err?.status || err?.code || err?.statusCode);
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Check if this is a fallback-worthy error (rate limit, quota, server errors)
@@ -654,7 +665,7 @@ Guidelines:
           temperature: 0.7,
           max_tokens: 2048
         });
-      } catch (modelError: any) {
+      } catch (modelError: unknown) {
         // If model not found, log error and rethrow
         console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
         throw modelError;
@@ -676,17 +687,78 @@ Guidelines:
           total_tokens: completion.usage.total_tokens || 0
         } : undefined
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = error?.response?.data || error?.body || error?.message || error;
+      const errorDetails = err?.response?.data || err?.body || err?.message || error;
       console.error('Groq API error:', {
         message: errorMessage,
         details: errorDetails,
         model: this.modelName,
-        status: error?.status || error?.statusCode
+        status: err?.status || err?.statusCode
       });
       throw new Error(`Groq error: ${errorMessage}`);
     }
+  }
+
+  // Vision analysis - uses Llama 4 Scout to fully analyze any type of image
+  async analyzeImage(imageBase64: string, mimeType: string): Promise<string> {
+    if (!this.isAvailable()) {
+      throw new Error('Groq is not available');
+    }
+
+    const visionModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+    const prompt = `You are an expert image analyst. Analyze this image thoroughly.
+
+First, identify which ONE of these types best describes it:
+- TEXT: Typed or printed text (document, article, book page)
+- HANDWRITING: Handwritten notes or annotations
+- MATH: Mathematical equations, formulas, or problem sets (typed or handwritten)
+- DIAGRAM: Flowchart, graph, chart, plot, or scientific figure
+- TABLE: Data table, spreadsheet, or structured grid data
+- SLIDE: Presentation slide or projected screen content
+- PHOTO: Real-world photograph, scene, or object
+- MIXED: Clear combination of two or more of the above
+
+Then extract everything useful based on what you found:
+- TEXT or HANDWRITING → Transcribe ALL text verbatim, preserving layout and structure.
+- MATH → Extract all equations; use LaTeX notation (e.g. $x^2 + y^2 = z^2$) where appropriate. Transcribe any surrounding text too.
+- DIAGRAM → Describe what it represents, extract all labels, axis titles, legend entries, and key data values. Explain the relationships or trends shown.
+- TABLE → Reproduce the full table in markdown format, preserving all rows, columns, and values.
+- SLIDE → Extract the title, all bullet points, and describe any figures, charts, or images on the slide.
+- PHOTO → Describe the scene in detail: objects present, any visible text, setting, and anything academically or contextually relevant.
+- MIXED → Handle each component using the appropriate method above, clearly separating each section.
+
+Respond in exactly this format:
+IMAGE TYPE: [type]
+CONTENT:
+[your full extraction or description]`;
+
+    const completion = await this.groqClient!.chat.completions.create({
+      model: visionModel,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`
+              }
+            }
+          ]
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 4096
+    });
+
+    return completion.choices[0]?.message?.content || '';
   }
 
   async generateFlashcards(_prompt: string): Promise<AIResponse> {
@@ -719,7 +791,7 @@ Guidelines:
           temperature: 0.5,
           max_tokens: 8192 // Higher token limit for flashcard generation
         });
-      } catch (modelError: any) {
+      } catch (modelError: unknown) {
         // If model not found, log error and rethrow
         console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
         throw modelError;
@@ -741,14 +813,15 @@ Guidelines:
           total_tokens: completion.usage.total_tokens || 0
         } : undefined
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = error?.response?.data || error?.body || error?.message || error;
+      const errorDetails = err?.response?.data || err?.body || err?.message || error;
       console.error('Groq flashcard API error:', {
         message: errorMessage,
         details: errorDetails,
         model: this.modelName,
-        status: error?.status || error?.statusCode
+        status: err?.status || err?.statusCode
       });
       throw new Error(`Groq flashcard error: ${errorMessage}`);
     }
@@ -1012,6 +1085,14 @@ export class FirebaseAILogicService {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`All Firebase AI Logic providers failed. Last error: ${errorMessage}`);
     }
+  }
+
+  // Analyze an image using Groq's vision model (Llama 4 Scout)
+  async analyzeImage(imageBase64: string, mimeType: string): Promise<string> {
+    if (this.groqProvider && this.groqProvider.isAvailable()) {
+      return this.groqProvider.analyzeImage(imageBase64, mimeType);
+    }
+    throw new Error('Image analysis requires Groq provider (Llama 4 Scout) but it is not available');
   }
 
   getCurrentProvider(): string {

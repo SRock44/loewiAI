@@ -117,8 +117,8 @@ describe('markdownRenderer', () => {
     })
 
     it('should handle null and undefined gracefully', () => {
-      expect(cleanFlashcardContent(null as any)).toBe('')
-      expect(cleanFlashcardContent(undefined as any)).toBe('')
+      expect(cleanFlashcardContent(null as unknown as string)).toBe('')
+      expect(cleanFlashcardContent(undefined as unknown as string)).toBe('')
     })
   })
 
@@ -147,8 +147,8 @@ describe('markdownRenderer', () => {
     })
 
     it('should handle null and undefined', () => {
-      expect(renderMarkdownSafe(null as any)).toBe('')
-      expect(renderMarkdownSafe(undefined as any)).toBe('')
+      expect(renderMarkdownSafe(null as unknown as string)).toBe('')
+      expect(renderMarkdownSafe(undefined as unknown as string)).toBe('')
     })
 
     it('should sanitize while preserving formatting', () => {

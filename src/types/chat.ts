@@ -20,6 +20,9 @@ export interface ChatMessage {
   isTyping?: boolean;
   flashcardSet?: FlashcardSet; // FlashcardSet generated from this message
   validationResults?: CodeValidationResult[]; // CodeValidationResult[] from code validation
+  imageUrls?: string[]; // base64 data URLs of image thumbnails (persisted to Firestore)
+  fullImageUrls?: string[]; // original-quality data URLs for lightbox (in-memory only, not persisted)
+  storagePaths?: string[]; // Firebase Storage paths for all attachments (used for cleanup on delete)
 }
 
 export interface ChatSession {
@@ -37,6 +40,9 @@ export interface ChatContext {
   documentIds: string[];
   currentTopic?: string;
   processedDocuments?: ProcessedDocument[]; // Processed documents in this chat context
+  imageUrls?: string[]; // Thumbnail data URLs to attach to the persisted user message
+  fullImageUrls?: string[]; // Storage download URLs for cross-session full-quality lightbox
+  storagePaths?: string[]; // Firebase Storage paths for cleanup on session delete
   userPreferences?: {
     responseStyle: 'concise' | 'detailed' | 'conversational';
     expertiseLevel: 'beginner' | 'intermediate' | 'advanced';

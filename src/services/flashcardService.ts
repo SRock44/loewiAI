@@ -270,7 +270,7 @@ FINAL REMINDER:
       // Successfully parsed flashcards
 
       // Helper function to clean flashcard text content
-      const cleanFlashcardText = (text: any): string => {
+      const cleanFlashcardText = (text: unknown): string => {
         if (!text) return '';
         let cleaned = String(text).trim();
         
@@ -302,7 +302,7 @@ FINAL REMINDER:
         return cleaned.trim();
       };
 
-      return parsed.flashcards.map((card: any, index: number) => ({
+      return parsed.flashcards.map((card: { question?: string; answer?: string; category?: string; difficulty?: string; tags?: string[] }, index: number) => ({
         id: `flashcard_${Date.now()}_${index}`,
         question: cleanFlashcardText(card.question) || 'No question provided',
         answer: cleanFlashcardText(card.answer) || 'No answer provided',
@@ -612,7 +612,7 @@ FINAL REMINDER:
       
       // Find sets that have local IDs (stored in the document data)
       const setsWithLocalIds = allSets.filter(set => {
-        const data = set as any;
+        const data = set as FlashcardSet & { originalId?: string };
         return data.originalId && data.originalId.startsWith('set_');
       });
       
@@ -643,11 +643,11 @@ FINAL REMINDER:
       if (stored) {
         const sets = JSON.parse(stored);
         // Convert date strings back to Date objects
-        return sets.map((set: any) => ({
+        return sets.map((set: FlashcardSet) => ({
           ...set,
           createdAt: new Date(set.createdAt),
           updatedAt: new Date(set.updatedAt),
-          flashcards: set.flashcards.map((card: any) => ({
+          flashcards: set.flashcards.map((card: Flashcard) => ({
             ...card,
             createdAt: new Date(card.createdAt),
             lastReviewed: card.lastReviewed ? new Date(card.lastReviewed) : undefined

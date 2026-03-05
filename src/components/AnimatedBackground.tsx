@@ -3,7 +3,7 @@ import './AnimatedBackground.css';
 
 // Shared animation state - only one animation runs for all instances
 let sharedAnimationId: number | null = null;
-let sharedParticles: any[] = [];
+let sharedParticles: FloatingText[] = [];
 let activeCanvases = new Set<HTMLCanvasElement>();
 let animationRunning = false;
 let lastFrameTime = 0;

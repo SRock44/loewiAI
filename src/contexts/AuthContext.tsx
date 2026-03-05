@@ -130,6 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- custom hook must be co-located with its context provider
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -139,6 +140,7 @@ export const useAuth = (): AuthContextType => {
 };
 
 // Higher-order component for protecting routes
+// eslint-disable-next-line react-refresh/only-export-components -- HOC must be co-located with its context provider
 export const withAuth = <P extends object>(
   Component: React.ComponentType<P>
 ): React.FC<P> => {
