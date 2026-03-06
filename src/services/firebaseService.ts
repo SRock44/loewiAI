@@ -173,33 +173,47 @@ export class FirebaseService {
     }
   }
 
-  async deleteStorageFiles(paths: string[]): Promise<void> {
+  async deleteStorageFiles(paths: string[]): Promise<{ deleted: number; failed: number; errors: string[] }> {
+    let deleted = 0;
+    let failed = 0;
+    const errors: string[] = [];
     await Promise.all(
       paths.map(path =>
-        deleteObject(ref(storage, path)).catch(() => { /* already deleted or missing — ignore */ })
+        deleteObject(ref(storage, path))
+          .then(() => { deleted++; })
+          .catch((err: unknown) => {
+            const code = (err as { code?: string })?.code;
+            if (code === 'storage/object-not-found') {
+              deleted++; // already gone, counts as success
+            } else {
+              failed++;
+              errors.push(`${path}: ${code || String(err)}`);
+            }
+          })
       )
     );
+    return { deleted, failed, errors };
   }
 
   async deleteChatSession(sessionId: string): Promise<void> {
-    try {
-      console.log('🗑️ Firebase: Deleting chat session:', sessionId);
-      const sessionRef = doc(db, 'chatSessions', sessionId);
-      const sessionSnap = await getDoc(sessionRef);
-      if (sessionSnap.exists()) {
-        const data = sessionSnap.data();
-        const messages: Array<{ storagePaths?: string[] }> = Array.isArray(data.messages) ? data.messages : [];
-        const allPaths = messages.flatMap(m => m.storagePaths ?? []);
-        if (allPaths.length > 0) {
-          await this.deleteStorageFiles(allPaths);
+    const sessionRef = doc(db, 'chatSessions', sessionId);
+    const sessionSnap = await getDoc(sessionRef);
+    if (sessionSnap.exists()) {
+      const data = sessionSnap.data();
+      const messages: Array<{ storagePaths?: string[] }> = Array.isArray(data.messages) ? data.messages : [];
+      const allPaths = messages.flatMap(m => m.storagePaths ?? []);
+      if (allPaths.length > 0) {
+        const result = await this.deleteStorageFiles(allPaths);
+        if (result.failed > 0) {
+          // Use alert so it's visible even with drop_console in production
+          alert(`Storage cleanup: ${result.deleted} deleted, ${result.failed} failed.\n${result.errors.join('\n')}`);
         }
+      } else {
+        // DEBUG: temporarily alert to check if storagePaths exist in Firestore
+        alert(`DEBUG: No storagePaths found in ${messages.length} messages for session ${sessionId}`);
       }
-      await deleteDoc(sessionRef);
-      console.log('✅ Firebase: Chat session deleted successfully');
-    } catch (error) {
-      console.error('❌ Firebase: Error deleting chat session:', error);
-      throw error;
     }
+    await deleteDoc(sessionRef);
   }
 
   async deleteSessionMessages(sessionId: string): Promise<void> {
