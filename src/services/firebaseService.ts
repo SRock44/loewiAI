@@ -826,13 +826,15 @@ export class FirebaseService {
   }
 
   // Chat Image Storage
-  async uploadChatFile(userId: string, blob: Blob, fileName: string, mimeType: string): Promise<{ url: string; path: string }> {
+  generateChatFilePath(userId: string, fileName: string): string {
     const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
-    const path = `chatImages/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    return `chatImages/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  }
+
+  async uploadChatFileToPath(blob: Blob, path: string, mimeType: string): Promise<string> {
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, blob, { contentType: mimeType });
-    const url = await getDownloadURL(storageRef);
-    return { url, path };
+    return getDownloadURL(storageRef);
   }
 
   // User Profile
