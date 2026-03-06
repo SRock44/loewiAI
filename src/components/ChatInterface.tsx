@@ -394,13 +394,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
           setUploadedFiles(prev => prev.map(f =>
             f.id === uploadedFile.id ? { ...f, thumbnailUrl, fullImageUrl } : f
           ));
-          // Upload compressed version to Firebase Storage in background (for cross-session persistence)
+          // Generate path synchronously so it's in state before the upload resolves,
+          // preventing a race condition where the user sends before the upload finishes.
           const userId = firebaseAuthService.getCurrentUser()?.id;
           if (userId) {
+            const storagePath = firebaseService.generateChatFilePath(userId, file.name);
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === uploadedFile.id ? { ...f, storagePath } : f
+            ));
             compressImage(file)
-              .then(blob => firebaseService.uploadChatFile(userId, blob, file.name, 'image/jpeg'))
-              .then(({ url: storageUrl, path: storagePath }) => setUploadedFiles(prev => prev.map(f =>
-                f.id === uploadedFile.id ? { ...f, storageUrl, storagePath } : f
+              .then(blob => firebaseService.uploadChatFileToPath(blob, storagePath, 'image/jpeg'))
+              .then(storageUrl => setUploadedFiles(prev => prev.map(f =>
+                f.id === uploadedFile.id ? { ...f, storageUrl } : f
               )))
               .catch(() => { /* silent — data URL lightbox still works for current session */ });
           }
