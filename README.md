@@ -92,6 +92,45 @@ An AI-powered platform for academic learning with document analysis, intelligent
 
 ## Architecture
 
+### System Overview
+```mermaid
+graph TD
+  subgraph CLIENT["Client layer · React 18 + TypeScript + Vite"]
+    UI1[ChatInterface.tsx]
+    UI2[DocumentUpload.tsx]
+    UI3[FlashcardList.tsx]
+    UI4[ModelSelector.tsx]
+  end
+
+  subgraph SERVICES["Service layer · TypeScript"]
+    S1[chatService.ts]
+    S2[documentProcessor.ts]
+    S3[flashcardService.ts]
+    S4[automaticCleanupService.ts]
+  end
+
+  subgraph AI["AI provider layer · firebaseAILogicService.ts"]
+    G[Gemini primary\ngemini-2.5-flash / 2.0-flash]
+    K[Groq KimiK2 fallback\nkimi-k2-instruct-0905]
+    G -->|"429/403/500/503 → fallback"| K
+  end
+
+  subgraph DATA["Data persistence layer"]
+    FA[Firebase Auth\nGoogle OAuth]
+    FS[Firestore\nSessions · Flashcards · Docs]
+    LS[localStorage\nUnauthenticated fallback]
+  end
+
+  subgraph RAG["RAG pipeline"]
+    R1[Retrieve\nDoc chunks + user level] --> R2[Augment\nInject into prompt] --> R3[Generate\nGemini / Groq] --> R4[Grounded response]
+  end
+
+  CLIENT --> SERVICES
+  SERVICES --> AI
+  SERVICES --> DATA
+  AI --> RAG
+```
+
 ### Project Structure
 
 ```
