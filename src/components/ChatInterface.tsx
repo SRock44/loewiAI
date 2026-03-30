@@ -561,7 +561,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         const updatedSessions = chatService.getSessions();
         setSessions(updatedSessions);
       }
-    } catch (error) {
+    } catch {
       // if something goes wrong, show error message to user
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}`,

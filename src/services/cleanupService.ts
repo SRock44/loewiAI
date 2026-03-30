@@ -58,7 +58,7 @@ export class CleanupService {
       // Cleanup orphaned messages
       await this.cleanupOrphanedMessages(cutoffTime);
       
-    } catch (error) {
+    } catch {
       // Silent error handling - cleanup failures shouldn't affect user experience
     }
   }
@@ -70,7 +70,7 @@ export class CleanupService {
       const { firebaseAuthService } = await import('./firebaseAuthService');
       const currentUser = firebaseAuthService.getCurrentUser();
       return currentUser !== null;
-    } catch (error) {
+    } catch {
       // If we can't check auth, assume we don't have it
       return false;
     }
@@ -98,7 +98,7 @@ export class CleanupService {
       }
       
       return deletedCount;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
@@ -141,7 +141,7 @@ export class CleanupService {
       }
       
       return deletedCount;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
@@ -164,7 +164,7 @@ export class CleanupService {
       }
       
       return deletedCount;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
@@ -180,7 +180,7 @@ export class CleanupService {
       for (const docSnapshot of snapshot.docs) {
         await deleteDoc(doc(db, 'messages', docSnapshot.id));
       }
-    } catch (error) {
+    } catch {
       // Silent error handling
     }
   }
@@ -209,7 +209,7 @@ export class CleanupService {
       
       // NOTE: User settings in 'users' collection are preserved for good UX
       
-    } catch (error) {
+    } catch {
       // Silent error handling
     }
   }
@@ -255,7 +255,7 @@ export class CleanupService {
         oldFlashcardSets,
         oldMessages
       };
-    } catch (error) {
+    } catch {
       return {
         totalChatSessions: 0,
         totalFlashcardSets: 0,

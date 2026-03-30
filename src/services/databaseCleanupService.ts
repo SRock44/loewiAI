@@ -53,7 +53,7 @@ export class DatabaseCleanupService {
       
       // Clean up old empty sessions (24+ hours)
       await this.cleanupOldEmptySessions();
-    } catch (error) {
+    } catch {
       // Silent error handling - cleanup failures shouldn't affect user experience
     }
   }
@@ -106,7 +106,7 @@ export class DatabaseCleanupService {
 
       return stats;
 
-    } catch (error) {
+    } catch {
       // Silent error handling
       return stats;
     }
@@ -156,7 +156,7 @@ export class DatabaseCleanupService {
 
       return stats;
 
-    } catch (error) {
+    } catch {
       // Silent error handling
       return stats;
     }
@@ -172,7 +172,7 @@ export class DatabaseCleanupService {
       for (const docSnapshot of snapshot.docs) {
         await deleteDoc(doc(db, 'messages', docSnapshot.id));
       }
-    } catch (error) {
+    } catch {
       // Silent error handling
     }
   }
@@ -275,7 +275,7 @@ export class DatabaseCleanupService {
       
       return deletedCount;
 
-    } catch (error) {
+    } catch {
       // Silent error handling
       return 0;
     }

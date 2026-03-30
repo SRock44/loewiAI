@@ -102,8 +102,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           return updated;
         });
 
-      } catch (error) {
-        setUploadedFiles(prev => prev.map(f => 
+      } catch {
+        setUploadedFiles(prev => prev.map(f =>
           f.id === uploadedFile.id 
             ? { 
                 ...f, 
