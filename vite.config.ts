@@ -37,7 +37,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2015',
-    minify: 'terser',
+    minify: true,
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
@@ -76,11 +76,5 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     },
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    }
   }
 })
