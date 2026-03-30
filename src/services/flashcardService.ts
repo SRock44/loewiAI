@@ -83,7 +83,7 @@ class RealFlashcardService implements FlashcardService {
       let flashcards: Flashcard[];
       try {
         flashcards = this.parseFlashcardResponse(response.content, request);
-      } catch (parseError) {
+      } catch {
         // sometimes the AI adds extra text around the JSON (like markdown code blocks)
         // if parsing fails, we retry with a more explicit prompt telling it to return ONLY json
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
@@ -133,7 +133,7 @@ ${prompt}`;
       let flashcards: Flashcard[];
       try {
         flashcards = this.parseFlashcardResponse(response.content, request);
-      } catch (parseError) {
+      } catch {
         // First attempt failed, retrying with more explicit prompt
         // Retry with a more explicit prompt
         const retryPrompt = `You must respond with ONLY valid JSON. No explanatory text, no code examples, no markdown. Start with { and end with }.
@@ -314,9 +314,9 @@ FINAL REMINDER:
         masteryLevel: 0,
         sourceDocumentId: request.documentId
       }));
-    } catch (error) {
+    } catch {
       // Error parsing flashcard response
-      
+
       // Fallback: create simple flashcards from the response
       return this.createFallbackFlashcards(response, request);
     }
@@ -623,7 +623,7 @@ FINAL REMINDER:
         try {
           await firebaseService.deleteFlashcardSet(set.id, userId);
           // Cleaned up set with local ID
-        } catch (error) {
+        } catch {
           // Failed to cleanup set
         }
       }

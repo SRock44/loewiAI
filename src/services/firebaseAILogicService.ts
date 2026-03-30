@@ -73,7 +73,7 @@ class FirebaseAILogicProvider implements AIProvider {
       });
       this.currentModelName = modelName;
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -124,7 +124,7 @@ class FirebaseAILogicProvider implements AIProvider {
           this.triedModels.add(modelName);
           modelInitialized = true;
           break;
-        } catch (modelError) {
+        } catch {
           // Model initialization failed, try next
         }
       }
@@ -132,7 +132,7 @@ class FirebaseAILogicProvider implements AIProvider {
       if (!modelInitialized) {
         throw new Error('All Firebase AI Logic models failed to initialize');
       }
-    } catch (error) {
+    } catch {
       this.genAI = null;
       this.model = null;
     }
@@ -963,16 +963,16 @@ export class FirebaseAILogicService {
       ) {
         this.modelPreference = saved;
       }
-    } catch (error) {
+    } catch {
       // localStorage not available, use default
     }
   }
-  
+
   setModelPreference(preference: ModelPreference) {
     this.modelPreference = preference;
     try {
       localStorage.setItem('newton_ai_model_preference', preference);
-    } catch (error) {
+    } catch {
       // localStorage not available, ignore
     }
     
@@ -1038,7 +1038,7 @@ export class FirebaseAILogicService {
 
     try {
       return await this.currentProvider.generateFlashcards(prompt);
-    } catch (error) {
+    } catch {
       // In auto mode, try fallback providers
       // In kimi2 mode, only try other providers if Groq fails
       if (this.modelPreference === 'auto') {
@@ -1047,13 +1047,13 @@ export class FirebaseAILogicService {
         if (provider !== this.currentProvider && provider.isAvailable()) {
           try {
             return await provider.generateFlashcards(prompt);
-          } catch (fallbackError) {
+          } catch {
             // Fallback failed, try next
             }
           }
         }
       }
-      
+
       throw new Error('All Firebase AI Logic providers failed for flashcard generation');
     }
   }
@@ -1110,7 +1110,7 @@ export class FirebaseAILogicService {
     try {
       await this.generateResponse("Hello, is Firebase AI Logic working?");
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

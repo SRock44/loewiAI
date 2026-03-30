@@ -134,7 +134,7 @@ export class FirebaseService {
           lastActivityAt: (data.lastActivityAt as FirestoreTimestamp)?.toDate ? (data.lastActivityAt as FirestoreTimestamp).toDate() : data.lastActivityAt
         } as ChatSession;
       });
-    } catch (error) {
+    } catch {
       // Error getting chat sessions
       return [];
     }
@@ -384,7 +384,7 @@ export class FirebaseService {
       }
       
       return null;
-    } catch (error) {
+    } catch {
       // Error checking for duplicates
       return null;
     }
@@ -758,7 +758,7 @@ export class FirebaseService {
       for (const sessionId of toDelete) {
         try {
           await deleteDoc(doc(db, 'chatSessions', sessionId));
-        } catch (error) {
+        } catch {
           // Error deleting individual session
         }
       }
@@ -860,7 +860,7 @@ export class FirebaseService {
         lastLoginAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch {
       // If user doesn't exist, create them
       try {
         await addDoc(collection(db, 'users'), {
@@ -934,7 +934,7 @@ export class FirebaseService {
       }
       
       return { educationLevel: '', major: '' };
-    } catch (error) {
+    } catch {
       // Error getting user settings
       return { educationLevel: '', major: '' };
     }

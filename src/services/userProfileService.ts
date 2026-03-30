@@ -26,7 +26,7 @@ export class UserProfileService {
       this.currentProfile = settings;
       this.currentUserId = user.id;
       return settings;
-    } catch (error) {
+    } catch {
       // Error loading user profile
       return { educationLevel: '', major: '' };
     }
@@ -42,7 +42,7 @@ export class UserProfileService {
       await firebaseService.saveUserSettings(user.id, profile);
       this.currentProfile = profile;
       this.currentUserId = user.id;
-    } catch (error) {
+    } catch {
       throw new Error('Failed to save user profile');
     }
   }

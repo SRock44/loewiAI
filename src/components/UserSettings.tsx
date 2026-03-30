@@ -26,7 +26,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose, onSignOut 
       const profile = await UserProfileService.getUserProfile();
       setEducationLevel(profile.educationLevel);
       setMajor(profile.major);
-    } catch (error) {
+    } catch {
       // Error loading user profile
     } finally {
       setIsLoading(false);
@@ -41,7 +41,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({ isOpen, onClose, onSignOut 
         major
       });
       onClose();
-    } catch (error) {
+    } catch {
       // Error saving user profile
     } finally {
       setIsSaving(false);
