@@ -845,6 +845,12 @@ export class FirebaseService {
     return `chatImages/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   }
 
+  // Chat Document Storage
+  generateChatDocPath(userId: string, fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
+    return `chatDocs/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  }
+
   async uploadChatFileToPath(blob: Blob, path: string, mimeType: string): Promise<string> {
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, blob, { contentType: mimeType });

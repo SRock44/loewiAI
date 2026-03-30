@@ -434,6 +434,32 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
         const processedDocument = await documentProcessor.processDocument(file);
 
+        // Upload raw document to Firebase Storage after processing completes.
+        // Path is generated synchronously so it's in state before the upload resolves,
+        // preventing a race condition where the user sends before the upload finishes.
+        let docStoragePath: string | undefined;
+        if (!file.type.startsWith('image/')) {
+          const userId = firebaseAuthService.getCurrentUser()?.id;
+          if (userId) {
+            docStoragePath = firebaseService.generateChatDocPath(userId, file.name);
+            firebaseService.uploadChatFileToPath(file, docStoragePath, file.type || 'application/octet-stream')
+              .then(storageUrl => {
+                setUploadedFiles(prev => prev.map(f =>
+                  f.id === uploadedFile.id
+                    ? {
+                        ...f,
+                        storageUrl,
+                        processedDocument: f.processedDocument
+                          ? { ...f.processedDocument, storageUrl }
+                          : f.processedDocument,
+                      }
+                    : f
+                ));
+              })
+              .catch(() => { /* silent — text extraction still works without storage URL */ });
+          }
+        }
+
         // Update with processed data
         setUploadedFiles(prev => {
           return prev.map(f =>
@@ -446,6 +472,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   uploadProgress: 100,
                   thumbnailUrl,
                   fullImageUrl,
+                  ...(docStoragePath ? { storagePath: docStoragePath } : {}),
                 }
               : f
           );
