@@ -1,7 +1,8 @@
 /* Layout Styles */
 .layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: #f8fafc;
 }
 
@@ -418,8 +419,8 @@
 .main-content {
   flex: 1;
   margin-left: 60px;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
   background: #f8fafc;
 }
 

@@ -833,39 +833,29 @@ export class FirebaseService {
   }
 
   /**
-   * Save a single user-level context file that accumulates knowledge across sessions.
-   * Path: context/{userId}.md — one file per user, constantly updated.
+   * Save a single user-level context document in Firestore.
+   * Collection: userContext / document: {userId}
    */
   async saveUserContext(userId: string, mdContent: string): Promise<void> {
     try {
       if (!userId || !mdContent) return;
-
-      const blob = new Blob([mdContent], { type: 'text/markdown' });
-      const path = `context/${userId}.md`;
-      const storageRef = ref(storage, path);
-
-      await uploadBytes(storageRef, blob, {
-        contentType: 'text/markdown',
-        customMetadata: { updatedAt: new Date().toISOString() }
-      });
+      const ref = doc(db, 'userContext', userId);
+      await setDoc(ref, { content: mdContent, updatedAt: serverTimestamp() }, { merge: true });
     } catch (error) {
       console.error('Error saving user context:', error);
     }
   }
 
   /**
-   * Fetch the user's context file. Returns empty string if none exists.
+   * Fetch the user's context from Firestore. Returns empty string if none exists.
    */
   async getUserContext(userId: string): Promise<string> {
     try {
-      const path = `context/${userId}.md`;
-      const storageRef = ref(storage, path);
-      const url = await getDownloadURL(storageRef);
-      const response = await fetch(url);
-      if (response.ok) return await response.text();
+      const ref = doc(db, 'userContext', userId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) return (snap.data().content as string) ?? '';
       return '';
     } catch {
-      // File doesn't exist yet — that's fine
       return '';
     }
   }

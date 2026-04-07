@@ -21,22 +21,28 @@
   font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   display: flex;
   place-items: center;
   min-width: 320px;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
 }
 
 #root {
   width: 100%;
+  height: 100vh;
   margin: 0 auto;
   text-align: center;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* Mobile optimizations */

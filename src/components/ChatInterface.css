@@ -529,16 +529,79 @@
   counter-reset: list-counter;
 }
 
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+}
+
+.message.user .message-footer {
+  flex-direction: row-reverse;
+}
+
 .message-time {
   font-family: 'Work Sans', sans-serif;
   font-size: 0.7rem;
   color: #a0aec0;
-  margin-top: 0.4rem;
-  text-align: left;
 }
 
-.message.user .message-time {
-  text-align: right;
+/* Document attachment card in message */
+.doc-attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  max-width: 320px;
+}
+
+.doc-attachment-card:hover {
+  background: #f0f4ff;
+  border-color: #3b6de0;
+  box-shadow: 0 2px 8px rgba(59, 109, 224, 0.12);
+}
+
+.doc-attachment-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #fee2e2;
+  border-radius: 6px;
+  color: #e84040;
+  flex-shrink: 0;
+}
+
+.doc-attachment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.doc-attachment-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #111827;
+  font-family: 'Work Sans', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-attachment-meta {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-family: 'Work Sans', sans-serif;
 }
 
 /* Image Thumbnails in Messages */

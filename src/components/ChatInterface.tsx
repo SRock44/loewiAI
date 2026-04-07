@@ -7,6 +7,7 @@ import { createThumbnail, readFileAsDataUrl, compressImage } from '../utils/imag
 import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
+import DocumentPreviewPanel from './DocumentPreviewPanel';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { renderMarkdownSafe } from '../utils/markdownRenderer';
@@ -56,9 +57,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);  // current chat session
   const [, setSessions] = useState<ChatSession[]>([]);  // all chat sessions (for sidebar)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);  // files being uploaded/processed
+  // Session-level document cache: all docs processed in this session, keyed by id.
+  // Persists across message sends so subsequent questions can still reference uploaded files.
+  const sessionDocsRef = useRef<Map<string, ProcessedDocument>>(new Map());
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showFlashcardList, setShowFlashcardList] = useState(false);  // show flashcard list sidebar?
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
+  const [docPreviewMessage, setDocPreviewMessage] = useState<ChatMessage | null>(null);
   const [typingText, setTypingText] = useState('');  // for typing animation effect
   const [modelPreference, setModelPreference] = useState<ModelPreference>(() => {
     // Load from service on mount
@@ -326,11 +331,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const createNewSession = async () => {
     const newSession = await chatService.createNewSession();
     setCurrentSession(newSession);
-    
+
     // Refresh sessions from chat service to get all updated sessions
     const updatedSessions = chatService.getSessions();
     setSessions(updatedSessions);
-    
+
+    // Clear session-level document cache for the new session
+    sessionDocsRef.current.clear();
     setMessages([]);
     if (onNewSession) {
       onNewSession(newSession);
@@ -480,6 +487,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
         // Update with processed data
         setUploadedFiles(prev => {
+          // Cache this document for the lifetime of the session
+          sessionDocsRef.current.set(processedDocument.id, processedDocument);
+
           return prev.map(f =>
             f.id === uploadedFile.id
               ? {
@@ -563,10 +573,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     setInputValue('');  // clear input field
     setIsLoading(true);
 
-    // Capture processed docs before clearing the attachment tray
-    const processedDocs = uploadedFiles
+    // Merge current tray docs into session cache (in case they weren't cached yet)
+    uploadedFiles
       .filter(f => f.uploadStatus === 'completed' && f.processedDocument)
-      .map(f => f.processedDocument!);
+      .forEach(f => sessionDocsRef.current.set(f.processedDocument!.id, f.processedDocument!));
+
+    // All processed docs for this session (tray + previously uploaded)
+    const processedDocs = Array.from(sessionDocsRef.current.values());
 
     // Clear attached files immediately so the input area feels responsive
     setUploadedFiles([]);
@@ -716,6 +729,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     if (session) {
       setCurrentSession(session);
       setMessages(session.messages);
+      // Clear document cache — different session has different uploads
+      sessionDocsRef.current.clear();
     } else {
       // Session was deleted, create a new blank chat
       createNewSession();
@@ -946,24 +961,50 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         ))}
                       </div>
                     )}
-                    <div className={`message-text ${message.isTyping ? 'streaming' : ''}`}>
+                    <div
+                      data-message-id={message.id}
+                      className={`message-text ${message.isTyping ? 'streaming' : ''}`}
+                    >
                       <div
                         dangerouslySetInnerHTML={{
                           __html: formatMessage(message)
                         }}
                       />
                     </div>
-                    
+
                     {message.flashcardSet && (
                       <div className="flashcard-message-hint">
                         <span className="hint-text">Click to view flashcards</span>
                       </div>
                     )}
-                    <div className="message-time">
-                      {message.timestamp instanceof Date 
-                        ? message.timestamp.toLocaleTimeString()
-                        : new Date(message.timestamp).toLocaleTimeString()
-                      }
+                    {message.isDocument && !message.isTyping && (
+                      <button
+                        className="doc-attachment-card"
+                        onClick={e => { e.stopPropagation(); setDocPreviewMessage(message); }}
+                      >
+                        <div className="doc-attachment-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                          </svg>
+                        </div>
+                        <div className="doc-attachment-info">
+                          <span className="doc-attachment-name">
+                            {(message.documentTitle ?? 'Document').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}.pdf
+                          </span>
+                          <span className="doc-attachment-meta">PDF · Click to preview</span>
+                        </div>
+                      </button>
+                    )}
+                    <div className="message-footer">
+                      <div className="message-time">
+                        {message.timestamp instanceof Date
+                          ? message.timestamp.toLocaleTimeString()
+                          : new Date(message.timestamp).toLocaleTimeString()
+                        }
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1128,6 +1169,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         </form>
       </div>
 
+      {/* Document Preview Panel — sibling to chat-main, forms the right column */}
+      {docPreviewMessage && (
+        <DocumentPreviewPanel
+          messageId={docPreviewMessage.id}
+          title={docPreviewMessage.documentTitle ?? 'Document'}
+          contentHtml={formatMessage({
+            ...docPreviewMessage,
+            content: docPreviewMessage.documentContent ?? docPreviewMessage.content,
+          })}
+          onClose={() => setDocPreviewMessage(null)}
+        />
+      )}
 
       {/* Flashcard List Modal */}
       {showFlashcardList && currentFlashcardSet && (

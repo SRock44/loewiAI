@@ -251,11 +251,19 @@ Would you like me to help you with anything else about the code, such as explain
       await codeExecutor.executeCodeBlocks(finalContent);
       // Note: Execution results are not displayed to users, only used for internal validation
 
+      const isDoc = this.isDocumentRequest(message);
+      const chatContent = isDoc ? this.extractDocumentSummary(finalContent) : finalContent;
+
       const assistantMessage: ChatMessage = {
         id: `msg_${Date.now()}_${++this.messageCounter}`,
         role: 'assistant',
-        content: finalContent,
-        timestamp: new Date()
+        content: chatContent,
+        timestamp: new Date(),
+        ...(isDoc ? {
+          isDocument: true,
+          documentTitle: this.extractDocumentTitle(message),
+          documentContent: finalContent,
+        } : {}),
       };
 
       // Update session with new messages
@@ -767,7 +775,7 @@ Please provide the corrected version with the same formatting and structure, but
     // Build rich context from processed document content
     try {
     const documentSummaries = documentProcessor.getDocumentSummaries(processedDocuments);
-    const documentContent = documentProcessor.getDocumentContent(processedDocuments, 6000);
+    const documentContent = documentProcessor.getDocumentContent(processedDocuments, 24000);
 
       // Check if we actually got content
       if (!documentContent || documentContent.trim().length === 0) {
@@ -811,6 +819,55 @@ The document content above contains all the information needed to provide compre
   // Test AI connection
   async testAIConnection(): Promise<boolean> {
     return await firebaseAILogicService.testConnection();
+  }
+
+  private extractDocumentTitle(message: string): string {
+    const lower = message.toLowerCase();
+
+    let docType = 'Document';
+    if (lower.includes('study guide')) docType = 'Study Guide';
+    else if (lower.includes('formula sheet')) docType = 'Formula Sheet';
+    else if (lower.includes('cheat sheet')) docType = 'Cheat Sheet';
+    else if (lower.includes('reference sheet') || lower.includes('quick reference')) docType = 'Reference Sheet';
+    else if (lower.includes('review sheet') || lower.includes('summary sheet')) docType = 'Review Sheet';
+    else if (lower.includes('fact sheet')) docType = 'Fact Sheet';
+
+    const topicPatterns = [
+      /(?:create|generate|make|write)\s+(?:a\s+|an\s+)?(?:study guide|formula sheet|cheat sheet|reference sheet|review sheet|summary sheet|fact sheet|guide|sheet)\s+(?:for|about|on)\s+(.+)/i,
+      /(?:study guide|formula sheet|cheat sheet|reference sheet|review sheet|fact sheet)\s+(?:for|about|on)\s+(.+)/i,
+      /(?:for|about|on)\s+(.+?)(?:\s+(?:study guide|formula sheet|cheat sheet|sheet|guide))?$/i,
+    ];
+
+    for (const pattern of topicPatterns) {
+      const match = message.match(pattern);
+      if (match?.[1]) {
+        const topic = match[1].trim().replace(/[^a-zA-Z0-9 ]/g, '').trim();
+        if (topic.length > 0 && topic.length < 60) {
+          return `${topic.charAt(0).toUpperCase() + topic.slice(1)} ${docType}`;
+        }
+      }
+    }
+
+    return docType;
+  }
+
+  private extractDocumentSummary(fullContent: string): string {
+    // Take the first paragraph (up to the first section heading or horizontal rule)
+    const match = fullContent.match(/^([\s\S]*?)(?=\n#{1,3} |\n---)/);
+    const intro = match ? match[1].trim() : fullContent.slice(0, 400).trim();
+    // Hard cap at 400 chars so the chat bubble stays compact
+    const capped = intro.length > 400 ? intro.slice(0, 400).replace(/\s+\S*$/, '') + '…' : intro;
+    return capped || fullContent.slice(0, 200);
+  }
+
+  private isDocumentRequest(message: string): boolean {
+    // Must have BOTH a creation-intent verb AND an explicit document-type noun.
+    // This prevents "the problems are in the study guide" from triggering.
+    const creationVerbs = /\b(?:create|make|generate|write|build|produce|give me|can you make|can you create|can you generate)\b/i;
+    if (!creationVerbs.test(message)) return false;
+
+    const documentTypes = /\b(?:study guide|formula sheet|cheat sheet|reference sheet|summary sheet|review sheet|fact sheet|reference card|quick reference|study sheet|notes sheet|pdf)\b/i;
+    return documentTypes.test(message);
   }
 
   // Flashcard generation methods
