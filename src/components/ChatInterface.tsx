@@ -770,8 +770,14 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const formatMessage = (message: ChatMessage) => {
     // For assistant messages, use the robust markdown renderer
     if (message.role === 'assistant') {
-      // Special handling for code blocks to keep the copy button
-      let content = message.content;
+      // Restore LaTeX commands corrupted by JSON escape interpretation.
+      // Groq's API sends \tan as literal \t (tab) in JSON, so JSON.parse
+      // turns it into a tab char + "an". Same for \r (\right), \b (\beta), \f (\frac).
+      let content = message.content
+        .replace(/\t/g, '\\t')
+        .replace(/\r/g, '\\r')
+        .replace(/\f/g, '\\f')
+        .replace(/\b/g, '\\b');
 
       // Preserve code blocks with custom UI
       const codeBlocks: string[] = [];
