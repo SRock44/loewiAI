@@ -34,6 +34,11 @@ service cloud.firestore {
         request.auth.uid == request.resource.data.userId;
     }
     
+    // User context - accumulated knowledge across sessions
+    match /userContext/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;

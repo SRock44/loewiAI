@@ -23,6 +23,9 @@ export interface ChatMessage {
   imageUrls?: string[]; // base64 data URLs of image thumbnails (persisted to Firestore)
   fullImageUrls?: string[]; // original-quality data URLs for lightbox (in-memory only, not persisted)
   storagePaths?: string[]; // Firebase Storage paths for all attachments (used for cleanup on delete)
+  isDocument?: boolean; // true when AI generated a downloadable document (study guide, formula sheet, etc.)
+  documentTitle?: string; // human-readable title for the generated document (e.g. "Calculus Derivatives Study Guide")
+  documentContent?: string; // full markdown content of the document — message.content holds only the chat summary
 }
 
 export interface ChatSession {
