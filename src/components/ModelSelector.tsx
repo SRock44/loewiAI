@@ -13,24 +13,19 @@ export interface AIModel {
 // eslint-disable-next-line react-refresh/only-export-components -- shared constant needed by other components
 export const availableModels: AIModel[] = [
   {
-    id: 'auto',
-    name: 'Gemini',
-    description: 'Uses Gemini with automatic fallback to Groq'
+    id: 'openai/gpt-oss-120b',
+    name: 'GPT-OSS 120B',
+    description: 'Default model — fast and capable'
   },
   {
     id: 'kimi2',
     name: 'KimiK2',
-    description: 'Direct Groq KimiK2 model for fast responses'
+    description: 'KimiK2 model for fast responses'
   },
   {
     id: 'llama-3.3-70b-versatile',
     name: 'Llama 3.3 70B',
-    description: 'Direct Groq Llama 3.3 70B Versatile model'
-  },
-  {
-    id: 'openai/gpt-oss-120b',
-    name: 'GPT-OSS 120B',
-    description: 'Direct Groq GPT-OSS 120B model'
+    description: 'Llama 3.3 70B Versatile model'
   }
 ];
 

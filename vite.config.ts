@@ -28,7 +28,7 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Embedder-Policy': 'unsafe-none',
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://accounts.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://www.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebase.com https://*.google.com https://www.googleapis.com https://accounts.google.com https://www.gstatic.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.groq.com wss://*.googleapis.com wss://firestore.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://*.firebaseapp.com; font-src 'self' data:;"
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://accounts.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: https://www.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebase.com https://*.google.com https://www.googleapis.com https://accounts.google.com https://www.gstatic.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.groq.com wss://*.googleapis.com wss://firestore.googleapis.com; frame-src 'self' https://accounts.google.com https://apis.google.com https://*.firebaseapp.com; font-src 'self' data: https://fonts.gstatic.com;"
     }
   },
   optimizeDeps: {
@@ -52,7 +52,7 @@ export default defineConfig({
             if (id.includes('pdfjs-dist')) {
               return 'pdfjs';
             }
-            if (id.includes('@google/generative-ai') || id.includes('firebase')) {
+            if (id.includes('firebase')) {
               return 'ai-services';
             }
             if (id.includes('framer-motion')) {

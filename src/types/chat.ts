@@ -50,7 +50,7 @@ export interface ChatContext {
 }
 
 export interface ChatService {
-  sendMessage(message: string, context: ChatContext): Promise<ChatMessage>;
+  sendMessage(message: string, context: ChatContext, onStreamChunk?: (partialContent: string) => void): Promise<ChatMessage>;
   getChatHistory(sessionId: string): Promise<ChatMessage[]>;
   createNewSession(title?: string): Promise<ChatSession>;
   deleteSession(sessionId: string): Promise<void>;

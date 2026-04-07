@@ -11,7 +11,7 @@ import { firebaseService } from './firebaseService';
 
 // this is the main chat service - handles all chat logic, AI integration, and session management
 // it's a singleton that gets created once when the app starts
-class GeminiChatService implements ChatService {
+class ChatServiceImpl implements ChatService {
   // store all chat sessions in memory - key is session id, value is the session object
   private sessions: Map<string, ChatSession> = new Map();
   // counter to make sure each message gets a unique id
@@ -20,6 +20,13 @@ class GeminiChatService implements ChatService {
   private currentUserId: string | null = null;
   // function to unsubscribe from firebase real-time updates when user logs out
   private realtimeUnsubscribe: (() => void) | null = null;
+  // In-memory user context — loaded once per sign-in, avoids repeated fetches
+  private userContextCache: string = '';
+  // Throttle context saves — adaptive interval based on activity
+  private lastContextSaveTime = 0;
+  private recentMessageTimestamps: number[] = []; // tracks message times for activity detection
+  private static IDLE_SAVE_INTERVAL_MS = 2 * 60 * 60 * 1000;   // 2 hours when idle
+  private static ACTIVE_SAVE_INTERVAL_MS = 20 * 60 * 1000;      // 20 minutes when very active
 
   constructor() {
     // listen for when user signs in/out so we can load their sessions
@@ -36,6 +43,7 @@ class GeminiChatService implements ChatService {
         console.log('👤 User signed in, loading sessions...');
         this.currentUserId = user.id;
         this.loadSessionsFromFirebase();
+        this.loadUserContext();
       } else if (!user && this.currentUserId) {
         // user signed out - clean up everything
         console.log('👋 User signed out, clearing sessions...');
@@ -46,6 +54,9 @@ class GeminiChatService implements ChatService {
         this.currentUserId = null;
         this.sessions.clear();
         this.messageCounter = 0;
+        this.userContextCache = '';
+        this.lastContextSaveTime = 0;
+        this.recentMessageTimestamps = [];
       }
     });
   }
@@ -133,7 +144,7 @@ class GeminiChatService implements ChatService {
 
   // this is the main function that handles when user sends a message
   // it figures out what the user wants (regular chat, flashcards, code help) and routes accordingly
-  async sendMessage(message: string, context: ChatContext): Promise<ChatMessage> {
+  async sendMessage(message: string, context: ChatContext, onStreamChunk?: (partialContent: string) => void): Promise<ChatMessage> {
     // create the user message object - this gets saved to the session
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}_${++this.messageCounter}`,
@@ -201,14 +212,21 @@ Would you like me to help you with anything else about the code, such as explain
       }
 
       // Build conversation history context
-      const conversationContext = this.buildConversationContext(context.sessionId);
+      const conversationContext = await this.buildConversationContext(context.sessionId);
       
-      // Get AI response from Firebase AI Logic Service
-      const aiResponse: AIResponse = await firebaseAILogicService.generateResponse(
-        message, 
-        documentContext,
-        conversationContext
-      );
+      // Get AI response — use streaming when a chunk callback is provided
+      const aiResponse: AIResponse = onStreamChunk
+        ? await firebaseAILogicService.generateResponseStream(
+            message,
+            documentContext,
+            conversationContext,
+            onStreamChunk
+          )
+        : await firebaseAILogicService.generateResponse(
+            message,
+            documentContext,
+            conversationContext
+          );
 
       // Log error if AI returns empty response
       if (!aiResponse || !aiResponse.content || aiResponse.content.trim().length === 0) {
@@ -255,6 +273,10 @@ Would you like me to help you with anything else about the code, such as explain
         if (this.currentUserId) {
           try {
             await firebaseService.saveChatSession(session, this.currentUserId);
+            
+            // Background: Update user context file (throttled to every 2 hours)
+            this.maybeUpdateUserContext(session);
+            
             window.dispatchEvent(new CustomEvent('sessionUpdated'));
           } catch (error) {
             console.error('Failed to save session to Firebase:', error);
@@ -612,41 +634,124 @@ Please provide the corrected version with the same formatting and structure, but
   }
 
   /**
-   * Builds conversation history context for better follow-up question handling
+   * Load user context from Firebase Storage into memory (called once on sign-in).
    */
-  private buildConversationContext(sessionId: string): string {
+  private async loadUserContext() {
+    if (!this.currentUserId) return;
+    try {
+      this.userContextCache = await firebaseService.getUserContext(this.currentUserId);
+    } catch {
+      this.userContextCache = '';
+    }
+  }
+
+  /**
+   * Build a condensed context summary from a session (topics + key facts, not raw messages).
+   */
+  private buildSessionSummary(session: ChatSession): string {
+    if (!session.messages || session.messages.length < 2) return '';
+
+    const userMessages = session.messages
+      .filter(m => m.role === 'user')
+      .map(m => m.content.length > 150 ? m.content.substring(0, 150) + '...' : m.content);
+
+    // Keep it very concise — just the topics discussed
+    const title = session.title || 'Untitled';
+    const date = session.updatedAt instanceof Date
+      ? session.updatedAt.toLocaleDateString()
+      : new Date().toLocaleDateString();
+    const topics = userMessages.slice(0, 5).join(' | ');
+
+    return `- ${title} (${date}): ${topics}`;
+  }
+
+  /**
+   * Throttled save — interval adapts to user activity.
+   * Very active (5+ messages in 10 min) → saves every 20 minutes.
+   * Idle → saves every 2 hours.
+   */
+  private maybeUpdateUserContext(_session: ChatSession) {
+    if (!this.currentUserId) return;
+
+    const now = Date.now();
+
+    // Track this message for activity detection
+    this.recentMessageTimestamps.push(now);
+    // Only keep timestamps from the last 10 minutes
+    const tenMinAgo = now - 10 * 60 * 1000;
+    this.recentMessageTimestamps = this.recentMessageTimestamps.filter(t => t > tenMinAgo);
+
+    // If 5+ messages in the last 10 minutes, user is very active → shorter interval
+    const isVeryActive = this.recentMessageTimestamps.length >= 5;
+    const interval = isVeryActive
+      ? ChatServiceImpl.ACTIVE_SAVE_INTERVAL_MS
+      : ChatServiceImpl.IDLE_SAVE_INTERVAL_MS;
+
+    if (now - this.lastContextSaveTime < interval) return;
+    this.lastContextSaveTime = now;
+
+    // Build a fresh context from all in-memory sessions
+    const allSummaries = Array.from(this.sessions.values())
+      .filter(s => s.messages.length >= 2)
+      .sort((a, b) => {
+        const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
+        const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 15) // keep the 15 most recent sessions
+      .map(s => this.buildSessionSummary(s))
+      .filter(s => s.length > 0);
+
+    if (allSummaries.length === 0) return;
+
+    const md = `# User Study Context\nUpdated: ${new Date().toISOString()}\n\nRecent topics and questions:\n${allSummaries.join('\n')}\n`;
+
+    // Update in-memory cache immediately
+    this.userContextCache = md;
+
+    // Persist to Firebase in background
+    firebaseService.saveUserContext(this.currentUserId, md).catch(() => {
+      // Silent — non-critical background save
+    });
+  }
+
+  /**
+   * Builds conversation history context for better follow-up question handling.
+   * Uses in-memory cached user context (no network calls) + recent session messages.
+   */
+  private async buildConversationContext(sessionId: string): Promise<string> {
+    let context = '';
+
+    // 1. Add user context from memory (loaded once on sign-in, updated every 2h)
+    if (this.userContextCache) {
+      context += '\n\nUSER STUDY HISTORY:\n';
+      context += this.userContextCache;
+      context += '\n';
+    }
+
     if (!sessionId || !this.sessions.has(sessionId)) {
-      return '';
+      return context;
     }
 
     const session = this.sessions.get(sessionId)!;
     const messages = session.messages;
-    
-    // Only include recent conversation history (last 10 messages to avoid token limits)
-    const recentMessages = messages.slice(-10);
-    
-    if (recentMessages.length <= 2) {
-      return ''; // No need for context if this is the first exchange
+
+    // 2. Add recent conversation history from current session (last 8 messages)
+    const recentMessages = messages.slice(-8);
+
+    if (recentMessages.length <= 2 && !this.userContextCache) {
+      return '';
     }
 
-    let context = '\n\nCONVERSATION HISTORY:\n';
-    context += 'The following is the recent conversation history to help you understand the context and provide better follow-up responses:\n\n';
-
-    for (let i = 0; i < recentMessages.length - 1; i++) {
-      const msg = recentMessages[i];
-      const role = msg.role === 'user' ? 'User' : 'Assistant';
-      const content = msg.content.length > 500 ? msg.content.substring(0, 500) + '...' : msg.content;
-      
-      context += `${role}: ${content}\n\n`;
+    if (recentMessages.length > 1) {
+      context += '\n\nCURRENT CONVERSATION:\n';
+      for (let i = 0; i < recentMessages.length - 1; i++) {
+        const msg = recentMessages[i];
+        const role = msg.role === 'user' ? 'User' : 'Newton';
+        const content = msg.content.length > 400 ? msg.content.substring(0, 400) + '...' : msg.content;
+        context += `${role}: ${content}\n\n`;
+      }
     }
-
-    context += 'CURRENT USER MESSAGE: [This is the message you are responding to]\n\n';
-    context += 'INSTRUCTIONS:\n';
-    context += '- Use the conversation history to understand the context of follow-up questions\n';
-    context += '- Reference previous topics, code, or concepts when relevant\n';
-    context += '- If the user asks about something from a previous message, acknowledge and build upon it\n';
-    context += '- Maintain continuity in the conversation flow\n';
-    context += '- If the user asks "what about X?" or "how about Y?", refer to the previous context\n';
 
     return context;
   }
@@ -703,8 +808,8 @@ The document content above contains all the information needed to provide compre
     return firebaseAILogicService.getAvailableProviders();
   }
 
-  // Test Gemini connection
-  async testGeminiConnection(): Promise<boolean> {
+  // Test AI connection
+  async testAIConnection(): Promise<boolean> {
     return await firebaseAILogicService.testConnection();
   }
 
@@ -914,4 +1019,4 @@ Your request was valid - this is just a temporary technical issue.`;
 }
 
 // Export singleton instance
-export const chatService = new GeminiChatService();
+export const chatService = new ChatServiceImpl();

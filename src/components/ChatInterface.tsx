@@ -9,11 +9,14 @@ import { documentProcessor, ProcessedDocument } from '../services/documentProces
 import FlashcardList from './FlashcardList';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
+import { renderMarkdownSafe } from '../utils/markdownRenderer';
 import { allFlashcardEventTarget } from '../hooks/useAllFlashcards';
 import { firebaseAILogicService, ModelPreference } from '../services/firebaseAILogicService';
 import { firebaseService } from '../services/firebaseService';
 import { firebaseAuthService } from '../services/firebaseAuthService';
 import { ModelSelector } from './ModelSelector';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import './ChatInterface.css';
 
 interface ChatInterfaceProps {
@@ -46,7 +49,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     onDocumentsChange,  // callback when documents are uploaded
     onNewSession  // callback when a new chat session is created
   } = props;
-  const { isAuthenticated } = useAuth();  // check if user is logged in
+  const { isAuthenticated, user } = useAuth();  // check if user is logged in
   const [messages, setMessages] = useState<ChatMessage[]>([]);  // all messages in current chat
   const [inputValue, setInputValue] = useState('');  // what user is typing
   const [isLoading, setIsLoading] = useState(false);  // is AI currently responding?
@@ -66,6 +69,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const fileInputRef = useRef<HTMLInputElement>(null);  // ref to hidden file input
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);  // timeout for typing animation
   const isTypingRef = useRef(false);  // track if typing animation is running
+  // Streaming animation refs — separate from React state to avoid batching issues
+  const streamBufferRef = useRef('');       // full content received so far from API
+  const revealedLenRef = useRef(0);         // how many chars are currently shown
+  const streamDoneRef = useRef(false);      // true when API has finished sending
+  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const inputActionsLeftRef = useRef<HTMLDivElement>(null);
 
@@ -82,12 +90,22 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     "Ask me anything about your studies..."
   ];
 
-  // Auto-scroll to top of last assistant message when it's generated
+  // Auto-scroll: snap to top of assistant message on first appearance,
+  // then keep bottom in view during streaming updates
+  const prevMessageCountRef = useRef(messages.length);
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage && lastMessage.role === 'assistant' && lastAssistantMessageRef.current) {
-      // Scroll to the top of the assistant message
+    if (!lastMessage || lastMessage.role !== 'assistant') return;
+
+    const isNewMessage = messages.length !== prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+
+    if (isNewMessage && lastAssistantMessageRef.current) {
+      // New message just appeared — scroll to its top
       lastAssistantMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (lastMessage.isTyping && messagesEndRef.current) {
+      // Streaming update — keep bottom visible
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
     }
   }, [messages]);
 
@@ -565,30 +583,97 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         ...(fullImageUrls.length > 0 ? { fullImageUrls } : {}),
         ...(storagePaths.length > 0 ? { storagePaths } : {}),
       };
-      // send to chat service - it handles AI communication and returns the response
-      const response = await chatService.sendMessage(content.trim(), context);
-      setMessages(prev => [...prev, response]);
-      
+
+      // --- Streaming animation setup ---
+      const streamingId = `streaming_${Date.now()}`;
+      streamBufferRef.current = '';
+      revealedLenRef.current = 0;
+      streamDoneRef.current = false;
+
+      // Add empty placeholder message
+      setMessages(prev => [...prev, {
+        id: streamingId,
+        role: 'assistant' as const,
+        content: '',
+        timestamp: new Date(),
+        isTyping: true
+      }]);
+
+      // Typing speed: ~2 words per tick at 30ms intervals ≈ ~65 wpm visual pace.
+      // Feels natural — fast enough to not bore, slow enough to read along.
+      const TICK_MS = 30;
+      const CHARS_PER_TICK = 3;
+
+      const revealTick = () => {
+        const target = streamBufferRef.current.length;
+        if (revealedLenRef.current < target) {
+          // Advance by CHARS_PER_TICK, then snap forward to the next word boundary
+          let next = Math.min(revealedLenRef.current + CHARS_PER_TICK, target);
+          if (next < target) {
+            const spaceIdx = streamBufferRef.current.indexOf(' ', next);
+            if (spaceIdx !== -1 && spaceIdx - next < 15) next = spaceIdx + 1;
+          }
+          revealedLenRef.current = next;
+          const slice = streamBufferRef.current.slice(0, revealedLenRef.current);
+          setMessages(prev => prev.map(m =>
+            m.id === streamingId ? { ...m, content: slice } : m
+          ));
+        }
+
+        // Keep ticking until we've shown everything AND the API is done
+        if (!(streamDoneRef.current && revealedLenRef.current >= streamBufferRef.current.length)) {
+          streamTimerRef.current = setTimeout(revealTick, TICK_MS);
+        }
+      };
+      streamTimerRef.current = setTimeout(revealTick, TICK_MS);
+
+      // Chunk callback — just fills the buffer (no React state updates)
+      const onStreamChunk = (partialContent: string) => {
+        streamBufferRef.current = partialContent;
+      };
+
+      // Fire the streaming request
+      const response = await chatService.sendMessage(content.trim(), context, onStreamChunk);
+      streamDoneRef.current = true;
+      streamBufferRef.current = response.content;
+
+      // Wait for reveal animation to catch up to full content
+      await new Promise<void>(resolve => {
+        const waitDone = () => {
+          if (revealedLenRef.current >= streamBufferRef.current.length) {
+            if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+            resolve();
+          } else {
+            setTimeout(waitDone, TICK_MS);
+          }
+        };
+        waitDone();
+      });
+
+      // Replace placeholder with final message (correct id, flashcardSet, etc.)
+      setMessages(prev => prev.map(m =>
+        m.id === streamingId ? { ...response, isTyping: false } : m
+      ));
+
       // If this was the first message in a brand-new blank session, notify parent
       // so the sidebar highlight can follow the active session once it becomes real.
       if (wasEmptySession && onNewSession) {
         onNewSession(session);
       }
 
-      // chat service automatically saves sessions to firebase (if logged in) or memory
-      // the layout component listens for session updates to show them in the sidebar
-      
       // if the AI generated flashcards, show them to the user
       if (response.flashcardSet) {
         handleFlashcardsGenerated(response.flashcardSet);
       }
-      
-      // refresh session list to get updated titles (AI sometimes updates session title based on conversation)
+
+      // refresh session list to get updated titles
       if (isAuthenticated) {
         const updatedSessions = chatService.getSessions();
         setSessions(updatedSessions);
       }
     } catch {
+      // Cancel any running animation
+      if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
       // if something goes wrong, show error message to user
       const errorMessage: ChatMessage = {
         id: `error_${Date.now()}`,
@@ -596,7 +681,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      // Remove any streaming placeholder and add error
+      setMessages(prev => {
+        const withoutStreaming = prev.filter(m => !m.isTyping);
+        return [...withoutStreaming, errorMessage];
+      });
     } finally {
       setIsLoading(false);
     }
@@ -633,62 +722,89 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     }
   };
 
-  const formatMessage = (message: ChatMessage) => {
-    let content = message.content;
-    
-    // Handle code blocks (triple backticks)
-    content = content.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (_, language, code) => {
-      const lang = (language && language.trim()) || 'text';
-      const escapedCode = code
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-      
-      return `<div class="code-block-container">
-        <div class="code-block-header">
-          <span class="code-language">${lang !== 'text' ? lang.toUpperCase() : 'CODE'}</span>
-          <button class="copy-code-btn" data-code-content="${escapedCode}" title="Copy code">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-          </button>
-        </div>
-        <pre class="code-block"><code>${escapedCode}</code></pre>
-      </div>`;
+  // Render LaTeX math expressions using KaTeX
+  const renderMath = (html: string): string => {
+    // Render display math: $$...$$ or \[...\]
+    html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
+      try {
+        return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false });
+      } catch { return `<div class="math-block">${tex}</div>`; }
     });
+    html = html.replace(/\\\[([\s\S]*?)\\\]/g, (_, tex) => {
+      try {
+        return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false });
+      } catch { return `<div class="math-block">${tex}</div>`; }
+    });
+
+    // Render inline math: $...$ or \(...\)
+    html = html.replace(/\\\(([\s\S]*?)\\\)/g, (_, tex) => {
+      try {
+        return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false });
+      } catch { return `<span class="math-inline">${tex}</span>`; }
+    });
+    // Single $ delimiters — avoid matching $$ (already handled) or currency like $5
+    html = html.replace(/(?<!\$)\$(?!\$)([^\n$]+?)\$(?!\$)/g, (_, tex) => {
+      try {
+        return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false });
+      } catch { return `<span class="math-inline">${tex}</span>`; }
+    });
+
+    return html;
+  };
+
+  const formatMessage = (message: ChatMessage) => {
+    // For assistant messages, use the robust markdown renderer
+    if (message.role === 'assistant') {
+      // Special handling for code blocks to keep the copy button
+      let content = message.content;
+
+      // Preserve code blocks with custom UI
+      const codeBlocks: string[] = [];
+      content = content.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (_, language, code) => {
+        const lang = (language && language.trim()) || 'text';
+        const escapedCode = code
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+        const block = `<div class="code-block-container">
+          <div class="code-block-header">
+            <span class="code-language">${lang !== 'text' ? lang.toUpperCase() : 'CODE'}</span>
+            <button class="copy-code-btn" data-code-content="${escapedCode}" title="Copy code">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+          <pre class="code-block"><code>${escapedCode}</code></pre>
+        </div>`;
+        codeBlocks.push(block);
+        return `\x01CBUI${codeBlocks.length - 1}\x02`;
+      });
+
+      // Render the rest with the robust markdown utility
+      let rendered = renderMarkdownSafe(content);
+
+      // Render LaTeX math expressions with KaTeX
+      rendered = renderMath(rendered);
+
+      // Restore code blocks
+      codeBlocks.forEach((block, i) => {
+        rendered = rendered.replace(`\x01CBUI${i}\x02`, block);
+      });
+
+      return rendered;
+    }
     
-    // Handle inline code (single backticks)
-    content = content.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-    
-    // Handle math expressions (basic LaTeX-style)
-    content = content.replace(/\$\$([^$]+)\$\$/g, '<div class="math-block">$$$1$$</div>');
-    content = content.replace(/\$([^$]+)\$/g, '<span class="math-inline">$$1$</span>');
-    
-    // Handle step-by-step math solutions
-    content = content.replace(/Step (\d+):\s*(.*)/g, '<div class="math-step"><strong>Step $1:</strong> $2</div>');
-    
-    // Handle bold and italic text
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    
-    // Handle numbered lists with better styling
-    content = content.replace(/^\d+\.\s+(.*)$/gm, '<div class="list-item numbered">$1</div>');
-    
-    // Handle bullet points with better spacing and styling
-    content = content.replace(/^[-•]\s+(.*)$/gm, '<div class="list-item bulleted">$1</div>');
-    
-    // Handle line breaks with proper spacing
-    content = content.replace(/\n\n/g, '<br/><br/>');
-    content = content.replace(/\n/g, '<br/>');
-    
-    // note: we removed the fallback code detection because it was creating false positives
-    // the AI should use proper markdown code blocks with triple backticks
-    // if code doesn't have backticks, it will display as regular text (which is acceptable)
-    
-    return content;
+    // For user messages, simple escape and basic formatting
+    return message.content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>');
   };
 
   const renderSolarIcon = (iconName: string, size: number = 16) => {
@@ -805,13 +921,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   ref={isLastAssistantMessage ? lastAssistantMessageRef : null}
                   className={`message ${message.role} ${message.flashcardSet ? 'flashcard-message' : ''}`}
                 >
-                  <div 
+                  <div
                     className={`message-content ${message.flashcardSet ? 'clickable-flashcard-message' : ''}`}
                     onClick={message.flashcardSet ? () => {
                       setCurrentFlashcardSet(message.flashcardSet!);
                       setShowFlashcardList(true);
                     } : undefined}
                   >
+                    <div className={`message-role-label ${message.role === 'assistant' ? 'newton' : ''}`}>
+                      {message.role === 'user'
+                        ? (user?.name?.split(' ')[0] || 'You')
+                        : 'Newton'}
+                    </div>
                     {message.imageUrls && message.imageUrls.length > 0 && (
                       <div className="message-images">
                         {message.imageUrls.map((url, i) => (
@@ -825,7 +946,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         ))}
                       </div>
                     )}
-                    <div className="message-text">
+                    <div className={`message-text ${message.isTyping ? 'streaming' : ''}`}>
                       <div
                         dangerouslySetInnerHTML={{
                           __html: formatMessage(message)
@@ -850,7 +971,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
             })
           )}
           
-          {isLoading && (
+          {isLoading && !messages.some(m => m.isTyping) && (
             <div className="message assistant">
               <div className="message-content">
                 <div className="typing-indicator">
