@@ -115,7 +115,7 @@ export const renderMarkdown = (text: string): string => {
 
   // ── Paragraphs & line breaks ──
   // Remove blank lines immediately before/after block elements to prevent double-spacing
-  html = html.replace(/\n{2,}(?=<(?:h[1-4]|ul|ol|table|blockquote|hr|div|\x01))/g, '\n');
+  html = html.replace(/\n{2,}(?=<(?:h[1-4]|ul|ol|table|blockquote|hr|div|pre))/g, '\n');
   html = html.replace(/(<\/(?:h[1-4]|ul|ol|table|blockquote|div)>)\n{2,}/g, '$1\n');
   html = html.replace(/<hr>\n{2,}/g, '<hr>\n');
 
