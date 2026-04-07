@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@google-cloud/local-auth": "^2.1.0",
-    "@google/generative-ai": "^0.2.1",
     "@solar-icons/react": "^1.0.1",
     "firebase": "^12.3.0",
     "framer-motion": "^12.23.25",

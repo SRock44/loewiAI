@@ -203,14 +203,7 @@ export class FirebaseService {
       const messages: Array<{ storagePaths?: string[] }> = Array.isArray(data.messages) ? data.messages : [];
       const allPaths = messages.flatMap(m => m.storagePaths ?? []);
       if (allPaths.length > 0) {
-        const result = await this.deleteStorageFiles(allPaths);
-        if (result.failed > 0) {
-          // Use alert so it's visible even with drop_console in production
-          alert(`Storage cleanup: ${result.deleted} deleted, ${result.failed} failed.\n${result.errors.join('\n')}`);
-        }
-      } else {
-        // DEBUG: temporarily alert to check if storagePaths exist in Firestore
-        alert(`DEBUG: No storagePaths found in ${messages.length} messages for session ${sessionId}`);
+        await this.deleteStorageFiles(allPaths);
       }
     }
     await deleteDoc(sessionRef);
@@ -836,6 +829,44 @@ export class FirebaseService {
         totalFlashcards: 0,
         duplicatesFound: 0
       };
+    }
+  }
+
+  /**
+   * Save a single user-level context file that accumulates knowledge across sessions.
+   * Path: context/{userId}.md — one file per user, constantly updated.
+   */
+  async saveUserContext(userId: string, mdContent: string): Promise<void> {
+    try {
+      if (!userId || !mdContent) return;
+
+      const blob = new Blob([mdContent], { type: 'text/markdown' });
+      const path = `context/${userId}.md`;
+      const storageRef = ref(storage, path);
+
+      await uploadBytes(storageRef, blob, {
+        contentType: 'text/markdown',
+        customMetadata: { updatedAt: new Date().toISOString() }
+      });
+    } catch (error) {
+      console.error('Error saving user context:', error);
+    }
+  }
+
+  /**
+   * Fetch the user's context file. Returns empty string if none exists.
+   */
+  async getUserContext(userId: string): Promise<string> {
+    try {
+      const path = `context/${userId}.md`;
+      const storageRef = ref(storage, path);
+      const url = await getDownloadURL(storageRef);
+      const response = await fetch(url);
+      if (response.ok) return await response.text();
+      return '';
+    } catch {
+      // File doesn't exist yet — that's fine
+      return '';
     }
   }
 
