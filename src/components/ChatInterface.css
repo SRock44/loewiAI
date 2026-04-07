@@ -352,6 +352,8 @@
   word-wrap: break-word;
   overflow-wrap: break-word;
   text-align: left;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .message.user .message-text {
@@ -433,6 +435,9 @@
   border-collapse: collapse;
   margin: 12px 0;
   font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 .message-text th,
@@ -1896,7 +1901,7 @@
   overflow: hidden;
   background: #0d1117 !important;
   border: 1px solid #30363d;
-  display: inline-block;
+  display: block;
   max-width: 100%;
 }
 
