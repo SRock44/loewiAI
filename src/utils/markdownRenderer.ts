@@ -152,7 +152,7 @@ export const renderMarkdown = (text: string): string => {
   // ── Final wrapping ──
 
   if (!html.startsWith('<p>') && !html.startsWith('<h') && !html.startsWith('<ul') &&
-      !html.startsWith('<ol') && !html.startsWith('<blockquote') && !html.startsWith('<table')) {
+    !html.startsWith('<ol') && !html.startsWith('<blockquote') && !html.startsWith('<table')) {
     html = `<p>${html}</p>`;
   }
 
@@ -179,6 +179,12 @@ export const cleanFlashcardContent = (text: string): string => {
   if (!text || typeof text !== 'string') return '';
 
   let cleaned = text.trim();
+
+  // Normalize any HTML line breaks from model output back into plain text newlines
+  // before markdown processing so they don't leak into rendered math/table content.
+  cleaned = cleaned
+    .replace(/&lt;br\s*\/?&gt;/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n');
 
   // Remove JSON wrapper if the content is a JSON string
   if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
@@ -234,14 +240,13 @@ export const cleanFlashcardContent = (text: string): string => {
     cleaned = cleaned.replace(/<[^>]+>/g, ' ');
   }
 
-  // Replace escaped characters
+  // Replace escaped characters.
+  // Intentionally avoid unescaping \n, \t, and \r here because LaTeX commands like
+  // \neq or \text would be corrupted by those replacements.
   cleaned = cleaned
-    .replace(/\\n/g, '\n')
-    .replace(/\\t/g, '\t')
     .replace(/\\"/g, '"')
     .replace(/\\'/g, "'")
-    .replace(/\\\\/g, '\\')
-    .replace(/\\r/g, '\r');
+    .replace(/\\\\/g, '\\');
 
   // Clean up excessive whitespace but preserve intentional spacing
   cleaned = cleaned.replace(/[ \t]+/g, ' ');
