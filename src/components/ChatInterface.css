@@ -2246,3 +2246,39 @@ code.token.entity {
     font-size: 0.9rem;
   }
 }
+
+/* ── Document generation loader ── */
+.doc-generating-loader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 2px;
+}
+
+.atom-spinner {
+  flex-shrink: 0;
+}
+
+.orbit { transform-origin: 32px 32px; }
+
+.orbit-1 { animation: orbit-spin 2.2s linear infinite; }
+.orbit-2 { transform: rotate(60deg); animation: orbit-spin-2 2.8s linear infinite; }
+.orbit-3 { transform: rotate(120deg); animation: orbit-spin-3 1.8s linear infinite; }
+
+@keyframes orbit-spin   { to { transform: rotate(360deg); } }
+@keyframes orbit-spin-2 { to { transform: rotate(420deg); } }
+@keyframes orbit-spin-3 { to { transform: rotate(480deg); } }
+
+.doc-generating-text {
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-style: italic;
+  color: #4a5568;
+  animation: doc-msg-fade 0.4s ease;
+}
+
+@keyframes doc-msg-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

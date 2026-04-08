@@ -1,69 +1,128 @@
-import jsPDF from 'jspdf';
+/**
+ * PDF export using jsPDF + html2canvas.
+ *
+ * Renders the document element off-screen at a fixed A4-width, captures it
+ * with html2canvas, slices it into A4 pages, and triggers a real file download
+ * — no print dialog involved.
+ */
+
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
-async function captureAndSave(el: HTMLElement, title?: string): Promise<void> {
-  const canvas = await html2canvas(el, {
-    backgroundColor: '#ffffff',
-    scale: 2,
-    useCORS: true,
-    logging: false,
-  });
+const A4_W_MM = 210;
+const A4_H_MM = 297;
+const MARGIN_MM = 15;
+const CONTENT_W_MM = A4_W_MM - MARGIN_MM * 2;  // 180 mm
+const CONTENT_H_MM = A4_H_MM - MARGIN_MM * 2;  // 267 mm
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: 'a4' });
+/** CSS pixel width we render into (≈ A4 at 96 dpi with side padding removed). */
+const RENDER_PX = 740;
 
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 32;
-  const contentWidth = pageWidth - margin * 2;
+/** html2canvas scale factor — 2× gives crisp, retina-quality text. */
+const SCALE = 2;
 
-  let yOffset = margin;
+async function generatePDF(el: HTMLElement, title?: string): Promise<void> {
+  // ── 1. Build an off-screen, A4-width clone of the content ──────────────────
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'position:fixed;top:-99999px;left:-99999px;' +
+    `width:${RENDER_PX}px;padding:40px 48px;` +
+    'background:#fff;box-sizing:border-box;' +
+    'font-family:"Work Sans",sans-serif;font-size:14px;' +
+    'line-height:1.7;color:#1a202c;';
 
+  // Optional document title header
   if (title) {
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(14);
-    pdf.setTextColor(40, 40, 40);
-    pdf.text(title, margin, yOffset);
-    yOffset += 22;
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText =
+      'font-size:20px;font-weight:700;color:#1a202c;' +
+      'margin:0 0 18px;padding-bottom:10px;' +
+      'border-bottom:2px solid #e2e8f0;';
+    titleEl.textContent = title;
+    wrap.appendChild(titleEl);
   }
 
-  const sliceHeight = ((pageHeight - margin - yOffset) / contentWidth) * canvas.width;
-  let srcY = 0;
+  // Clone the content node so we can strip UI chrome without mutating the DOM
+  const body = document.createElement('div');
+  // Carry over classes (e.g. 'doc-panel-content message-text') so the
+  // document's existing stylesheets keep applying.
+  body.className = el.className;
+  body.innerHTML = el.innerHTML;
+  body.querySelectorAll<HTMLElement>('.copy-code-btn, button').forEach(
+    b => (b.style.display = 'none')
+  );
+  wrap.appendChild(body);
+  document.body.appendChild(wrap);
 
-  while (srcY < canvas.height) {
-    const remaining = canvas.height - srcY;
-    const slice = Math.min(sliceHeight, remaining);
-    const sliceCanvas = document.createElement('canvas');
-    sliceCanvas.width = canvas.width;
-    sliceCanvas.height = slice;
-    const ctx = sliceCanvas.getContext('2d')!;
-    ctx.drawImage(canvas, 0, srcY, canvas.width, slice, 0, 0, canvas.width, slice);
+  try {
+    // ── 2. Render to canvas ─────────────────────────────────────────────────
+    const canvas = await html2canvas(wrap, {
+      scale: SCALE,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+    });
 
-    const sliceData = sliceCanvas.toDataURL('image/png');
-    const sliceRenderedHeight = (slice * contentWidth) / canvas.width;
-    pdf.addImage(sliceData, 'PNG', margin, yOffset, contentWidth, sliceRenderedHeight);
+    // ── 3. Slice canvas into A4 pages and build PDF ─────────────────────────
+    // canvas.width = RENDER_PX * SCALE (e.g. 1480 px) → maps to CONTENT_W_MM
+    const pxPerMm = canvas.width / CONTENT_W_MM;
+    const pageHeightPx = CONTENT_H_MM * pxPerMm;
 
-    srcY += slice;
-    if (srcY < canvas.height) {
-      pdf.addPage();
-      yOffset = margin;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    let yPx = 0;
+    let pageIdx = 0;
+
+    while (yPx < canvas.height) {
+      if (pageIdx++ > 0) pdf.addPage();
+
+      const sliceH = Math.min(pageHeightPx, canvas.height - yPx);
+
+      // Draw the relevant strip of the full canvas into a page-sized slice
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = Math.ceil(sliceH);
+      const ctx = slice.getContext('2d')!;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(
+        canvas,
+        0, yPx, canvas.width, sliceH,
+        0, 0,   canvas.width, sliceH,
+      );
+
+      pdf.addImage(
+        slice.toDataURL('image/jpeg', 0.95),
+        'JPEG',
+        MARGIN_MM,
+        MARGIN_MM,
+        CONTENT_W_MM,
+        sliceH / pxPerMm,
+      );
+
+      yPx += sliceH;
     }
+
+    // ── 4. Trigger download ─────────────────────────────────────────────────
+    const fileName =
+      (title ?? 'document')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '') + '.pdf';
+    pdf.save(fileName);
+  } finally {
+    document.body.removeChild(wrap);
   }
-
-  const fileName = (title ?? 'newton-document')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  pdf.save(`${fileName}.pdf`);
 }
 
-/** Download the panel's content element as a PDF (preferred — captures full document). */
+/** Download the panel's content element as a PDF. */
 export async function downloadElementAsPDF(el: HTMLElement, title?: string): Promise<void> {
-  await captureAndSave(el, title);
+  await generatePDF(el, title);
 }
 
-/** Fallback: look up by data-message-id in the DOM (captures chat bubble, not full doc). */
+/** Fallback: look up by data-message-id in the DOM. */
 export async function downloadMessageAsPDF(messageId: string, title?: string): Promise<void> {
   const el = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
   if (!el) return;
-  await captureAndSave(el, title);
+  await generatePDF(el, title);
 }

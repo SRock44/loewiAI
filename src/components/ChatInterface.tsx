@@ -42,6 +42,47 @@ interface UploadedFile extends DocumentMetadata {
   storagePath?: string;    // Firebase Storage path — used for cleanup on session delete
 }
 
+const DOC_LOADER_MESSAGES = [
+  (title: string) => `Generating your ${title}`,
+  () => 'Gathering relevant concepts',
+  () => 'Compiling key formulas',
+  () => 'Organizing sections',
+  () => 'Formatting equations',
+  () => 'Structuring definitions',
+  () => 'Reviewing worked examples',
+  () => 'Building your reference guide',
+  () => 'Polishing the final layout',
+  () => 'Almost there',
+];
+
+function DocGeneratingLoader({ title }: { title: string }) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % DOC_LOADER_MESSAGES.length), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  const msg = DOC_LOADER_MESSAGES[idx](title);
+
+  return (
+    <div className="doc-generating-loader">
+      <div className="atom-spinner">
+        <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+          <circle cx="32" cy="32" r="4.5" fill="#3b6de0" />
+          <ellipse cx="32" cy="32" rx="28" ry="10" fill="none" stroke="#3b6de0" strokeWidth="1.4" strokeOpacity="0.65"
+            className="orbit orbit-1" />
+          <ellipse cx="32" cy="32" rx="28" ry="10" fill="none" stroke="#3b6de0" strokeWidth="1.4" strokeOpacity="0.65"
+            className="orbit orbit-2" />
+          <ellipse cx="32" cy="32" rx="28" ry="10" fill="none" stroke="#3b6de0" strokeWidth="1.4" strokeOpacity="0.65"
+            className="orbit orbit-3" />
+        </svg>
+      </div>
+      <span className="doc-generating-text">{msg}…</span>
+    </div>
+  );
+}
+
 // this is the main chat interface - handles all user interaction
 // it manages messages, document uploads, chat sessions, and coordinates with the chat service
 const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, ref) => {
@@ -65,6 +106,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [currentFlashcardSet, setCurrentFlashcardSet] = useState<FlashcardSet | null>(null);  // currently viewing flashcard set
   const [docPreviewMessage, setDocPreviewMessage] = useState<ChatMessage | null>(null);
   const [typingText, setTypingText] = useState('');  // for typing animation effect
+  const [generatingDocTitle, setGeneratingDocTitle] = useState<string>('');
   const [modelPreference, setModelPreference] = useState<ModelPreference>(() => {
     // Load from service on mount
     return firebaseAILogicService.getModelPreference();
@@ -79,6 +121,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const revealedLenRef = useRef(0);         // how many chars are currently shown
   const streamDoneRef = useRef(false);      // true when API has finished sending
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDocStreamRef = useRef(false);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const inputActionsLeftRef = useRef<HTMLDivElement>(null);
 
@@ -597,6 +640,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         ...(storagePaths.length > 0 ? { storagePaths } : {}),
       };
 
+      // --- Detect document request before streaming starts ---
+      const willBeDocument = chatService.isDocumentRequest(content.trim());
+      isDocStreamRef.current = willBeDocument;
+      if (willBeDocument) {
+        setGeneratingDocTitle(chatService.extractDocumentTitle(content.trim()));
+      }
+
       // --- Streaming animation setup ---
       const streamingId = `streaming_${Date.now()}`;
       streamBufferRef.current = '';
@@ -618,6 +668,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       const CHARS_PER_TICK = 3;
 
       const revealTick = () => {
+        // Don't reveal document content — we show the atom loader instead
+        if (isDocStreamRef.current) {
+          revealedLenRef.current = streamBufferRef.current.length;
+          if (!streamDoneRef.current) streamTimerRef.current = setTimeout(revealTick, TICK_MS);
+          return;
+        }
+
         const target = streamBufferRef.current.length;
         if (revealedLenRef.current < target) {
           // Advance by CHARS_PER_TICK, then snap forward to the next word boundary
@@ -700,6 +757,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         return [...withoutStreaming, errorMessage];
       });
     } finally {
+      isDocStreamRef.current = false;
+      setGeneratingDocTitle('');
       setIsLoading(false);
     }
   };
@@ -961,16 +1020,20 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         ))}
                       </div>
                     )}
-                    <div
-                      data-message-id={message.id}
-                      className={`message-text ${message.isTyping ? 'streaming' : ''}`}
-                    >
+                    {message.isTyping && isDocStreamRef.current ? (
+                      <DocGeneratingLoader title={generatingDocTitle} />
+                    ) : (
                       <div
-                        dangerouslySetInnerHTML={{
-                          __html: formatMessage(message)
-                        }}
-                      />
-                    </div>
+                        data-message-id={message.id}
+                        className={`message-text ${message.isTyping ? 'streaming' : ''}`}
+                      >
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: formatMessage(message)
+                          }}
+                        />
+                      </div>
+                    )}
 
                     {message.flashcardSet && (
                       <div className="flashcard-message-hint">

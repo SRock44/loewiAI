@@ -821,7 +821,7 @@ The document content above contains all the information needed to provide compre
     return await firebaseAILogicService.testConnection();
   }
 
-  private extractDocumentTitle(message: string): string {
+  public extractDocumentTitle(message: string): string {
     const lower = message.toLowerCase();
 
     let docType = 'Document';
@@ -860,7 +860,7 @@ The document content above contains all the information needed to provide compre
     return capped || fullContent.slice(0, 200);
   }
 
-  private isDocumentRequest(message: string): boolean {
+  public isDocumentRequest(message: string): boolean {
     // Must have BOTH a creation-intent verb AND an explicit document-type noun.
     // This prevents "the problems are in the study guide" from triggering.
     const creationVerbs = /\b(?:create|make|generate|write|build|produce|give me|can you make|can you create|can you generate)\b/i;
