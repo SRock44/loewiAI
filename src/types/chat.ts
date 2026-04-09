@@ -2,6 +2,7 @@
 
 import { FlashcardSet } from './flashcard';
 import { ProcessedDocument } from '../services/documentProcessor';
+import { ProfessionalDocumentMetadata } from './documentIntent';
 
 // Define missing types
 export interface CodeValidationResult {
@@ -27,6 +28,8 @@ export interface ChatMessage {
   documentTitle?: string; // human-readable title for the generated document (e.g. "Calculus Derivatives Study Guide")
   documentContent?: string; // full markdown content of the document — message.content holds only the chat summary
   rating?: 'good' | 'bad'; // user feedback on this message
+  isProfessionalDocument?: boolean; // true when AI generated a professional formatted doc (essay, report, etc.)
+  documentMetadata?: ProfessionalDocumentMetadata; // metadata for professional documents (author, course, citation style, etc.)
 }
 
 export interface ChatSession {

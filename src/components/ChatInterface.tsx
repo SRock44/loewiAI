@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import DocumentPreviewPanel from './DocumentPreviewPanel';
+import ProfessionalDocumentPanel from './ProfessionalDocumentPanel';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { renderMarkdownSafe } from '../utils/markdownRenderer';
@@ -55,15 +56,41 @@ const DOC_LOADER_MESSAGES = [
   () => 'Almost there',
 ];
 
-function DocGeneratingLoader({ title }: { title: string }) {
+const PROF_DOC_LOADER_MESSAGES = [
+  (title: string) => `Drafting your ${title}`,
+  () => 'Structuring the argument',
+  () => 'Writing the introduction',
+  () => 'Developing body paragraphs',
+  () => 'Formatting citations',
+  () => 'Crafting the conclusion',
+  () => 'Building the Works Cited',
+  () => 'Reviewing academic style',
+  () => 'Polishing the final draft',
+  () => 'Almost there',
+];
+
+const FLASHCARD_LOADER_MESSAGES = [
+  (topic: string) => topic ? `Creating flashcards for ${topic}` : 'Creating your flashcards',
+  () => 'Identifying key concepts',
+  () => 'Writing question prompts',
+  () => 'Crafting clear answers',
+  () => 'Balancing difficulty levels',
+  () => 'Adding helpful hints',
+  () => 'Organizing by topic',
+  () => 'Reviewing for accuracy',
+  () => 'Almost ready to study',
+];
+
+function DocGeneratingLoader({ title, isProfessional }: { title: string; isProfessional?: boolean }) {
+  const messages = isProfessional ? PROF_DOC_LOADER_MESSAGES : DOC_LOADER_MESSAGES;
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % DOC_LOADER_MESSAGES.length), 2200);
+    const id = setInterval(() => setIdx(i => (i + 1) % messages.length), 2200);
     return () => clearInterval(id);
-  }, []);
+  }, [messages.length]);
 
-  const msg = DOC_LOADER_MESSAGES[idx](title);
+  const msg = messages[idx](title);
 
   return (
     <div className="doc-generating-loader">
@@ -106,6 +133,57 @@ function DocGeneratingLoader({ title }: { title: string }) {
   );
 }
 
+function FlashcardGeneratingLoader({ topic }: { topic: string }) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % FLASHCARD_LOADER_MESSAGES.length), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  const msg = FLASHCARD_LOADER_MESSAGES[idx](topic);
+
+  return (
+    <div className="doc-generating-loader">
+      <div className="atom-spinner">
+        <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+          <defs>
+            <filter id="fc-atom-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="1.8" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <radialGradient id="fcNucleusGrad" cx="38%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#86efac" />
+              <stop offset="100%" stopColor="#16a34a" />
+            </radialGradient>
+          </defs>
+          {/* Orbit 1 – green */}
+          <g className="orbit-group orbit-group-1">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#16a34a" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#16a34a" filter="url(#fc-atom-glow)" />
+          </g>
+          {/* Orbit 2 – emerald */}
+          <g className="orbit-group orbit-group-2">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#10b981" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#10b981" filter="url(#fc-atom-glow)" />
+          </g>
+          {/* Orbit 3 – teal */}
+          <g className="orbit-group orbit-group-3">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#14b8a6" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#14b8a6" filter="url(#fc-atom-glow)" />
+          </g>
+          {/* Nucleus */}
+          <circle cx="32" cy="32" r="5.5" fill="url(#fcNucleusGrad)" filter="url(#fc-atom-glow)" className="atom-nucleus" />
+        </svg>
+      </div>
+      <span className="doc-generating-text">{msg}…</span>
+    </div>
+  );
+}
+
 // this is the main chat interface - handles all user interaction
 // it manages messages, document uploads, chat sessions, and coordinates with the chat service
 const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, ref) => {
@@ -130,6 +208,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [docPreviewMessage, setDocPreviewMessage] = useState<ChatMessage | null>(null);
   const [typingText, setTypingText] = useState('');  // for typing animation effect
   const [generatingDocTitle, setGeneratingDocTitle] = useState<string>('');
+  const [generatingDocIsProfessional, setGeneratingDocIsProfessional] = useState(false);
   const [messageRatings, setMessageRatings] = useState<Record<string, 'good' | 'bad'>>({});
   const [retryDialogMsgId, setRetryDialogMsgId] = useState<string | null>(null);
   const [retryFeedback, setRetryFeedback] = useState('');
@@ -149,6 +228,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const streamDoneRef = useRef(false);      // true when API has finished sending
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDocStreamRef = useRef(false);
+  const isFlashcardStreamRef = useRef(false);
+  const [generatingFlashcardTopic, setGeneratingFlashcardTopic] = useState('');
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const inputActionsLeftRef = useRef<HTMLDivElement>(null);
 
@@ -667,11 +748,23 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         ...(storagePaths.length > 0 ? { storagePaths } : {}),
       };
 
-      // --- Detect document request before streaming starts ---
-      const willBeDocument = chatService.isDocumentRequest(content.trim());
+      // --- Detect document / flashcard request before streaming starts ---
+      // mightBeDocument covers both academic-resource and professional-document types
+      const trimmed = content.trim();
+      const willBeFlashcard = chatService.mightBeFlashcard(trimmed);
+      const willBeDocument = !willBeFlashcard && chatService.mightBeDocument(trimmed);
+      isFlashcardStreamRef.current = willBeFlashcard;
       isDocStreamRef.current = willBeDocument;
+      if (willBeFlashcard) {
+        const topicMatch = trimmed.match(/flashcards?\s+(?:for|about|on)\s+(.+)/i)
+          ?? trimmed.match(/(?:create|make|generate)\s+flashcards?\s+(?:for|about|on)\s+(.+)/i);
+        setGeneratingFlashcardTopic(topicMatch?.[1]?.replace(/[.!?]+$/, '').trim() ?? '');
+      }
       if (willBeDocument) {
-        setGeneratingDocTitle(chatService.extractDocumentTitle(content.trim()));
+        // Check if this looks like a professional document vs academic resource
+        const looksProf = /\b(?:essay|research paper|lab report|thesis|term paper|mla|apa|chicago|cover letter|resume|argumentative|analytical paper|position paper)\b/i.test(trimmed);
+        setGeneratingDocIsProfessional(looksProf);
+        setGeneratingDocTitle(chatService.extractDocumentTitle(trimmed));
       }
 
       // --- Streaming animation setup ---
@@ -695,8 +788,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       const CHARS_PER_TICK = 3;
 
       const revealTick = () => {
-        // Don't reveal document content — we show the atom loader instead
-        if (isDocStreamRef.current) {
+        // Don't reveal document/flashcard content — we show the atom loader instead
+        if (isDocStreamRef.current || isFlashcardStreamRef.current) {
           revealedLenRef.current = streamBufferRef.current.length;
           if (!streamDoneRef.current) streamTimerRef.current = setTimeout(revealTick, TICK_MS);
           return;
@@ -785,7 +878,9 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       });
     } finally {
       isDocStreamRef.current = false;
+      isFlashcardStreamRef.current = false;
       setGeneratingDocTitle('');
+      setGeneratingFlashcardTopic('');
       setIsLoading(false);
     }
   };
@@ -908,6 +1003,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setIsLoading(false);
       setIsRetrying(false);
       isDocStreamRef.current = false;
+      isFlashcardStreamRef.current = false;
     }
   };
 
@@ -1139,11 +1235,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   className={`message ${message.role} ${message.flashcardSet ? 'flashcard-message' : ''}`}
                 >
                   <div
-                    className={`message-content ${message.flashcardSet ? 'clickable-flashcard-message' : ''}`}
-                    onClick={message.flashcardSet ? () => {
-                      setCurrentFlashcardSet(message.flashcardSet!);
-                      setShowFlashcardList(true);
-                    } : undefined}
+                    className="message-content"
                   >
                     <div className={`message-role-label ${message.role === 'assistant' ? 'newton' : ''}`}>
                       {message.role === 'user'
@@ -1163,8 +1255,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         ))}
                       </div>
                     )}
-                    {message.isTyping && isDocStreamRef.current ? (
-                      <DocGeneratingLoader title={generatingDocTitle} />
+                    {message.isTyping && isFlashcardStreamRef.current ? (
+                      <FlashcardGeneratingLoader topic={generatingFlashcardTopic} />
+                    ) : message.isTyping && isDocStreamRef.current ? (
+                      <DocGeneratingLoader title={generatingDocTitle} isProfessional={generatingDocIsProfessional} />
                     ) : (
                       <div
                         data-message-id={message.id}
@@ -1179,9 +1273,15 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                     )}
 
                     {message.flashcardSet && (
-                      <div className="flashcard-message-hint">
+                      <button
+                        className="flashcard-message-hint"
+                        onClick={() => {
+                          setCurrentFlashcardSet(message.flashcardSet!);
+                          setShowFlashcardList(true);
+                        }}
+                      >
                         <span className="hint-text">Click to view flashcards</span>
-                      </div>
+                      </button>
                     )}
                     {message.isDocument && !message.isTyping && (
                       <button
@@ -1198,9 +1298,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         </div>
                         <div className="doc-attachment-info">
                           <span className="doc-attachment-name">
-                            {(message.documentTitle ?? 'Document').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}.pdf
+                            {(message.documentTitle ?? 'Document').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}{message.isProfessionalDocument ? '.pdf' : '.pdf'}
                           </span>
-                          <span className="doc-attachment-meta">PDF · Click to preview</span>
+                          <span className="doc-attachment-meta">
+                            {message.isProfessionalDocument
+                              ? `${message.documentMetadata?.citationStyle ?? 'DOC'} · Click to preview`
+                              : 'PDF · Click to preview'}
+                          </span>
                         </div>
                       </button>
                     )}
@@ -1409,15 +1513,25 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
       {/* Document Preview Panel — sibling to chat-main, forms the right column */}
       {docPreviewMessage && (
-        <DocumentPreviewPanel
-          messageId={docPreviewMessage.id}
-          title={docPreviewMessage.documentTitle ?? 'Document'}
-          contentHtml={formatMessage({
-            ...docPreviewMessage,
-            content: docPreviewMessage.documentContent ?? docPreviewMessage.content,
-          })}
-          onClose={() => setDocPreviewMessage(null)}
-        />
+        docPreviewMessage.isProfessionalDocument ? (
+          <ProfessionalDocumentPanel
+            messageId={docPreviewMessage.id}
+            title={docPreviewMessage.documentTitle ?? 'Document'}
+            contentMarkdown={docPreviewMessage.documentContent ?? docPreviewMessage.content}
+            metadata={docPreviewMessage.documentMetadata}
+            onClose={() => setDocPreviewMessage(null)}
+          />
+        ) : (
+          <DocumentPreviewPanel
+            messageId={docPreviewMessage.id}
+            title={docPreviewMessage.documentTitle ?? 'Document'}
+            contentHtml={formatMessage({
+              ...docPreviewMessage,
+              content: docPreviewMessage.documentContent ?? docPreviewMessage.content,
+            })}
+            onClose={() => setDocPreviewMessage(null)}
+          />
+        )
       )}
 
       {/* Flashcard List Modal */}
