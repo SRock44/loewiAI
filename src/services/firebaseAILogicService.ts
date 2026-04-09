@@ -192,17 +192,12 @@ DOCUMENT GENERATION (study guides, formula sheets, cheat sheets, reference sheet
 
 
       // Try the requested model, fallback to moonshot-v1-128k if it fails
-      let completion;
-      try {
-        completion = await this.groqClient!.chat.completions.create({
-          messages,
-          model: this.modelName,
-          temperature: 0.7,
-          max_tokens: 4096
-        });
-      } catch (modelError: unknown) {
-        throw modelError;
-      }
+      const completion = await this.groqClient!.chat.completions.create({
+        messages,
+        model: this.modelName,
+        temperature: 0.7,
+        max_tokens: 4096
+      });
 
       const content = completion.choices[0]?.message?.content || '';
 
@@ -221,9 +216,7 @@ DOCUMENT GENERATION (study guides, formula sheets, cheat sheets, reference sheet
         } : undefined
       };
     } catch (error: unknown) {
-      const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = err?.response?.data || err?.body || err?.message || error;
       throw new Error(`AI error: ${errorMessage}`);
     }
   }
@@ -365,17 +358,12 @@ CONTENT:
 
 
       // Try the requested model, fallback to moonshot-v1-128k if it fails
-      let completion;
-      try {
-        completion = await this.groqClient!.chat.completions.create({
-          messages,
-          model: this.modelName,
-          temperature: 0.5,
-          max_tokens: 8192 // Higher token limit for flashcard generation
-        });
-      } catch (modelError: unknown) {
-        throw modelError;
-      }
+      const completion = await this.groqClient!.chat.completions.create({
+        messages,
+        model: this.modelName,
+        temperature: 0.5,
+        max_tokens: 8192 // Higher token limit for flashcard generation
+      });
 
       const content = completion.choices[0]?.message?.content || '';
 
@@ -394,9 +382,7 @@ CONTENT:
         } : undefined
       };
     } catch (error: unknown) {
-      const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = err?.response?.data || err?.body || err?.message || error;
       throw new Error(`AI flashcard error: ${errorMessage}`);
     }
   }
@@ -616,7 +602,7 @@ export class FirebaseAILogicService {
         if (provider !== this.currentProvider && provider.isAvailable()) {
           try {
             return await provider.generateResponse(_message, _context, _conversationHistory);
-          } catch (_fallbackError) {
+          } catch {
             // Fallback failed, try next
           }
         }
@@ -637,7 +623,7 @@ export class FirebaseAILogicService {
     if (this.groqProvider && this.groqProvider.isAvailable()) {
       try {
         return await this.groqProvider.generateResponseStream(_message, _context, _conversationHistory, onChunk);
-      } catch (_error) {
+      } catch {
         // Streaming failed, fall back to non-streaming
       }
     }
