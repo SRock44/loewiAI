@@ -37,16 +37,13 @@ class ChatServiceImpl implements ChatService {
   // when they sign out, we clear everything from memory
   private setupAuthStateListener() {
     firebaseAuthService.onAuthStateChange((user) => {
-      console.log('🔐 Auth state changed:', user ? `User ${user.id}` : 'No user');
       if (user && user.id !== this.currentUserId) {
         // user just signed in or switched accounts - load their sessions from firebase
-        console.log('👤 User signed in, loading sessions...');
         this.currentUserId = user.id;
         this.loadSessionsFromFirebase();
         this.loadUserContext();
       } else if (!user && this.currentUserId) {
         // user signed out - clean up everything
-        console.log('👋 User signed out, clearing sessions...');
         if (this.realtimeUnsubscribe) {
           this.realtimeUnsubscribe();
           this.realtimeUnsubscribe = null;
@@ -433,24 +430,18 @@ Would you like me to help you with anything else about the code, such as explain
     }
     
     try {
-      console.log('🗑️ Starting deletion process:', { sessionId });
-
       // If signed in, delete from Firestore.
       // (Messages are stored on the session document itself.)
       if (userId) {
         await firebaseService.deleteChatSession(sessionId);
         await this.loadSessionsFromFirebase();
       }
-      
+
       // Remove from local memory (for both Firebase and local sessions)
-      console.log('🗑️ Step 4: Removing from local memory...');
       this.sessions.delete(sessionId);
-      console.log('✅ Step 4: Removed from local memory');
-      
+
       // Dispatch event to notify all connected devices of the deletion
-      console.log('🗑️ Step 5: Dispatching session update event...');
       window.dispatchEvent(new CustomEvent('sessionUpdated'));
-      console.log('✅ Step 5: Session update event dispatched');
       
     } catch (error) {
       console.error('❌ Firebase deletion failed:', error);

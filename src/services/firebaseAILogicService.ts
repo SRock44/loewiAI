@@ -190,7 +190,6 @@ DOCUMENT GENERATION (study guides, formula sheets, cheat sheets, reference sheet
       // Add user message
       messages.push({ role: 'user', content: _message });
 
-      console.log(`Groq API call - Model: ${this.modelName}, Messages: ${messages.length}`);
 
       // Try the requested model, fallback to moonshot-v1-128k if it fails
       let completion;
@@ -202,15 +201,13 @@ DOCUMENT GENERATION (study guides, formula sheets, cheat sheets, reference sheet
           max_tokens: 4096
         });
       } catch (modelError: unknown) {
-        // If model not found, log error and rethrow
-        console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
         throw modelError;
       }
 
       const content = completion.choices[0]?.message?.content || '';
 
       if (!content || content.trim().length === 0) {
-        throw new Error('Empty response from Groq');
+        throw new Error('Empty response from AI');
       }
 
       return {
@@ -227,13 +224,7 @@ DOCUMENT GENERATION (study guides, formula sheets, cheat sheets, reference sheet
       const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorDetails = err?.response?.data || err?.body || err?.message || error;
-      console.error('Groq API error:', {
-        message: errorMessage,
-        details: errorDetails,
-        model: this.modelName,
-        status: err?.status || err?.statusCode
-      });
-      throw new Error(`Groq error: ${errorMessage}`);
+      throw new Error(`AI error: ${errorMessage}`);
     }
   }
 
@@ -372,7 +363,6 @@ CONTENT:
       // Add the flashcard generation prompt as user message
       messages.push({ role: 'user', content: _prompt });
 
-      console.log(`Groq flashcard API call - Model: ${this.modelName}`);
 
       // Try the requested model, fallback to moonshot-v1-128k if it fails
       let completion;
@@ -384,15 +374,13 @@ CONTENT:
           max_tokens: 8192 // Higher token limit for flashcard generation
         });
       } catch (modelError: unknown) {
-        // If model not found, log error and rethrow
-        console.error(`Groq model ${this.modelName} not found or not accessible:`, modelError);
         throw modelError;
       }
 
       const content = completion.choices[0]?.message?.content || '';
 
       if (!content || content.trim().length < 10) {
-        throw new Error('Empty or incomplete response from Groq');
+        throw new Error('Empty or incomplete response from AI');
       }
 
       return {
@@ -409,13 +397,7 @@ CONTENT:
       const err = error as AIServiceError;
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorDetails = err?.response?.data || err?.body || err?.message || error;
-      console.error('Groq flashcard API error:', {
-        message: errorMessage,
-        details: errorDetails,
-        model: this.modelName,
-        status: err?.status || err?.statusCode
-      });
-      throw new Error(`Groq flashcard error: ${errorMessage}`);
+      throw new Error(`AI flashcard error: ${errorMessage}`);
     }
   }
 }
@@ -629,17 +611,12 @@ export class FirebaseAILogicService {
     try {
       return await this.currentProvider.generateResponse(_message, _context, _conversationHistory);
     } catch (error) {
-      // Log the error for debugging
-      console.error('Primary provider failed:', error);
-
       // Try fallback providers
       for (const provider of this.providers) {
         if (provider !== this.currentProvider && provider.isAvailable()) {
           try {
-            console.log(`Trying fallback provider: ${provider.name}`);
             return await provider.generateResponse(_message, _context, _conversationHistory);
-          } catch (fallbackError) {
-            console.error(`Fallback provider ${provider.name} failed:`, fallbackError);
+          } catch (_fallbackError) {
             // Fallback failed, try next
           }
         }
@@ -660,8 +637,8 @@ export class FirebaseAILogicService {
     if (this.groqProvider && this.groqProvider.isAvailable()) {
       try {
         return await this.groqProvider.generateResponseStream(_message, _context, _conversationHistory, onChunk);
-      } catch (error) {
-        console.error('Streaming failed, falling back to non-streaming:', error);
+      } catch (_error) {
+        // Streaming failed, fall back to non-streaming
       }
     }
     // Fallback to non-streaming

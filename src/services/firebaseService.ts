@@ -211,18 +211,15 @@ export class FirebaseService {
 
   async deleteSessionMessages(sessionId: string): Promise<void> {
     try {
-      console.log('🗑️ Firebase: Deleting messages for session:', sessionId);
       const messagesRef = collection(db, 'messages');
       const q = query(messagesRef, where('sessionId', '==', sessionId));
       const snapshot = await getDocs(q);
-      
-      console.log(`🗑️ Firebase: Found ${snapshot.docs.length} messages to delete`);
-      const deletePromises = snapshot.docs.map(docSnapshot => 
+
+      const deletePromises = snapshot.docs.map(docSnapshot =>
         deleteDoc(doc(db, 'messages', docSnapshot.id))
       );
-      
+
       await Promise.all(deletePromises);
-      console.log('✅ Firebase: Session messages deleted successfully');
     } catch (error) {
       console.error('❌ Firebase: Error deleting session messages:', error);
       throw error;
@@ -473,34 +470,20 @@ export class FirebaseService {
 
   async deleteFlashcardSet(setId: string, userId: string): Promise<void> {
     try {
-      console.log('🔍 Checking flashcard set for deletion:', { setId, userId });
-      
       // First verify the flashcard set belongs to the user
       const setRef = doc(db, 'flashcardSets', setId);
       const setDoc = await getDoc(setRef);
-      
+
       if (!setDoc.exists()) {
-        console.error('❌ Flashcard set not found in Firebase:', setId);
         throw new Error('Flashcard set not found');
       }
-      
+
       const setData = setDoc.data();
-      console.log('📋 Flashcard set data:', { 
-        setId, 
-        setUserId: setData.userId, 
-        requestingUserId: userId,
-        title: setData.title,
-        hasLocalId: setId.startsWith('set_')
-      });
-      
       if (setData.userId !== userId) {
-        console.error('❌ Access denied - flashcard set belongs to different user');
         throw new Error('Access denied - flashcard set belongs to different user');
       }
-      
-      console.log('✅ User authorized, proceeding with deletion');
+
       await deleteDoc(setRef);
-      console.log('✅ Successfully deleted flashcard set from Firebase');
     } catch (error) {
       console.error('Error deleting flashcard set:', error);
       throw error;
@@ -622,10 +605,6 @@ export class FirebaseService {
         }
       }
       
-      if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} expired chat sessions (24+ hours old)`);
-      }
-      
       return deletedCount;
     } catch (error) {
       console.error('Error cleaning up expired sessions:', error);
@@ -676,10 +655,6 @@ export class FirebaseService {
             console.error(`Error deleting old flashcard ${flashcardDoc.id}:`, error);
           }
         }
-      }
-      
-      if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} expired flashcard sets (24+ hours old)`);
       }
       
       return deletedCount;

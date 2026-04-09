@@ -282,21 +282,17 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
   const handleDeleteChat = async (chatId: string) => {
     try {
-      console.log('🗑️ Layout: Starting chat deletion for:', chatId);
       await chatService.deleteSession(chatId);
-      console.log('✅ Layout: Chat service deletion completed');
-      
+
       // The chatService.deleteSession already reloads from Firebase and dispatches sessionUpdated
       // Just refresh the local state
       const updatedSessions = chatService.getSessions();
-      console.log('📋 Layout: Updated sessions after deletion:', updatedSessions.length);
       setChatSessions(updatedSessions);
-      
+
       // Notify parent component that a chat was deleted
       if (onChatDelete) {
         onChatDelete(chatId);
       }
-      console.log('✅ Layout: Chat deletion completed successfully');
     } catch (error) {
       console.error('❌ Layout: Error deleting chat:', error);
       alert('Failed to delete chat. Please try again.');
