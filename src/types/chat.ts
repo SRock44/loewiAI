@@ -26,6 +26,7 @@ export interface ChatMessage {
   isDocument?: boolean; // true when AI generated a downloadable document (study guide, formula sheet, etc.)
   documentTitle?: string; // human-readable title for the generated document (e.g. "Calculus Derivatives Study Guide")
   documentContent?: string; // full markdown content of the document — message.content holds only the chat summary
+  rating?: 'good' | 'bad'; // user feedback on this message
 }
 
 export interface ChatSession {

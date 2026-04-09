@@ -130,6 +130,10 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [docPreviewMessage, setDocPreviewMessage] = useState<ChatMessage | null>(null);
   const [typingText, setTypingText] = useState('');  // for typing animation effect
   const [generatingDocTitle, setGeneratingDocTitle] = useState<string>('');
+  const [messageRatings, setMessageRatings] = useState<Record<string, 'good' | 'bad'>>({});
+  const [retryDialogMsgId, setRetryDialogMsgId] = useState<string | null>(null);
+  const [retryFeedback, setRetryFeedback] = useState('');
+  const [isRetrying, setIsRetrying] = useState(false);
   const [modelPreference, setModelPreference] = useState<ModelPreference>(() => {
     // Load from service on mount
     return firebaseAILogicService.getModelPreference();
@@ -791,6 +795,122 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     sendMessage(inputValue);
   };
 
+  // ── Rating handlers ──────────────────────────────────────────────────────────
+
+  const handleRate = async (message: ChatMessage, rating: 'good' | 'bad') => {
+    const current = messageRatings[message.id];
+
+    // Tapping the active rating deselects it
+    if (current === rating) {
+      setMessageRatings(prev => { const n = { ...prev }; delete n[message.id]; return n; });
+      await chatService.removeRating(message.id);
+      return;
+    }
+
+    // Switch to new rating (overwrites previous record in Firestore via setDoc)
+    setMessageRatings(prev => ({ ...prev, [message.id]: rating }));
+    if (!currentSession) return;
+    const msgIdx = messages.findIndex(m => m.id === message.id);
+    const prevUser = messages.slice(0, msgIdx).reverse().find(m => m.role === 'user');
+    await chatService.rateMessage(
+      message.id,
+      currentSession.id,
+      rating,
+      message.content,
+      prevUser?.content ?? ''
+    );
+  };
+
+  const openRetryDialog = (msgId: string) => {
+    setRetryDialogMsgId(msgId);
+    setRetryFeedback('');
+  };
+
+  const handleRetrySubmit = async () => {
+    if (!retryDialogMsgId || !currentSession || isRetrying) return;
+    const feedback = retryFeedback.trim() || undefined;
+    const retryingId = retryDialogMsgId;
+    setRetryDialogMsgId(null);
+    setIsRetrying(true);
+    setIsLoading(true);
+
+    // Strip the old assistant message from the UI
+    setMessages(prev => {
+      const idx = prev.findIndex(m => m.id === retryingId);
+      return idx >= 0 ? prev.slice(0, idx) : prev;
+    });
+
+    const streamingId = `streaming_${Date.now()}`;
+    streamBufferRef.current = '';
+    revealedLenRef.current = 0;
+    streamDoneRef.current = false;
+    isDocStreamRef.current = false;
+
+    setMessages(prev => [...prev, {
+      id: streamingId,
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date(),
+      isTyping: true
+    }]);
+
+    const TICK_MS = 30;
+    const CHARS_PER_TICK = 3;
+    const revealTick = () => {
+      if (!isDocStreamRef.current) {
+        const target = streamBufferRef.current.length;
+        if (revealedLenRef.current < target) {
+          let next = Math.min(revealedLenRef.current + CHARS_PER_TICK, target);
+          if (next < target) {
+            const spaceIdx = streamBufferRef.current.indexOf(' ', next);
+            if (spaceIdx !== -1 && spaceIdx - next < 15) next = spaceIdx + 1;
+          }
+          revealedLenRef.current = next;
+          const slice = streamBufferRef.current.slice(0, revealedLenRef.current);
+          setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, content: slice } : m));
+        }
+      }
+      if (!(streamDoneRef.current && revealedLenRef.current >= streamBufferRef.current.length)) {
+        streamTimerRef.current = setTimeout(revealTick, TICK_MS);
+      }
+    };
+    streamTimerRef.current = setTimeout(revealTick, TICK_MS);
+
+    try {
+      const onStreamChunk = (partial: string) => { streamBufferRef.current = partial; };
+      const response = await chatService.retryMessage(currentSession.id, retryingId, feedback, onStreamChunk);
+      streamDoneRef.current = true;
+      streamBufferRef.current = response.content;
+
+      await new Promise<void>(resolve => {
+        const waitDone = () => {
+          if (revealedLenRef.current >= streamBufferRef.current.length) {
+            if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+            resolve();
+          } else setTimeout(waitDone, TICK_MS);
+        };
+        waitDone();
+      });
+
+      setMessages(prev => prev.map(m => m.id === streamingId ? { ...response, isTyping: false } : m));
+      if (response.flashcardSet) handleFlashcardsGenerated(response.flashcardSet);
+      setSessions(chatService.getSessions());
+    } catch {
+      if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+      const errMsg: ChatMessage = {
+        id: `error_${Date.now()}`,
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while regenerating. Please try again.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev.filter(m => !m.isTyping), errMsg]);
+    } finally {
+      setIsLoading(false);
+      setIsRetrying(false);
+      isDocStreamRef.current = false;
+    }
+  };
+
   const handleQuickAction = (action: QuickAction) => {
     setInputValue(action.prompt);
     // Focus the input field so user can continue typing
@@ -1091,6 +1211,38 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                           : new Date(message.timestamp).toLocaleTimeString()
                         }
                       </div>
+                      {message.role === 'assistant' && !message.isTyping && (
+                        <div className="message-actions">
+                          <button
+                            className={`msg-action-btn${messageRatings[message.id] === 'good' ? ' rated-good' : ''}`}
+                            onClick={() => handleRate(message, 'good')}
+                            title="Good response"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
+                            </svg>
+                          </button>
+                          <button
+                            className={`msg-action-btn${messageRatings[message.id] === 'bad' ? ' rated-bad' : ''}`}
+                            onClick={() => handleRate(message, 'bad')}
+                            title="Bad response"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/>
+                            </svg>
+                          </button>
+                          <button
+                            className="msg-action-btn retry-btn"
+                            onClick={() => openRetryDialog(message.id)}
+                            title="Regenerate response"
+                            disabled={isLoading}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1297,6 +1449,35 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
             className="lightbox-image"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {retryDialogMsgId && (
+        <div className="retry-overlay" onClick={() => !isRetrying && setRetryDialogMsgId(null)}>
+          <div className="retry-dialog" onClick={e => e.stopPropagation()}>
+            <div className="retry-dialog-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+              <h4>Regenerate Response</h4>
+            </div>
+            <p className="retry-dialog-desc">How can we improve this response? <span>(optional)</span></p>
+            <textarea
+              className="retry-feedback-input"
+              value={retryFeedback}
+              onChange={e => setRetryFeedback(e.target.value)}
+              placeholder="e.g. Make it simpler, add more examples, be more concise..."
+              rows={3}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRetrySubmit(); }}
+            />
+            <div className="retry-dialog-actions">
+              <button className="retry-cancel" onClick={() => setRetryDialogMsgId(null)}>Cancel</button>
+              <button className="retry-submit" onClick={handleRetrySubmit} disabled={isLoading}>
+                Regenerate
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

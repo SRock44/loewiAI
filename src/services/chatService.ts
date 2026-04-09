@@ -22,6 +22,8 @@ class ChatServiceImpl implements ChatService {
   private realtimeUnsubscribe: (() => void) | null = null;
   // In-memory user context — loaded once per sign-in, avoids repeated fetches
   private userContextCache: string = '';
+  // In-memory user memory — persisted facts about the user across sessions
+  private userMemoryCache: string = '';
   // Throttle context saves — adaptive interval based on activity
   private lastContextSaveTime = 0;
   private recentMessageTimestamps: number[] = []; // tracks message times for activity detection
@@ -42,6 +44,7 @@ class ChatServiceImpl implements ChatService {
         this.currentUserId = user.id;
         this.loadSessionsFromFirebase();
         this.loadUserContext();
+        this.loadUserMemory();
       } else if (!user && this.currentUserId) {
         // user signed out - clean up everything
         if (this.realtimeUnsubscribe) {
@@ -52,6 +55,7 @@ class ChatServiceImpl implements ChatService {
         this.sessions.clear();
         this.messageCounter = 0;
         this.userContextCache = '';
+        this.userMemoryCache = '';
         this.lastContextSaveTime = 0;
         this.recentMessageTimestamps = [];
       }
@@ -645,6 +649,142 @@ Please provide the corrected version with the same formatting and structure, but
   }
 
   /**
+   * Load user memory from Firestore into memory (called once on sign-in).
+   */
+  private async loadUserMemory() {
+    if (!this.currentUserId) return;
+    try {
+      this.userMemoryCache = await firebaseService.getUserMemory(this.currentUserId);
+    } catch {
+      this.userMemoryCache = '';
+    }
+  }
+
+  /**
+   * Append a fact/note to the in-memory user memory and persist it.
+   */
+  private appendToUserMemory(note: string) {
+    if (!this.currentUserId) return;
+    const updated = this.userMemoryCache
+      ? `${this.userMemoryCache}\n${note}`
+      : `# User Memory\n\n${note}`;
+    this.userMemoryCache = updated;
+    firebaseService.saveUserMemory(this.currentUserId, updated).catch(() => {});
+  }
+
+  /**
+   * Remove a previously submitted rating (user deselected it).
+   */
+  async removeRating(messageId: string): Promise<void> {
+    await firebaseService.deleteMessageRating(messageId);
+  }
+
+  /**
+   * Record a thumbs-up / thumbs-down rating for an assistant message.
+   */
+  async rateMessage(
+    messageId: string,
+    sessionId: string,
+    rating: 'good' | 'bad',
+    assistantContent: string,
+    userContent: string,
+    feedback?: string
+  ): Promise<void> {
+    if (!this.currentUserId) return;
+    await firebaseService.saveMessageRating({
+      messageId,
+      sessionId,
+      userId: this.currentUserId,
+      rating,
+      assistantContent,
+      userContent,
+      feedback
+    });
+    if (rating === 'bad' && feedback) {
+      const topicPreview = userContent.substring(0, 80).replace(/\n/g, ' ');
+      this.appendToUserMemory(
+        `- [${new Date().toLocaleDateString()}] Improvement requested for: "${topicPreview}" — Feedback: "${feedback}"`
+      );
+    }
+  }
+
+  /**
+   * Retry an assistant message: removes it from the session and regenerates using the
+   * preceding user message, optionally incorporating improvement feedback.
+   */
+  async retryMessage(
+    sessionId: string,
+    assistantMessageId: string,
+    feedback?: string,
+    onStreamChunk?: (partial: string) => void
+  ): Promise<ChatMessage> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const assistantIdx = session.messages.findIndex(m => m.id === assistantMessageId);
+    if (assistantIdx < 0) throw new Error('Assistant message not found');
+
+    // Remove the assistant message (and anything after it)
+    const removed = session.messages.splice(assistantIdx);
+
+    // The message just before should be the user's prompt
+    const userMsg = session.messages[session.messages.length - 1];
+    if (!userMsg || userMsg.role !== 'user') {
+      session.messages.push(...removed);
+      throw new Error('No preceding user message found');
+    }
+
+    // Persist retry feedback to user memory so future responses honour it
+    if (feedback) {
+      const topicPreview = userMsg.content.substring(0, 80).replace(/\n/g, ' ');
+      this.appendToUserMemory(
+        `- [${new Date().toLocaleDateString()}] User preference (from retry): "${feedback}" (context: "${topicPreview}")`
+      );
+    }
+
+    const documentContext = this.buildDocumentContext(session.documentIds || []);
+    const conversationContext = await this.buildConversationContext(sessionId);
+
+    const messageForAI = feedback
+      ? `${userMsg.content}\n\n[The previous response was unsatisfactory. Please provide a significantly improved answer addressing this feedback: "${feedback}"]`
+      : userMsg.content;
+
+    try {
+      const aiResponse: AIResponse = onStreamChunk
+        ? await firebaseAILogicService.generateResponseStream(messageForAI, documentContext, conversationContext, onStreamChunk)
+        : await firebaseAILogicService.generateResponse(messageForAI, documentContext, conversationContext);
+
+      const isDoc = this.isDocumentRequest(userMsg.content);
+      const chatContent = isDoc ? this.extractDocumentSummary(aiResponse.content) : aiResponse.content;
+
+      const newMsg: ChatMessage = {
+        id: `msg_${Date.now()}_${++this.messageCounter}`,
+        role: 'assistant',
+        content: chatContent,
+        timestamp: new Date(),
+        ...(isDoc ? {
+          isDocument: true,
+          documentTitle: this.extractDocumentTitle(userMsg.content),
+          documentContent: aiResponse.content
+        } : {})
+      };
+
+      session.messages.push(newMsg);
+      session.updatedAt = new Date();
+
+      if (this.currentUserId) {
+        firebaseService.saveChatSession(session, this.currentUserId).catch(() => {});
+      }
+
+      return newMsg;
+    } catch (error) {
+      // Restore removed messages so the session isn't left broken
+      session.messages.push(...removed);
+      throw error;
+    }
+  }
+
+  /**
    * Build a condensed context summary from a session (topics + key facts, not raw messages).
    */
   private buildSessionSummary(session: ChatSession): string {
@@ -721,7 +861,14 @@ Please provide the corrected version with the same formatting and structure, but
   private async buildConversationContext(sessionId: string): Promise<string> {
     let context = '';
 
-    // 1. Add user context from memory (loaded once on sign-in, updated every 2h)
+    // 1. Add user memory (persisted facts about the user — preferences, feedback patterns)
+    if (this.userMemoryCache) {
+      context += '\n\nUSER MEMORY:\n';
+      context += this.userMemoryCache;
+      context += '\n';
+    }
+
+    // 2. Add user context from memory (loaded once on sign-in, updated every 2h)
     if (this.userContextCache) {
       context += '\n\nUSER STUDY HISTORY:\n';
       context += this.userContextCache;

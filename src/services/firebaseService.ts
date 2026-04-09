@@ -898,12 +898,13 @@ export class FirebaseService {
     }
   }
 
-  async saveUserSettings(userId: string, settings: { educationLevel: string; major: string }): Promise<void> {
+  async saveUserSettings(userId: string, settings: { educationLevel: string; major: string; responsePreferences: string }): Promise<void> {
     try {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
         educationLevel: settings.educationLevel,
         major: settings.major,
+        responsePreferences: settings.responsePreferences,
         updatedAt: serverTimestamp()
       });
     } catch (error: unknown) {
@@ -913,6 +914,7 @@ export class FirebaseService {
           id: userId,
           educationLevel: settings.educationLevel,
           major: settings.major,
+          responsePreferences: settings.responsePreferences,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -922,23 +924,23 @@ export class FirebaseService {
     }
   }
 
-  async getUserSettings(userId: string): Promise<{ educationLevel: string; major: string }> {
+  async getUserSettings(userId: string): Promise<{ educationLevel: string; major: string; responsePreferences: string }> {
     try {
       const userRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userRef);
-      
+
       if (userDoc.exists()) {
         const data = userDoc.data();
         return {
           educationLevel: data.educationLevel || '',
-          major: data.major || ''
+          major: data.major || '',
+          responsePreferences: data.responsePreferences || ''
         };
       }
-      
-      return { educationLevel: '', major: '' };
+
+      return { educationLevel: '', major: '', responsePreferences: '' };
     } catch {
-      // Error getting user settings
-      return { educationLevel: '', major: '' };
+      return { educationLevel: '', major: '', responsePreferences: '' };
     }
   }
 
@@ -960,6 +962,62 @@ export class FirebaseService {
     } catch (error) {
       console.error('Error batch saving messages:', error);
       throw error;
+    }
+  }
+
+  // ── Message Ratings ──────────────────────────────────────────────────────────
+
+  async saveMessageRating(data: {
+    messageId: string;
+    sessionId: string;
+    userId: string;
+    rating: 'good' | 'bad';
+    assistantContent: string;
+    userContent: string;
+    feedback?: string;
+  }): Promise<void> {
+    try {
+      // Use messageId as the document ID so switching ratings overwrites rather than duplicates
+      const ratingRef = doc(db, 'messageRatings', data.messageId);
+      await setDoc(ratingRef, {
+        ...data,
+        assistantContent: data.assistantContent.substring(0, 2000),
+        userContent: data.userContent.substring(0, 500),
+        timestamp: serverTimestamp()
+      });
+    } catch {
+      // Silent — non-critical analytics
+    }
+  }
+
+  async deleteMessageRating(messageId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'messageRatings', messageId));
+    } catch {
+      // Silent
+    }
+  }
+
+  // ── User Memory ───────────────────────────────────────────────────────────────
+
+  async getUserMemory(userId: string): Promise<string> {
+    try {
+      const ref = doc(db, 'userMemory', userId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) return (snap.data().content as string) ?? '';
+      return '';
+    } catch {
+      return '';
+    }
+  }
+
+  async saveUserMemory(userId: string, content: string): Promise<void> {
+    try {
+      if (!userId) return;
+      const ref = doc(db, 'userMemory', userId);
+      await setDoc(ref, { content, updatedAt: serverTimestamp() }, { merge: true });
+    } catch {
+      // Silent — non-critical background save
     }
   }
 
