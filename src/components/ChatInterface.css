@@ -2257,28 +2257,58 @@ code.token.entity {
 
 .atom-spinner {
   flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(59, 109, 224, 0.3));
 }
 
-.orbit { transform-origin: 32px 32px; }
+/* Orbit groups – each a <g> that rotates as a unit (ellipse + electron dot) */
+.orbit-group { transform-origin: 32px 32px; }
 
-.orbit-1 { animation: orbit-spin 2.2s linear infinite; }
-.orbit-2 { transform: rotate(60deg); animation: orbit-spin-2 2.8s linear infinite; }
-.orbit-3 { transform: rotate(120deg); animation: orbit-spin-3 1.8s linear infinite; }
+.orbit-group-1 { animation: orbit-spin-1 2.4s linear infinite; }
+.orbit-group-2 { animation: orbit-spin-2 3.2s linear infinite; }
+.orbit-group-3 { animation: orbit-spin-3 1.9s linear infinite; }
 
-@keyframes orbit-spin   { to { transform: rotate(360deg); } }
-@keyframes orbit-spin-2 { to { transform: rotate(420deg); } }
-@keyframes orbit-spin-3 { to { transform: rotate(480deg); } }
+@keyframes orbit-spin-1 {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes orbit-spin-2 {
+  from { transform: rotate(60deg); }
+  to   { transform: rotate(420deg); }
+}
+@keyframes orbit-spin-3 {
+  from { transform: rotate(120deg); }
+  to   { transform: rotate(480deg); }
+}
+
+.atom-nucleus {
+  transform-origin: 32px 32px;
+  animation: nucleus-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes nucleus-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%       { transform: scale(1.25); opacity: 0.82; }
+}
 
 .doc-generating-text {
   font-family: 'Work Sans', sans-serif;
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.92rem;
+  font-weight: 450;
   font-style: italic;
-  color: #4a5568;
-  animation: doc-msg-fade 0.4s ease;
+  background: linear-gradient(90deg, #9ca3af, #3b6de0, #6366f1, #9ca3af);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-flow 2.8s linear infinite, doc-msg-fade 0.45s ease;
+}
+
+@keyframes gradient-flow {
+  from { background-position: 0% center; }
+  to   { background-position: 300% center; }
 }
 
 @keyframes doc-msg-fade {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
 }

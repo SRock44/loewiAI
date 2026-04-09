@@ -68,14 +68,37 @@ function DocGeneratingLoader({ title }: { title: string }) {
   return (
     <div className="doc-generating-loader">
       <div className="atom-spinner">
-        <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
-          <circle cx="32" cy="32" r="4.5" fill="#3b6de0" />
-          <ellipse cx="32" cy="32" rx="28" ry="10" fill="none" stroke="#3b6de0" strokeWidth="1.4" strokeOpacity="0.65"
-            className="orbit orbit-1" />
-          <ellipse cx="32" cy="32" rx="28" ry="10" fill="none" stroke="#3b6de0" strokeWidth="1.4" strokeOpacity="0.65"
-            className="orbit orbit-2" />
-          <ellipse cx="32" cy="32" rx="28" ry="10" fill="none" stroke="#3b6de0" strokeWidth="1.4" strokeOpacity="0.65"
-            className="orbit orbit-3" />
+        <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+          <defs>
+            <filter id="atom-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="1.8" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <radialGradient id="nucleusGrad" cx="38%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#93c5fd" />
+              <stop offset="100%" stopColor="#3b6de0" />
+            </radialGradient>
+          </defs>
+          {/* Orbit 1 – blue */}
+          <g className="orbit-group orbit-group-1">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#3b6de0" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#3b6de0" filter="url(#atom-glow)" />
+          </g>
+          {/* Orbit 2 – indigo */}
+          <g className="orbit-group orbit-group-2">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#6366f1" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#6366f1" filter="url(#atom-glow)" />
+          </g>
+          {/* Orbit 3 – cyan */}
+          <g className="orbit-group orbit-group-3">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#06b6d4" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#06b6d4" filter="url(#atom-glow)" />
+          </g>
+          {/* Nucleus */}
+          <circle cx="32" cy="32" r="5.5" fill="url(#nucleusGrad)" filter="url(#atom-glow)" className="atom-nucleus" />
         </svg>
       </div>
       <span className="doc-generating-text">{msg}…</span>
