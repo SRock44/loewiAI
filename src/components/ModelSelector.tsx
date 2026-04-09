@@ -98,6 +98,7 @@ export function ModelSelector({
             <div className="model-selector-menu">
               {availableModels.map((model) => (
                 <button
+                  type="button" // clicking on model selector would prev send prompt -- now the click only selects the model.
                   key={model.id}
                   onClick={() => handleSelectModel(model)}
                   className={`model-selector-option ${
