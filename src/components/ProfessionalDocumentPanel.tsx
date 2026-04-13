@@ -116,7 +116,7 @@ export default function ProfessionalDocumentPanel({
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
       const filename = title.replace(/[^\w\s-]/g, '').trim() || 'document';
 
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve) => {
         pdf.html(element, {
           callback: (doc) => {
             doc.save(`${filename}.pdf`);
