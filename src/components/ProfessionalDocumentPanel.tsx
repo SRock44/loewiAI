@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { ProfessionalDocumentMetadata } from '../types/documentIntent';
@@ -14,12 +14,60 @@ interface ProfessionalDocumentPanelProps {
   onClose: () => void;
 }
 
+/**
+ * Pre-processing: merge consecutive sentence-fragment paragraphs that the AI
+ * incorrectly splits with blank lines. Works Cited entries are never merged.
+ * A "fragment" is a block shorter than 320 chars with fewer than 2 internal
+ * sentence breaks — almost certainly a single sentence, not a real paragraph.
+ */
+function mergeBodyParagraphs(markdown: string): string {
+  const isSingleSentence = (s: string) =>
+    s.length < 320 && (s.match(/\.\s+[A-Z]/g) ?? []).length < 2;
+
+  const segments = markdown.split(/\n\n+/);
+  const result: string[] = [];
+  let inWorksSection = false;
+  let buffer: string[] = [];
+
+  const flush = () => {
+    if (buffer.length) { result.push(buffer.join(' ')); buffer = []; }
+  };
+
+  for (const seg of segments) {
+    const s = seg.trim();
+    if (!s) continue;
+    // Works Cited / References / Bibliography — never merge these entries
+    if (/^##\s*(Works\s+Cited|References|Bibliography)/i.test(s)) {
+      flush(); inWorksSection = true; result.push(s); continue;
+    }
+    // Any heading — flush buffer, reset section flag
+    if (s.startsWith('#')) { flush(); inWorksSection = false; result.push(s); continue; }
+    // Inside Works Cited — each citation entry stays on its own
+    if (inWorksSection) { result.push(s); continue; }
+    // Body text: accumulate likely-single-sentence blocks; flush on real paragraphs
+    if (isSingleSentence(s)) { buffer.push(s); }
+    else { flush(); result.push(s); }
+  }
+  flush();
+  return result.join('\n\n');
+}
+
 /** Render markdown → HTML with math, but WITHOUT chat-specific code-block UI */
 function renderDocumentMarkdown(markdown: string): string {
   if (!markdown) return '';
 
+  // Merge AI-split sentences into proper paragraphs before HTML conversion
+  const normalized = mergeBodyParagraphs(markdown);
+
   // Basic markdown render (paragraphs, headers, bold, italic, lists)
-  let html = renderMarkdownSafe(markdown);
+  let html = renderMarkdownSafe(normalized);
+
+  // Mark Works Cited / References / Bibliography headings so CSS can target
+  // them specifically for hanging-indent without affecting body section headings.
+  html = html.replace(
+    /<h2>(Works\s+Cited|References|Bibliography)<\/h2>/gi,
+    '<h2 class="works-cited-heading">$1</h2>'
+  );
 
   // Render display math: $$...$$
   html = html.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => {
@@ -55,8 +103,42 @@ export default function ProfessionalDocumentPanel({
   }, [onClose]);
 
   const contentHtml = useMemo(() => renderDocumentMarkdown(contentMarkdown), [contentMarkdown]);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const handlePrint = () => window.print();
+  const handleDownload = async () => {
+    const element = document.getElementById('newton-professional-doc');
+    if (!element || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      await import('html2canvas'); // ensure html2canvas is available for jsPDF's html()
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+      const filename = title.replace(/[^\w\s-]/g, '').trim() || 'document';
+
+      await new Promise<void>((resolve, reject) => {
+        pdf.html(element, {
+          callback: (doc) => {
+            doc.save(`${filename}.pdf`);
+            resolve();
+          },
+          // autoPaging:'text' avoids splitting lines at page boundaries
+          autoPaging: 'text',
+          // margin: 0 — the .prof-page already has 96px (1in) CSS padding
+          margin: [0, 0, 0, 0],
+          // width maps the element's CSS pixel width to PDF points (816px = 612pt = 8.5in)
+          width: 612,
+          windowWidth: 816,
+          x: 0,
+          y: 0,
+        });
+      });
+    } catch (err) {
+      console.error('PDF download failed:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const citationLabel = metadata?.citationStyle ?? 'DOC';
 
@@ -73,13 +155,19 @@ export default function ProfessionalDocumentPanel({
           <span className="prof-doc-style-badge">{citationLabel}</span>
         </div>
         <div className="prof-doc-actions">
-          <button className="prof-doc-print-btn" title="Print / Save as PDF" onClick={handlePrint}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="8"/>
-            </svg>
-            Print / Save PDF
+          <button className="prof-doc-print-btn" title="Download as PDF" onClick={handleDownload} disabled={isDownloading}>
+            {isDownloading ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            )}
+            {isDownloading ? 'Generating…' : 'Download PDF'}
           </button>
           <button className="prof-doc-icon-btn" title="Close" onClick={onClose}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

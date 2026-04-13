@@ -76,8 +76,18 @@
   transition: background 0.15s;
 }
 
-.prof-doc-print-btn:hover {
+.prof-doc-print-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.18);
+}
+
+.prof-doc-print-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .prof-doc-icon-btn {
@@ -121,6 +131,8 @@
   font-size: 12pt;
   line-height: 2;
   color: #000;
+  /* Override #root { text-align: center } from index.css */
+  text-align: left;
 }
 
 /* ── Title block ─────────────────────────────────────────────────────────── */
@@ -139,10 +151,11 @@
   font-size: 12pt;
   line-height: 2;
   color: #000;
+  text-align: left !important;
 }
 
 .prof-title-centered {
-  text-align: center;
+  text-align: center !important;
 }
 
 .prof-title-main {
@@ -231,11 +244,11 @@
   font-style: italic !important;
 }
 
-/* Works Cited entries output as plain paragraphs — hanging indent */
-.prof-doc-content h2 ~ p {
-  text-indent: 0 !important;
+/* Works Cited / References / Bibliography entries — hanging indent.
+   Scoped to .works-cited-heading so body section paragraphs are NOT affected. */
+.prof-doc-content .works-cited-heading ~ p {
+  text-indent: -0.5in !important;  /* hanging indent: first line flush, continuation indented */
   padding-left: 0.5in !important;
-  text-indent: -0.5in !important;  /* hanging indent: first line flush, rest indented */
   text-align: left !important;
 }
 
@@ -312,43 +325,6 @@
   line-height: 2;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   @media print — show only #newton-professional-doc
-   ═══════════════════════════════════════════════════════════════════════════ */
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-
-  #newton-professional-doc,
-  #newton-professional-doc * {
-    visibility: visible !important;
-  }
-
-  #newton-professional-doc {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: #fff;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
-  }
-
-  .prof-page {
-    width: 100% !important;
-    min-height: unset !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-  }
-
-  @page {
-    margin: 1in;
-    size: letter portrait;
-  }
-}
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
