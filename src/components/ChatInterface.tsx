@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChatMessage, ChatSession, ChatContext, QuickAction, QUICK_ACTIONS } from '../types/chat';
 import { chatService } from '../services/chatService';
 import { DocumentMetadata } from '../types/ai';
@@ -81,7 +82,27 @@ const FLASHCARD_LOADER_MESSAGES = [
   () => 'Almost ready to study',
 ];
 
-function DocGeneratingLoader({ title, isProfessional }: { title: string; isProfessional?: boolean }) {
+const THINKING_LOADER_MESSAGES = [
+  () => 'Deploying thinking agents',
+  () => 'Gathering research and key facts',
+  () => 'Analyzing from multiple angles',
+  () => 'Cross-validating findings',
+  () => 'Checking for accuracy',
+  () => 'Connecting related concepts',
+  () => 'Synthesizing comprehensive insights',
+  () => 'Reviewing reasoning and logic',
+  () => 'Almost ready with your answer',
+];
+
+function DocGeneratingLoader({
+  title,
+  isProfessional,
+  dynamicFirstMessage,
+}: {
+  title: string;
+  isProfessional?: boolean;
+  dynamicFirstMessage?: string;
+}) {
   const messages = isProfessional ? PROF_DOC_LOADER_MESSAGES : DOC_LOADER_MESSAGES;
   const [idx, setIdx] = useState(0);
 
@@ -90,7 +111,7 @@ function DocGeneratingLoader({ title, isProfessional }: { title: string; isProfe
     return () => clearInterval(id);
   }, [messages.length]);
 
-  const msg = messages[idx](title);
+  const msg = (idx === 0 && dynamicFirstMessage) ? dynamicFirstMessage : messages[idx](title);
 
   return (
     <div className="doc-generating-loader">
@@ -133,7 +154,13 @@ function DocGeneratingLoader({ title, isProfessional }: { title: string; isProfe
   );
 }
 
-function FlashcardGeneratingLoader({ topic }: { topic: string }) {
+function FlashcardGeneratingLoader({
+  topic,
+  dynamicFirstMessage,
+}: {
+  topic: string;
+  dynamicFirstMessage?: string;
+}) {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
@@ -141,7 +168,9 @@ function FlashcardGeneratingLoader({ topic }: { topic: string }) {
     return () => clearInterval(id);
   }, []);
 
-  const msg = FLASHCARD_LOADER_MESSAGES[idx](topic);
+  const msg = (idx === 0 && dynamicFirstMessage)
+    ? dynamicFirstMessage
+    : FLASHCARD_LOADER_MESSAGES[idx](topic);
 
   return (
     <div className="doc-generating-loader">
@@ -180,6 +209,72 @@ function FlashcardGeneratingLoader({ topic }: { topic: string }) {
         </svg>
       </div>
       <span className="doc-generating-text">{msg}…</span>
+    </div>
+  );
+}
+
+function ThinkingGeneratingLoader({
+  topic,
+  dynamicFirstMessage,
+}: {
+  topic?: string;
+  dynamicFirstMessage?: string;
+}) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % THINKING_LOADER_MESSAGES.length), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  const defaultFirst = topic ? `Thinking deeply about "${topic}"` : 'Deploying thinking agents';
+  const msg = (idx === 0 && dynamicFirstMessage)
+    ? dynamicFirstMessage
+    : (idx === 0 ? defaultFirst : THINKING_LOADER_MESSAGES[idx]());
+
+  return (
+    <div className="doc-generating-loader">
+      <div className="atom-spinner thinking-spinner">
+        {/* 4-orbit swarm spinner — each orbit represents an agent */}
+        <svg viewBox="0 0 72 72" width="60" height="60" aria-hidden="true">
+          <defs>
+            <filter id="thinking-glow" x="-35%" y="-35%" width="170%" height="170%">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <radialGradient id="thinkingNucleusGrad" cx="38%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#bfdbfe" />
+              <stop offset="100%" stopColor="#2563eb" />
+            </radialGradient>
+          </defs>
+          {/* Orbit 1 – deep blue (Research agent) */}
+          <g className="orbit-group orbit-group-1" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#1d4ed8" strokeWidth="1.8" strokeOpacity="0.75" />
+            <circle cx="66" cy="36" r="3" fill="#1d4ed8" filter="url(#thinking-glow)" />
+          </g>
+          {/* Orbit 2 – blue (Analysis agent) */}
+          <g className="orbit-group orbit-group-2" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#2563eb" strokeWidth="1.8" strokeOpacity="0.75" />
+            <circle cx="66" cy="36" r="3" fill="#2563eb" filter="url(#thinking-glow)" />
+          </g>
+          {/* Orbit 3 – sky (Validation agent) */}
+          <g className="orbit-group orbit-group-3" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#3b82f6" strokeWidth="1.8" strokeOpacity="0.75" />
+            <circle cx="66" cy="36" r="3" fill="#3b82f6" filter="url(#thinking-glow)" />
+          </g>
+          {/* Orbit 4 – light blue (Synthesis agent) */}
+          <g className="orbit-group orbit-group-4" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeOpacity="0.65" />
+            <circle cx="66" cy="36" r="3" fill="#60a5fa" filter="url(#thinking-glow)" />
+          </g>
+          {/* Nucleus */}
+          <circle cx="36" cy="36" r="5.5" fill="url(#thinkingNucleusGrad)" filter="url(#thinking-glow)" className="atom-nucleus" />
+        </svg>
+      </div>
+      <span className="doc-generating-text thinking-generating-text">{msg}…</span>
     </div>
   );
 }
@@ -229,7 +324,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDocStreamRef = useRef(false);
   const isFlashcardStreamRef = useRef(false);
+  const isThinkingStreamRef = useRef(false);
   const [generatingFlashcardTopic, setGeneratingFlashcardTopic] = useState('');
+  const [generatingThinkingTopic, setGeneratingThinkingTopic] = useState('');
+  const [dynamicLoaderFirstMessage, setDynamicLoaderFirstMessage] = useState('');
+  const [isThinkingModeEnabled, setIsThinkingModeEnabled] = useState(false);
+  const [isThinkingPopoverOpen, setIsThinkingPopoverOpen] = useState(false);
+  const thinkingPopoverRef = useRef<HTMLDivElement>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const inputActionsLeftRef = useRef<HTMLDivElement>(null);
 
@@ -313,6 +414,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [lightboxUrl]);
+
+  // Close thinking popover on click-outside
+  useEffect(() => {
+    if (!isThinkingPopoverOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (thinkingPopoverRef.current && !thinkingPopoverRef.current.contains(e.target as Node)) {
+        setIsThinkingPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isThinkingPopoverOpen]);
 
   // Typing animation effect
   useEffect(() => {
@@ -746,15 +859,20 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         ...(imageUrls.length > 0 ? { imageUrls } : {}),
         ...(fullImageUrls.length > 0 ? { fullImageUrls } : {}),
         ...(storagePaths.length > 0 ? { storagePaths } : {}),
+        ...(isThinkingModeEnabled ? { isThinkingMode: true } : {}),
       };
 
-      // --- Detect document / flashcard request before streaming starts ---
+      // --- Detect document / flashcard / thinking request before streaming starts ---
       // mightBeDocument covers both academic-resource and professional-document types
       const trimmed = content.trim();
       const willBeFlashcard = chatService.mightBeFlashcard(trimmed);
       const willBeDocument = !willBeFlashcard && chatService.mightBeDocument(trimmed);
+      const willBeThinking = !willBeFlashcard && !willBeDocument
+        && (isThinkingModeEnabled || chatService.mightNeedThinking(trimmed));
       isFlashcardStreamRef.current = willBeFlashcard;
       isDocStreamRef.current = willBeDocument;
+      isThinkingStreamRef.current = willBeThinking;
+      setDynamicLoaderFirstMessage('');
       if (willBeFlashcard) {
         const topicMatch = trimmed.match(/flashcards?\s+(?:for|about|on)\s+(.+)/i)
           ?? trimmed.match(/(?:create|make|generate)\s+flashcards?\s+(?:for|about|on)\s+(.+)/i);
@@ -765,6 +883,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         const looksProf = /\b(?:essay|research paper|lab report|thesis|term paper|mla|apa|chicago|cover letter|resume|argumentative|analytical paper|position paper)\b/i.test(trimmed);
         setGeneratingDocIsProfessional(looksProf);
         setGeneratingDocTitle(chatService.extractDocumentTitle(trimmed));
+      }
+      if (willBeThinking) {
+        // Extract a short topic label for the spinner (first ~40 chars of message)
+        const topicSnippet = trimmed.length > 40 ? trimmed.substring(0, 40).replace(/\s+\S*$/, '') + '…' : trimmed;
+        setGeneratingThinkingTopic(topicSnippet);
+      }
+      // Fire dynamic loading hint in the background — updates spinner first message when it resolves
+      if (willBeFlashcard || willBeDocument || willBeThinking) {
+        const hintType = willBeThinking ? 'thinking' : willBeFlashcard ? 'flashcard' : 'document';
+        chatService.generateLoadingHint(trimmed, hintType)
+          .then(hint => { if (hint) setDynamicLoaderFirstMessage(hint); })
+          .catch(() => {});
       }
 
       // --- Streaming animation setup ---
@@ -788,8 +918,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       const CHARS_PER_TICK = 3;
 
       const revealTick = () => {
-        // Don't reveal document/flashcard content — we show the atom loader instead
-        if (isDocStreamRef.current || isFlashcardStreamRef.current) {
+        // Don't reveal document/flashcard/thinking content — we show the atom loader instead
+        if (isDocStreamRef.current || isFlashcardStreamRef.current || isThinkingStreamRef.current) {
           revealedLenRef.current = streamBufferRef.current.length;
           if (!streamDoneRef.current) streamTimerRef.current = setTimeout(revealTick, TICK_MS);
           return;
@@ -879,8 +1009,11 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     } finally {
       isDocStreamRef.current = false;
       isFlashcardStreamRef.current = false;
+      isThinkingStreamRef.current = false;
       setGeneratingDocTitle('');
       setGeneratingFlashcardTopic('');
+      setGeneratingThinkingTopic('');
+      setDynamicLoaderFirstMessage('');
       setIsLoading(false);
     }
   };
@@ -1255,10 +1388,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         ))}
                       </div>
                     )}
-                    {message.isTyping && isFlashcardStreamRef.current ? (
-                      <FlashcardGeneratingLoader topic={generatingFlashcardTopic} />
+                    {message.isTyping && isThinkingStreamRef.current ? (
+                      <ThinkingGeneratingLoader topic={generatingThinkingTopic} dynamicFirstMessage={dynamicLoaderFirstMessage} />
+                    ) : message.isTyping && isFlashcardStreamRef.current ? (
+                      <FlashcardGeneratingLoader topic={generatingFlashcardTopic} dynamicFirstMessage={dynamicLoaderFirstMessage} />
                     ) : message.isTyping && isDocStreamRef.current ? (
-                      <DocGeneratingLoader title={generatingDocTitle} isProfessional={generatingDocIsProfessional} />
+                      <DocGeneratingLoader title={generatingDocTitle} isProfessional={generatingDocIsProfessional} dynamicFirstMessage={dynamicLoaderFirstMessage} />
                     ) : (
                       <div
                         data-message-id={message.id}
@@ -1459,6 +1594,57 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 }}
               />
               <div className="input-actions">
+                <div className="input-icon-group">
+                <div className="thinking-popover-wrapper" ref={thinkingPopoverRef}>
+                  <button
+                    type="button"
+                    className={`thinking-toggle-btn${isThinkingModeEnabled ? ' active' : ''}`}
+                    onClick={() => setIsThinkingPopoverOpen(v => !v)}
+                    disabled={isLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3.16A2.5 2.5 0 0 1 9.5 2Z"/>
+                      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3.16A2.5 2.5 0 0 0 14.5 2Z"/>
+                    </svg>
+                  </button>
+
+                  <AnimatePresence>
+                    {isThinkingPopoverOpen && (
+                      <motion.div
+                        className="thinking-popover"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <div className="thinking-popover-header">
+                          <div className="thinking-popover-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3.16A2.5 2.5 0 0 1 9.5 2Z"/>
+                              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3.16A2.5 2.5 0 0 0 14.5 2Z"/>
+                            </svg>
+                            Thinking Mode
+                          </div>
+                          <button
+                            type="button"
+                            className={`thinking-popover-toggle${isThinkingModeEnabled ? ' on' : ''}`}
+                            onClick={() => setIsThinkingModeEnabled(v => !v)}
+                          >
+                            <span className="thinking-popover-toggle-knob" />
+                          </button>
+                        </div>
+                        <p className="thinking-popover-desc">
+                          Deploys a swarm of sub-agents that research, analyze multiple angles, and validate before synthesizing a comprehensive answer. Best for complex or nuanced questions.
+                        </p>
+                        <div className="thinking-popover-status">
+                          {isThinkingModeEnabled
+                            ? '✓ Active — all responses will use deep thinking'
+                            : 'Auto-activates for long, complex prompts'}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
                 <button
                   type="button"
                   className="attach-btn"
@@ -1468,6 +1654,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 >
                   <Paperclip size={16} />
                 </button>
+                </div>
                 <button
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}

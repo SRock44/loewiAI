@@ -97,6 +97,19 @@ class ChatServiceImpl implements ChatService {
     return this.master.mightBeFlashcard(message);
   }
 
+  /** Heuristic gate — true if this message warrants deep thinking mode. */
+  mightNeedThinking(message: string): boolean {
+    return this.master.mightNeedThinking(message);
+  }
+
+  /** Generate a short contextual loading hint (~20 tokens) for the spinner. */
+  generateLoadingHint(
+    query: string,
+    type: 'thinking' | 'document' | 'flashcard'
+  ): Promise<string> {
+    return this.master.generateLoadingHint(query, type);
+  }
+
   // ── AI provider info ──────────────────────────────────────────────────────
   getAIProviderInfo(): string {
     return this.master.getAIProviderInfo();

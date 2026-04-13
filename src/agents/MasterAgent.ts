@@ -17,6 +17,7 @@ import { WriterAgent } from './WriterAgent';
 import { ChatAgent } from './ChatAgent';
 import { FlashcardAgent } from './FlashcardAgent';
 import { DocumentAgent } from './DocumentAgent';
+import { ThinkingAgent } from './ThinkingAgent';
 
 export class MasterAgent {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -39,8 +40,15 @@ export class MasterAgent {
   private chatAgent: ChatAgent;
   private flashcardAgent: FlashcardAgent;
   private documentAgent: DocumentAgent;
+  private thinkingAgent: ThinkingAgent;
 
   constructor() {
+    // Init Groq first so sub-agents that need it can receive the client
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (apiKey) {
+      this.groqClient = new Groq({ apiKey, dangerouslyAllowBrowser: true });
+    }
+
     // Helpers passed into sub-agents so they share session/user state
     const getCounter = () => ++this.messageCounter;
     const getSessions = () => this.sessions;
@@ -59,11 +67,7 @@ export class MasterAgent {
       getSessions,
       getUserId
     );
-
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-    if (apiKey) {
-      this.groqClient = new Groq({ apiKey, dangerouslyAllowBrowser: true });
-    }
+    this.thinkingAgent = new ThinkingAgent(this.groqClient, getCounter, getSessions, getUserId);
 
     this.setupAuthStateListener();
   }
@@ -194,7 +198,21 @@ export class MasterAgent {
         return result;
       }
 
-      // 4. Regular chat
+      // 4. Thinking mode (swarm: research + analysis sub-agents → synthesis)
+      // Triggered by: explicit toggle in UI OR complex prompts (≥ 150 chars)
+      const shouldThink = context.isThinkingMode || message.length >= 150;
+      if (shouldThink) {
+        this.chatAgent.setUserCaches(this.userMemoryCache, this.userContextCache);
+        const result = await this.thinkingAgent.handle(
+          message, context, userMessage,
+          this.userMemoryCache, this.userContextCache, onStreamChunk
+        );
+        this.maybeUpdateUserContext(context.sessionId);
+        this.maybeGenerateSessionTitle(context.sessionId, message);
+        return result;
+      }
+
+      // 5. Regular chat
       const result = await this.chatAgent.handle(message, context, userMessage, onStreamChunk);
       this.maybeUpdateUserContext(context.sessionId);
       this.maybeGenerateSessionTitle(context.sessionId, message);
@@ -436,6 +454,19 @@ export class MasterAgent {
 
   mightBeDocument(message: string): boolean {
     return this.classifierAgent.mightBeDocument(message);
+  }
+
+  /** Returns true if the message is complex enough to auto-trigger thinking mode. */
+  mightNeedThinking(message: string): boolean {
+    return message.length >= 150;
+  }
+
+  /** Generate a short contextual first loading message (~10-20 tokens). */
+  generateLoadingHint(
+    query: string,
+    type: 'thinking' | 'document' | 'flashcard'
+  ): Promise<string> {
+    return this.thinkingAgent.generateLoadingHint(query, type);
   }
 
   mightBeFlashcard(message: string): boolean {

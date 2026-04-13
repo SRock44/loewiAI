@@ -2485,3 +2485,151 @@ code.token.entity {
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Thinking mode atom spinner (blue swarm — 4 orbits) ─────────────────── */
+.thinking-spinner {
+  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.3));
+}
+
+.orbit-group-4 { animation: orbit-spin-4 2.7s linear infinite; }
+@keyframes orbit-spin-4 {
+  from { transform: rotate(180deg); }
+  to   { transform: rotate(540deg); }
+}
+
+.thinking-generating-text {
+  background: linear-gradient(90deg, #93c5fd, #2563eb, #60a5fa, #93c5fd);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-flow 2.8s linear infinite, doc-msg-fade 0.45s ease;
+}
+
+/* Groups brain + clip with no gap between them */
+.input-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* ── Thinking mode toggle button — same size/color as attach-btn ─────────── */
+.thinking-toggle-btn {
+  background: transparent;
+  color: #667eea;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.thinking-toggle-btn:hover:not(:disabled) {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.thinking-toggle-btn.active svg {
+  filter: drop-shadow(0 0 3px rgba(102, 126, 234, 0.5));
+}
+
+.thinking-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Thinking mode popover ───────────────────────────────────────────────── */
+.thinking-popover-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.thinking-popover {
+  position: absolute;
+  bottom: calc(100% + 0.6rem);
+  right: 0;
+  width: 17rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: 0 -4px 16px rgba(59, 130, 246, 0.1), 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 0.85rem 0.9rem 0.75rem;
+  z-index: 1000;
+}
+
+.thinking-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.thinking-popover-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  font-family: 'Work Sans', sans-serif;
+}
+
+.thinking-popover-title svg {
+  stroke: #3b82f6;
+  flex-shrink: 0;
+}
+
+/* Toggle switch */
+.thinking-popover-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.thinking-popover-toggle.on {
+  background: #3b82f6;
+}
+
+.thinking-popover-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+  display: block;
+}
+
+.thinking-popover-toggle.on .thinking-popover-toggle-knob {
+  transform: translateX(16px);
+}
+
+.thinking-popover-desc {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.45;
+  margin: 0 0 0.55rem;
+  font-family: 'Work Sans', sans-serif;
+}
+
+.thinking-popover-status {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-family: 'Work Sans', sans-serif;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+}

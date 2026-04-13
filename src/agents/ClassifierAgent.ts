@@ -11,6 +11,9 @@ const DOCUMENT_GATE_KEYWORDS = [
   'essay', 'research paper', 'lab report', 'thesis', 'report', 'cover letter',
   'resume', 'mla', 'apa', 'chicago', 'term paper', 'argumentative', 'analytical paper',
   'position paper', 'write me', 'write a', 'draft a', 'draft an',
+  // additional catch-alls
+  'academic paper', 'academic essay', 'a paper', 'a report', 'an essay',
+  'a comprehensive', 'an analysis', 'a summary', 'an overview',
 ];
 
 // Creation-intent verbs — required for the heuristic gate to fire

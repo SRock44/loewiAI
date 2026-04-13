@@ -50,6 +50,7 @@ export interface ChatContext {
   imageUrls?: string[]; // Thumbnail data URLs to attach to the persisted user message
   fullImageUrls?: string[]; // Storage download URLs for cross-session full-quality lightbox
   storagePaths?: string[]; // Firebase Storage paths for cleanup on session delete
+  isThinkingMode?: boolean; // When true, route through ThinkingAgent swarm
   userPreferences?: {
     responseStyle: 'concise' | 'detailed' | 'conversational';
     expertiseLevel: 'beginner' | 'intermediate' | 'advanced';
