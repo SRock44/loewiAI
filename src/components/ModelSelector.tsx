@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ModelPreference } from '../services/firebaseAILogicService';
-import { Lightbulb, ArrowRight } from '@solar-icons/react';
-import './ModelSelector.css';
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ModelPreference } from "../services/firebaseAILogicService";
+import { Lightbulb, ArrowRight } from "@solar-icons/react";
+import "./ModelSelector.css";
 
 export interface AIModel {
   id: ModelPreference;
@@ -13,20 +13,20 @@ export interface AIModel {
 // eslint-disable-next-line react-refresh/only-export-components -- shared constant needed by other components
 export const availableModels: AIModel[] = [
   {
-    id: 'openai/gpt-oss-120b',
-    name: 'GPT-OSS 120B',
-    description: 'Default model — fast and capable'
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
+    description: "Default model — fast and capable",
   },
   {
-    id: 'kimi2',
-    name: 'KimiK2',
-    description: 'KimiK2 model for fast responses'
+    id: "kimi2",
+    name: "KimiK2",
+    description: "KimiK2 model for fast responses",
   },
   {
-    id: 'llama-3.3-70b-versatile',
-    name: 'Llama 3.3 70B',
-    description: 'Llama 3.3 70B Versatile model'
-  }
+    id: "llama-3.3-70b-versatile",
+    name: "Llama 3.3 70B",
+    description: "Llama 3.3 70B Versatile model",
+  },
 ];
 
 interface ModelSelectorProps {
@@ -35,20 +35,28 @@ interface ModelSelectorProps {
   disabled?: boolean;
 }
 
-export function ModelSelector({ selectedModel, onModelChange, disabled = false }: ModelSelectorProps) {
+export function ModelSelector({
+  selectedModel,
+  onModelChange,
+  disabled = false,
+}: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen]);
 
@@ -57,21 +65,23 @@ export function ModelSelector({ selectedModel, onModelChange, disabled = false }
     setIsOpen(false);
   };
 
-  const currentModel = availableModels.find(m => m.id === selectedModel) || availableModels[0];
+  const currentModel =
+    availableModels.find((m) => m.id === selectedModel) || availableModels[0];
 
   return (
     <div className="model-selector-wrapper" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
+        type="button" // clicking on model selector would prev send prompt -- now the click only toggles the dropdown.
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className="model-selector-trigger"
       >
         <Lightbulb size={12} className="model-selector-icon" />
         <span className="model-selector-text">{currentModel.name}</span>
-        <ArrowRight 
-          size={12} 
-          className={`model-selector-chevron ${isOpen ? 'open' : ''}`}
+        <ArrowRight
+          size={12}
+          className={`model-selector-chevron ${isOpen ? "open" : ""}`}
         />
       </button>
 
@@ -88,15 +98,18 @@ export function ModelSelector({ selectedModel, onModelChange, disabled = false }
             <div className="model-selector-menu">
               {availableModels.map((model) => (
                 <button
+                  type="button" // clicking on model selector would prev send prompt -- now the click only selects the model.
                   key={model.id}
                   onClick={() => handleSelectModel(model)}
                   className={`model-selector-option ${
-                    selectedModel === model.id ? 'selected' : ''
+                    selectedModel === model.id ? "selected" : ""
                   }`}
                 >
                   <div className="model-selector-option-content">
                     <div className="model-selector-option-header">
-                      <span className="model-selector-option-name">{model.name}</span>
+                      <span className="model-selector-option-name">
+                        {model.name}
+                      </span>
                       {selectedModel === model.id && (
                         <span className="model-selector-check">✓</span>
                       )}
@@ -114,5 +127,3 @@ export function ModelSelector({ selectedModel, onModelChange, disabled = false }
     </div>
   );
 }
-
-
