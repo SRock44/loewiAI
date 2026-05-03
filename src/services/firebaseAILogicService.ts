@@ -277,6 +277,57 @@ DOCUMENT GENERATION (study guides, formula sheets, cheat sheets, reference sheet
     }
   }
 
+  /**
+   * Generate a response using a pre-built system prompt (used by WriterAgent).
+   * Bypasses buildGroqPrompt so agents can supply their own system prompts.
+   */
+  async generateResponseWithPrompt(systemPrompt: string, message: string): Promise<AIResponse> {
+    if (!this.groqClient) throw new Error('Groq is not available');
+    const completion = await this.groqClient.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message },
+      ],
+      model: this.modelName,
+      temperature: 0.7,
+      max_tokens: 4096,
+    });
+    const content = completion.choices[0]?.message?.content || '';
+    if (!content.trim()) throw new Error('Empty response from AI');
+    return { content, model: this.modelName, provider: this.name };
+  }
+
+  /**
+   * Streaming variant of generateResponseWithPrompt.
+   */
+  async generateResponseStreamWithPrompt(
+    systemPrompt: string,
+    message: string,
+    onChunk: (partial: string) => void
+  ): Promise<AIResponse> {
+    if (!this.groqClient) throw new Error('Groq is not available');
+    const stream = await this.groqClient.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message },
+      ],
+      model: this.modelName,
+      temperature: 0.7,
+      max_tokens: 4096,
+      stream: true,
+    });
+    let fullContent = '';
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content || '';
+      if (delta) {
+        fullContent += delta;
+        onChunk(fullContent);
+      }
+    }
+    if (!fullContent.trim()) throw new Error('Empty streaming response from AI');
+    return { content: fullContent, model: this.modelName, provider: this.name };
+  }
+
   // Vision analysis - uses Llama 4 Scout to fully analyze any type of image
   async analyzeImage(imageBase64: string, mimeType: string): Promise<string> {
     if (!this.isAvailable()) {
@@ -629,6 +680,34 @@ export class FirebaseAILogicService {
     }
     // Fallback to non-streaming
     return this.generateResponse(_message, _context, _conversationHistory);
+  }
+
+  /**
+   * Generate a response with a caller-supplied system prompt (used by WriterAgent).
+   */
+  async generateResponseWithPrompt(systemPrompt: string, message: string): Promise<AIResponse> {
+    if (!this.groqProvider || !this.groqProvider.isAvailable()) {
+      return this.generateResponse(message); // fallback to mock
+    }
+    return this.groqProvider.generateResponseWithPrompt(systemPrompt, message);
+  }
+
+  /**
+   * Streaming variant with a caller-supplied system prompt.
+   */
+  async generateResponseStreamWithPrompt(
+    systemPrompt: string,
+    message: string,
+    onChunk: (partial: string) => void
+  ): Promise<AIResponse> {
+    if (this.groqProvider && this.groqProvider.isAvailable()) {
+      try {
+        return await this.groqProvider.generateResponseStreamWithPrompt(systemPrompt, message, onChunk);
+      } catch {
+        // Streaming failed — fall back to non-streaming
+      }
+    }
+    return this.generateResponseWithPrompt(systemPrompt, message);
   }
 
   // Analyze an image using Groq's vision model (Llama 4 Scout)

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChatMessage, ChatSession, ChatContext, QuickAction, QUICK_ACTIONS } from '../types/chat';
 import { chatService } from '../services/chatService';
 import { DocumentMetadata } from '../types/ai';
@@ -8,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { documentProcessor, ProcessedDocument } from '../services/documentProcessor';
 import FlashcardList from './FlashcardList';
 import DocumentPreviewPanel from './DocumentPreviewPanel';
+import ProfessionalDocumentPanel from './ProfessionalDocumentPanel';
 import { FlashcardSet } from '../types/flashcard';
 import { Card, Lightbulb, Calendar, Document as DocumentIcon, QuestionCircle, List, Target, Paperclip, ArrowRight, Pen, ClipboardList } from '@solar-icons/react';
 import { renderMarkdownSafe } from '../utils/markdownRenderer';
@@ -55,15 +57,61 @@ const DOC_LOADER_MESSAGES = [
   () => 'Almost there',
 ];
 
-function DocGeneratingLoader({ title }: { title: string }) {
+const PROF_DOC_LOADER_MESSAGES = [
+  (title: string) => `Drafting your ${title}`,
+  () => 'Structuring the argument',
+  () => 'Writing the introduction',
+  () => 'Developing body paragraphs',
+  () => 'Formatting citations',
+  () => 'Crafting the conclusion',
+  () => 'Building the Works Cited',
+  () => 'Reviewing academic style',
+  () => 'Polishing the final draft',
+  () => 'Almost there',
+];
+
+const FLASHCARD_LOADER_MESSAGES = [
+  (topic: string) => topic ? `Creating flashcards for ${topic}` : 'Creating your flashcards',
+  () => 'Identifying key concepts',
+  () => 'Writing question prompts',
+  () => 'Crafting clear answers',
+  () => 'Balancing difficulty levels',
+  () => 'Adding helpful hints',
+  () => 'Organizing by topic',
+  () => 'Reviewing for accuracy',
+  () => 'Almost ready to study',
+];
+
+const THINKING_LOADER_MESSAGES = [
+  () => 'Deploying thinking agents',
+  () => 'Gathering research and key facts',
+  () => 'Analyzing from multiple angles',
+  () => 'Cross-validating findings',
+  () => 'Checking for accuracy',
+  () => 'Connecting related concepts',
+  () => 'Synthesizing comprehensive insights',
+  () => 'Reviewing reasoning and logic',
+  () => 'Almost ready with your answer',
+];
+
+function DocGeneratingLoader({
+  title,
+  isProfessional,
+  dynamicFirstMessage,
+}: {
+  title: string;
+  isProfessional?: boolean;
+  dynamicFirstMessage?: string;
+}) {
+  const messages = isProfessional ? PROF_DOC_LOADER_MESSAGES : DOC_LOADER_MESSAGES;
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % DOC_LOADER_MESSAGES.length), 2200);
+    const id = setInterval(() => setIdx(i => (i + 1) % messages.length), 2200);
     return () => clearInterval(id);
-  }, []);
+  }, [messages.length]);
 
-  const msg = DOC_LOADER_MESSAGES[idx](title);
+  const msg = (idx === 0 && dynamicFirstMessage) ? dynamicFirstMessage : messages[idx](title);
 
   return (
     <div className="doc-generating-loader">
@@ -106,6 +154,131 @@ function DocGeneratingLoader({ title }: { title: string }) {
   );
 }
 
+function FlashcardGeneratingLoader({
+  topic,
+  dynamicFirstMessage,
+}: {
+  topic: string;
+  dynamicFirstMessage?: string;
+}) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % FLASHCARD_LOADER_MESSAGES.length), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  const msg = (idx === 0 && dynamicFirstMessage)
+    ? dynamicFirstMessage
+    : FLASHCARD_LOADER_MESSAGES[idx](topic);
+
+  return (
+    <div className="doc-generating-loader">
+      <div className="atom-spinner">
+        <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+          <defs>
+            <filter id="fc-atom-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="1.8" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <radialGradient id="fcNucleusGrad" cx="38%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#86efac" />
+              <stop offset="100%" stopColor="#16a34a" />
+            </radialGradient>
+          </defs>
+          {/* Orbit 1 – green */}
+          <g className="orbit-group orbit-group-1">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#16a34a" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#16a34a" filter="url(#fc-atom-glow)" />
+          </g>
+          {/* Orbit 2 – emerald */}
+          <g className="orbit-group orbit-group-2">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#10b981" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#10b981" filter="url(#fc-atom-glow)" />
+          </g>
+          {/* Orbit 3 – teal */}
+          <g className="orbit-group orbit-group-3">
+            <ellipse cx="32" cy="32" rx="27" ry="9.5" fill="none" stroke="#14b8a6" strokeWidth="2" strokeOpacity="0.8" />
+            <circle cx="59" cy="32" r="2.8" fill="#14b8a6" filter="url(#fc-atom-glow)" />
+          </g>
+          {/* Nucleus */}
+          <circle cx="32" cy="32" r="5.5" fill="url(#fcNucleusGrad)" filter="url(#fc-atom-glow)" className="atom-nucleus" />
+        </svg>
+      </div>
+      <span className="doc-generating-text">{msg}…</span>
+    </div>
+  );
+}
+
+function ThinkingGeneratingLoader({
+  topic,
+  dynamicFirstMessage,
+}: {
+  topic?: string;
+  dynamicFirstMessage?: string;
+}) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % THINKING_LOADER_MESSAGES.length), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  const defaultFirst = topic ? `Thinking deeply about "${topic}"` : 'Deploying thinking agents';
+  const msg = (idx === 0 && dynamicFirstMessage)
+    ? dynamicFirstMessage
+    : (idx === 0 ? defaultFirst : THINKING_LOADER_MESSAGES[idx]());
+
+  return (
+    <div className="doc-generating-loader">
+      <div className="atom-spinner thinking-spinner">
+        {/* 4-orbit swarm spinner — each orbit represents an agent */}
+        <svg viewBox="0 0 72 72" width="60" height="60" aria-hidden="true">
+          <defs>
+            <filter id="thinking-glow" x="-35%" y="-35%" width="170%" height="170%">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+            <radialGradient id="thinkingNucleusGrad" cx="38%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#bfdbfe" />
+              <stop offset="100%" stopColor="#2563eb" />
+            </radialGradient>
+          </defs>
+          {/* Orbit 1 – deep blue (Research agent) */}
+          <g className="orbit-group orbit-group-1" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#1d4ed8" strokeWidth="1.8" strokeOpacity="0.75" />
+            <circle cx="66" cy="36" r="3" fill="#1d4ed8" filter="url(#thinking-glow)" />
+          </g>
+          {/* Orbit 2 – blue (Analysis agent) */}
+          <g className="orbit-group orbit-group-2" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#2563eb" strokeWidth="1.8" strokeOpacity="0.75" />
+            <circle cx="66" cy="36" r="3" fill="#2563eb" filter="url(#thinking-glow)" />
+          </g>
+          {/* Orbit 3 – sky (Validation agent) */}
+          <g className="orbit-group orbit-group-3" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#3b82f6" strokeWidth="1.8" strokeOpacity="0.75" />
+            <circle cx="66" cy="36" r="3" fill="#3b82f6" filter="url(#thinking-glow)" />
+          </g>
+          {/* Orbit 4 – light blue (Synthesis agent) */}
+          <g className="orbit-group orbit-group-4" style={{ transformOrigin: '36px 36px' }}>
+            <ellipse cx="36" cy="36" rx="30" ry="10" fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeOpacity="0.65" />
+            <circle cx="66" cy="36" r="3" fill="#60a5fa" filter="url(#thinking-glow)" />
+          </g>
+          {/* Nucleus */}
+          <circle cx="36" cy="36" r="5.5" fill="url(#thinkingNucleusGrad)" filter="url(#thinking-glow)" className="atom-nucleus" />
+        </svg>
+      </div>
+      <span className="doc-generating-text thinking-generating-text">{msg}…</span>
+    </div>
+  );
+}
+
 // this is the main chat interface - handles all user interaction
 // it manages messages, document uploads, chat sessions, and coordinates with the chat service
 const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, ref) => {
@@ -130,6 +303,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const [docPreviewMessage, setDocPreviewMessage] = useState<ChatMessage | null>(null);
   const [typingText, setTypingText] = useState('');  // for typing animation effect
   const [generatingDocTitle, setGeneratingDocTitle] = useState<string>('');
+  const [generatingDocIsProfessional, setGeneratingDocIsProfessional] = useState(false);
   const [messageRatings, setMessageRatings] = useState<Record<string, 'good' | 'bad'>>({});
   const [retryDialogMsgId, setRetryDialogMsgId] = useState<string | null>(null);
   const [retryFeedback, setRetryFeedback] = useState('');
@@ -149,6 +323,14 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
   const streamDoneRef = useRef(false);      // true when API has finished sending
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDocStreamRef = useRef(false);
+  const isFlashcardStreamRef = useRef(false);
+  const isThinkingStreamRef = useRef(false);
+  const [generatingFlashcardTopic, setGeneratingFlashcardTopic] = useState('');
+  const [generatingThinkingTopic, setGeneratingThinkingTopic] = useState('');
+  const [dynamicLoaderFirstMessage, setDynamicLoaderFirstMessage] = useState('');
+  const [isThinkingModeEnabled, setIsThinkingModeEnabled] = useState(false);
+  const [isThinkingPopoverOpen, setIsThinkingPopoverOpen] = useState(false);
+  const thinkingPopoverRef = useRef<HTMLDivElement>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const inputActionsLeftRef = useRef<HTMLDivElement>(null);
 
@@ -232,6 +414,18 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [lightboxUrl]);
+
+  // Close thinking popover on click-outside
+  useEffect(() => {
+    if (!isThinkingPopoverOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (thinkingPopoverRef.current && !thinkingPopoverRef.current.contains(e.target as Node)) {
+        setIsThinkingPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isThinkingPopoverOpen]);
 
   // Typing animation effect
   useEffect(() => {
@@ -665,13 +859,42 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
         ...(imageUrls.length > 0 ? { imageUrls } : {}),
         ...(fullImageUrls.length > 0 ? { fullImageUrls } : {}),
         ...(storagePaths.length > 0 ? { storagePaths } : {}),
+        ...(isThinkingModeEnabled ? { isThinkingMode: true } : {}),
       };
 
-      // --- Detect document request before streaming starts ---
-      const willBeDocument = chatService.isDocumentRequest(content.trim());
+      // --- Detect document / flashcard / thinking request before streaming starts ---
+      // mightBeDocument covers both academic-resource and professional-document types
+      const trimmed = content.trim();
+      const willBeFlashcard = chatService.mightBeFlashcard(trimmed);
+      const willBeDocument = !willBeFlashcard && chatService.mightBeDocument(trimmed);
+      const willBeThinking = !willBeFlashcard && !willBeDocument
+        && (isThinkingModeEnabled || chatService.mightNeedThinking(trimmed));
+      isFlashcardStreamRef.current = willBeFlashcard;
       isDocStreamRef.current = willBeDocument;
+      isThinkingStreamRef.current = willBeThinking;
+      setDynamicLoaderFirstMessage('');
+      if (willBeFlashcard) {
+        const topicMatch = trimmed.match(/flashcards?\s+(?:for|about|on)\s+(.+)/i)
+          ?? trimmed.match(/(?:create|make|generate)\s+flashcards?\s+(?:for|about|on)\s+(.+)/i);
+        setGeneratingFlashcardTopic(topicMatch?.[1]?.replace(/[.!?]+$/, '').trim() ?? '');
+      }
       if (willBeDocument) {
-        setGeneratingDocTitle(chatService.extractDocumentTitle(content.trim()));
+        // Check if this looks like a professional document vs academic resource
+        const looksProf = /\b(?:essay|research paper|lab report|thesis|term paper|mla|apa|chicago|cover letter|resume|argumentative|analytical paper|position paper)\b/i.test(trimmed);
+        setGeneratingDocIsProfessional(looksProf);
+        setGeneratingDocTitle(chatService.extractDocumentTitle(trimmed));
+      }
+      if (willBeThinking) {
+        // Extract a short topic label for the spinner (first ~40 chars of message)
+        const topicSnippet = trimmed.length > 40 ? trimmed.substring(0, 40).replace(/\s+\S*$/, '') + '…' : trimmed;
+        setGeneratingThinkingTopic(topicSnippet);
+      }
+      // Fire dynamic loading hint in the background — updates spinner first message when it resolves
+      if (willBeFlashcard || willBeDocument || willBeThinking) {
+        const hintType = willBeThinking ? 'thinking' : willBeFlashcard ? 'flashcard' : 'document';
+        chatService.generateLoadingHint(trimmed, hintType)
+          .then(hint => { if (hint) setDynamicLoaderFirstMessage(hint); })
+          .catch(() => {});
       }
 
       // --- Streaming animation setup ---
@@ -695,8 +918,8 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       const CHARS_PER_TICK = 3;
 
       const revealTick = () => {
-        // Don't reveal document content — we show the atom loader instead
-        if (isDocStreamRef.current) {
+        // Don't reveal document/flashcard/thinking content — we show the atom loader instead
+        if (isDocStreamRef.current || isFlashcardStreamRef.current || isThinkingStreamRef.current) {
           revealedLenRef.current = streamBufferRef.current.length;
           if (!streamDoneRef.current) streamTimerRef.current = setTimeout(revealTick, TICK_MS);
           return;
@@ -785,7 +1008,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       });
     } finally {
       isDocStreamRef.current = false;
+      isFlashcardStreamRef.current = false;
+      isThinkingStreamRef.current = false;
       setGeneratingDocTitle('');
+      setGeneratingFlashcardTopic('');
+      setGeneratingThinkingTopic('');
+      setDynamicLoaderFirstMessage('');
       setIsLoading(false);
     }
   };
@@ -908,6 +1136,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
       setIsLoading(false);
       setIsRetrying(false);
       isDocStreamRef.current = false;
+      isFlashcardStreamRef.current = false;
     }
   };
 
@@ -1139,11 +1368,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                   className={`message ${message.role} ${message.flashcardSet ? 'flashcard-message' : ''}`}
                 >
                   <div
-                    className={`message-content ${message.flashcardSet ? 'clickable-flashcard-message' : ''}`}
-                    onClick={message.flashcardSet ? () => {
-                      setCurrentFlashcardSet(message.flashcardSet!);
-                      setShowFlashcardList(true);
-                    } : undefined}
+                    className="message-content"
                   >
                     <div className={`message-role-label ${message.role === 'assistant' ? 'newton' : ''}`}>
                       {message.role === 'user'
@@ -1163,8 +1388,12 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         ))}
                       </div>
                     )}
-                    {message.isTyping && isDocStreamRef.current ? (
-                      <DocGeneratingLoader title={generatingDocTitle} />
+                    {message.isTyping && isThinkingStreamRef.current ? (
+                      <ThinkingGeneratingLoader topic={generatingThinkingTopic} dynamicFirstMessage={dynamicLoaderFirstMessage} />
+                    ) : message.isTyping && isFlashcardStreamRef.current ? (
+                      <FlashcardGeneratingLoader topic={generatingFlashcardTopic} dynamicFirstMessage={dynamicLoaderFirstMessage} />
+                    ) : message.isTyping && isDocStreamRef.current ? (
+                      <DocGeneratingLoader title={generatingDocTitle} isProfessional={generatingDocIsProfessional} dynamicFirstMessage={dynamicLoaderFirstMessage} />
                     ) : (
                       <div
                         data-message-id={message.id}
@@ -1179,9 +1408,15 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                     )}
 
                     {message.flashcardSet && (
-                      <div className="flashcard-message-hint">
+                      <button
+                        className="flashcard-message-hint"
+                        onClick={() => {
+                          setCurrentFlashcardSet(message.flashcardSet!);
+                          setShowFlashcardList(true);
+                        }}
+                      >
                         <span className="hint-text">Click to view flashcards</span>
-                      </div>
+                      </button>
                     )}
                     {message.isDocument && !message.isTyping && (
                       <button
@@ -1198,9 +1433,13 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                         </div>
                         <div className="doc-attachment-info">
                           <span className="doc-attachment-name">
-                            {(message.documentTitle ?? 'Document').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}.pdf
+                            {(message.documentTitle ?? 'Document').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}{message.isProfessionalDocument ? '.pdf' : '.pdf'}
                           </span>
-                          <span className="doc-attachment-meta">PDF · Click to preview</span>
+                          <span className="doc-attachment-meta">
+                            {message.isProfessionalDocument
+                              ? `${message.documentMetadata?.citationStyle ?? 'DOC'} · Click to preview`
+                              : 'PDF · Click to preview'}
+                          </span>
                         </div>
                       </button>
                     )}
@@ -1355,6 +1594,57 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 }}
               />
               <div className="input-actions">
+                <div className="input-icon-group">
+                <div className="thinking-popover-wrapper" ref={thinkingPopoverRef}>
+                  <button
+                    type="button"
+                    className={`thinking-toggle-btn${isThinkingModeEnabled ? ' active' : ''}`}
+                    onClick={() => setIsThinkingPopoverOpen(v => !v)}
+                    disabled={isLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3.16A2.5 2.5 0 0 1 9.5 2Z"/>
+                      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3.16A2.5 2.5 0 0 0 14.5 2Z"/>
+                    </svg>
+                  </button>
+
+                  <AnimatePresence>
+                    {isThinkingPopoverOpen && (
+                      <motion.div
+                        className="thinking-popover"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <div className="thinking-popover-header">
+                          <div className="thinking-popover-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3.16A2.5 2.5 0 0 1 9.5 2Z"/>
+                              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3.16A2.5 2.5 0 0 0 14.5 2Z"/>
+                            </svg>
+                            Thinking Mode
+                          </div>
+                          <button
+                            type="button"
+                            className={`thinking-popover-toggle${isThinkingModeEnabled ? ' on' : ''}`}
+                            onClick={() => setIsThinkingModeEnabled(v => !v)}
+                          >
+                            <span className="thinking-popover-toggle-knob" />
+                          </button>
+                        </div>
+                        <p className="thinking-popover-desc">
+                          Deploys a swarm of sub-agents that research, analyze multiple angles, and validate before synthesizing a comprehensive answer. Best for complex or nuanced questions.
+                        </p>
+                        <div className="thinking-popover-status">
+                          {isThinkingModeEnabled
+                            ? '✓ Active — all responses will use deep thinking'
+                            : 'Auto-activates for long, complex prompts'}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
                 <button
                   type="button"
                   className="attach-btn"
@@ -1364,6 +1654,7 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
                 >
                   <Paperclip size={16} />
                 </button>
+                </div>
                 <button
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}
@@ -1409,15 +1700,25 @@ const ChatInterface = forwardRef<ChatInterfaceRef, ChatInterfaceProps>((props, r
 
       {/* Document Preview Panel — sibling to chat-main, forms the right column */}
       {docPreviewMessage && (
-        <DocumentPreviewPanel
-          messageId={docPreviewMessage.id}
-          title={docPreviewMessage.documentTitle ?? 'Document'}
-          contentHtml={formatMessage({
-            ...docPreviewMessage,
-            content: docPreviewMessage.documentContent ?? docPreviewMessage.content,
-          })}
-          onClose={() => setDocPreviewMessage(null)}
-        />
+        docPreviewMessage.isProfessionalDocument ? (
+          <ProfessionalDocumentPanel
+            messageId={docPreviewMessage.id}
+            title={docPreviewMessage.documentTitle ?? 'Document'}
+            contentMarkdown={docPreviewMessage.documentContent ?? docPreviewMessage.content}
+            metadata={docPreviewMessage.documentMetadata}
+            onClose={() => setDocPreviewMessage(null)}
+          />
+        ) : (
+          <DocumentPreviewPanel
+            messageId={docPreviewMessage.id}
+            title={docPreviewMessage.documentTitle ?? 'Document'}
+            contentHtml={formatMessage({
+              ...docPreviewMessage,
+              content: docPreviewMessage.documentContent ?? docPreviewMessage.content,
+            })}
+            onClose={() => setDocPreviewMessage(null)}
+          />
+        )
       )}
 
       {/* Flashcard List Modal */}
