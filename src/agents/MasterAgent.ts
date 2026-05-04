@@ -151,7 +151,7 @@ export class MasterAgent {
       ? `${this.userMemoryCache}\n${note}`
       : `# User Memory\n\n${note}`;
     this.userMemoryCache = updated;
-    firebaseService.saveUserMemory(this.currentUserId, updated).catch(() => {});
+    firebaseService.saveUserMemory(this.currentUserId, updated).catch(() => { });
   }
 
   // ── Core routing ──────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ export class MasterAgent {
         session.messages.push(userMessage, errorMessage);
         session.updatedAt = new Date();
         if (this.currentUserId) {
-          firebaseService.saveChatSession(session, this.currentUserId).catch(() => {});
+          firebaseService.saveChatSession(session, this.currentUserId).catch(() => { });
           window.dispatchEvent(new CustomEvent('sessionUpdated'));
         }
       }
@@ -401,7 +401,7 @@ export class MasterAgent {
       session.updatedAt = new Date();
 
       if (this.currentUserId) {
-        firebaseService.saveChatSession(session, this.currentUserId).catch(() => {});
+        firebaseService.saveChatSession(session, this.currentUserId).catch(() => { });
         window.dispatchEvent(new CustomEvent('sessionUpdated'));
       }
 
@@ -533,7 +533,7 @@ Would you like me to help you with anything else about the code?`,
       session.messages.push(userMessage, msg);
       session.updatedAt = new Date();
       if (this.currentUserId) {
-        firebaseService.saveChatSession(session, this.currentUserId).catch(() => {});
+        firebaseService.saveChatSession(session, this.currentUserId).catch(() => { });
         window.dispatchEvent(new CustomEvent('sessionUpdated'));
       }
     }
@@ -607,7 +607,7 @@ Would you like me to help you with anything else about the code?`,
 
       currentSession.title = title;
       if (userId) {
-        firebaseService.saveChatSession(currentSession, userId).catch(() => {});
+        firebaseService.saveChatSession(currentSession, userId).catch(() => { });
       }
       window.dispatchEvent(new CustomEvent('sessionUpdated'));
     }).catch(() => {
@@ -641,6 +641,6 @@ Would you like me to help you with anything else about the code?`,
 
     const md = `# User Study Context\nUpdated: ${new Date().toISOString()}\n\nRecent topics and questions:\n${allSummaries.join('\n')}\n`;
     this.userContextCache = md;
-    firebaseService.saveUserContext(this.currentUserId, md).catch(() => {});
+    firebaseService.saveUserContext(this.currentUserId, md).catch(() => { });
   }
 }

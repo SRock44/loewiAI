@@ -393,49 +393,57 @@ CONTENT:
       throw new Error('Groq is not available');
     }
 
-    try {
-      // For flashcards, use the prompt directly as user message
-      // The prompt already contains all necessary instructions
-      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
-
-      // Add system message for flashcard generation
-      messages.push({
+    // Flashcards use fixed Groq models (not the chat model): GPT-OSS 120B → Llama 3.3 70B → KimiK2.
+    const flashcardModels = [
+      'openai/gpt-oss-120b',
+      'llama-3.3-70b-versatile',
+      'moonshotai/kimi-k2-instruct-0905',
+    ] as const;
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      {
         role: 'system',
-        content: 'You are an expert educational content creator. Generate high-quality flashcards in JSON format based on the user\'s request.'
-      });
+        content:
+          'You are an expert educational content creator. Generate high-quality flashcards in JSON format based on the user\'s request.',
+      },
+      { role: 'user', content: _prompt },
+    ];
 
-      // Add the flashcard generation prompt as user message
-      messages.push({ role: 'user', content: _prompt });
+    const errors: string[] = [];
+    for (const modelId of flashcardModels) {
+      try {
+        const completion = await this.groqClient!.chat.completions.create({
+          messages,
+          model: modelId,
+          temperature: 0.5,
+          max_tokens: 8192,
+        });
 
+        const content = completion.choices[0]?.message?.content || '';
+        if (!content || content.trim().length < 10) {
+          throw new Error('Empty or incomplete response from AI');
+        }
 
-      // Try the requested model, fallback to moonshot-v1-128k if it fails
-      const completion = await this.groqClient!.chat.completions.create({
-        messages,
-        model: this.modelName,
-        temperature: 0.5,
-        max_tokens: 8192 // Higher token limit for flashcard generation
-      });
-
-      const content = completion.choices[0]?.message?.content || '';
-
-      if (!content || content.trim().length < 10) {
-        throw new Error('Empty or incomplete response from AI');
+        return {
+          content,
+          model: modelId,
+          provider: this.name,
+          usage: completion.usage
+            ? {
+                prompt_tokens: completion.usage.prompt_tokens || 0,
+                completion_tokens: completion.usage.completion_tokens || 0,
+                total_tokens: completion.usage.total_tokens || 0,
+              }
+            : undefined,
+        };
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        errors.push(`${modelId}: ${msg}`);
       }
-
-      return {
-        content: content,
-        model: this.modelName,
-        provider: this.name,
-        usage: completion.usage ? {
-          prompt_tokens: completion.usage.prompt_tokens || 0,
-          completion_tokens: completion.usage.completion_tokens || 0,
-          total_tokens: completion.usage.total_tokens || 0
-        } : undefined
-      };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`AI flashcard error: ${errorMessage}`);
     }
+
+    throw new Error(
+      `AI flashcard error (tried ${flashcardModels.join(' then ')}): ${errors.join(' | ')}`
+    );
   }
 }
 
@@ -484,9 +492,9 @@ class MockProvider implements AIProvider {
 
     // Check if this is a flashcard generation request
     const isFlashcardRequest = _message.toLowerCase().includes('flashcard') ||
-                              _message.toLowerCase().includes('generate') ||
-                              _message.toLowerCase().includes('create') ||
-                              _message.toLowerCase().includes('json');
+      _message.toLowerCase().includes('generate') ||
+      _message.toLowerCase().includes('create') ||
+      _message.toLowerCase().includes('json');
 
     if (isFlashcardRequest) {
       // Return a proper JSON response for flashcard requests
