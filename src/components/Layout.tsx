@@ -282,21 +282,17 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
 
   const handleDeleteChat = async (chatId: string) => {
     try {
-      console.log('🗑️ Layout: Starting chat deletion for:', chatId);
       await chatService.deleteSession(chatId);
-      console.log('✅ Layout: Chat service deletion completed');
-      
+
       // The chatService.deleteSession already reloads from Firebase and dispatches sessionUpdated
       // Just refresh the local state
       const updatedSessions = chatService.getSessions();
-      console.log('📋 Layout: Updated sessions after deletion:', updatedSessions.length);
       setChatSessions(updatedSessions);
-      
+
       // Notify parent component that a chat was deleted
       if (onChatDelete) {
         onChatDelete(chatId);
       }
-      console.log('✅ Layout: Chat deletion completed successfully');
     } catch (error) {
       console.error('❌ Layout: Error deleting chat:', error);
       alert('Failed to delete chat. Please try again.');
@@ -405,19 +401,16 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
           {location.pathname === '/dashboard' && chatSessions.length > 0 && (
             <>
               {chatSessions.slice(0, 10).map((session) => {
-                const firstMessage = session.messages.find(m => m.role === 'user');
-                const summary = firstMessage ? `Chat about: ${firstMessage.content.substring(0, 100)}${firstMessage.content.length > 100 ? '...' : ''}` : 'New conversation';
-                const chatTopic = (session.title && session.title.trim().length > 0)
+                const chatTopic = (session.title && !session.title.startsWith('Chat '))
                   ? session.title
                   : generateChatTopic(session);
-                const preview = firstMessage?.content ? firstMessage.content.trim() : 'New conversation';
                 
                 return (
                   <div key={session.id} className="chat-history-item-container">
                     <button
                       className={`nav-item chat-history-item ${currentChatId === session.id ? 'active' : ''}`}
                       onClick={() => handleChatSelect(session.id)}
-                      title={summary}
+                      title={chatTopic}
                     >
                       <span
                         className="chat-thumbnail"
@@ -429,7 +422,6 @@ const Layout: React.FC<LayoutProps> = ({ children, onCreateNewChat, onChatSelect
                       {isSidebarExpanded && (
                         <span className="chat-history-text">
                           <span className="chat-history-title">{chatTopic}</span>
-                          <span className="chat-history-preview">{preview}</span>
                         </span>
                       )}
                     </button>

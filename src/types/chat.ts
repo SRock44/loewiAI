@@ -2,6 +2,7 @@
 
 import { FlashcardSet } from './flashcard';
 import { ProcessedDocument } from '../services/documentProcessor';
+import { ProfessionalDocumentMetadata } from './documentIntent';
 
 // Define missing types
 export interface CodeValidationResult {
@@ -23,6 +24,12 @@ export interface ChatMessage {
   imageUrls?: string[]; // base64 data URLs of image thumbnails (persisted to Firestore)
   fullImageUrls?: string[]; // original-quality data URLs for lightbox (in-memory only, not persisted)
   storagePaths?: string[]; // Firebase Storage paths for all attachments (used for cleanup on delete)
+  isDocument?: boolean; // true when AI generated a downloadable document (study guide, formula sheet, etc.)
+  documentTitle?: string; // human-readable title for the generated document (e.g. "Calculus Derivatives Study Guide")
+  documentContent?: string; // full markdown content of the document — message.content holds only the chat summary
+  rating?: 'good' | 'bad'; // user feedback on this message
+  isProfessionalDocument?: boolean; // true when AI generated a professional formatted doc (essay, report, etc.)
+  documentMetadata?: ProfessionalDocumentMetadata; // metadata for professional documents (author, course, citation style, etc.)
 }
 
 export interface ChatSession {
@@ -43,6 +50,7 @@ export interface ChatContext {
   imageUrls?: string[]; // Thumbnail data URLs to attach to the persisted user message
   fullImageUrls?: string[]; // Storage download URLs for cross-session full-quality lightbox
   storagePaths?: string[]; // Firebase Storage paths for cleanup on session delete
+  isThinkingMode?: boolean; // When true, route through ThinkingAgent swarm
   userPreferences?: {
     responseStyle: 'concise' | 'detailed' | 'conversational';
     expertiseLevel: 'beginner' | 'intermediate' | 'advanced';
@@ -50,7 +58,7 @@ export interface ChatContext {
 }
 
 export interface ChatService {
-  sendMessage(message: string, context: ChatContext): Promise<ChatMessage>;
+  sendMessage(message: string, context: ChatContext, onStreamChunk?: (partialContent: string) => void): Promise<ChatMessage>;
   getChatHistory(sessionId: string): Promise<ChatMessage[]>;
   createNewSession(title?: string): Promise<ChatSession>;
   deleteSession(sessionId: string): Promise<void>;

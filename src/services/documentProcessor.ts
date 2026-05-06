@@ -19,6 +19,7 @@ export interface ProcessedDocument extends DocumentMetadata {
   keyTopics: string[];       // main topics we detected
   contentLength: number;
   contentPreview: string;
+  storageUrl?: string;       // Firebase Storage download URL for the original file
 }
 
 // singleton pattern - only one instance of this processor exists

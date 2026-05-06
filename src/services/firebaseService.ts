@@ -134,7 +134,7 @@ export class FirebaseService {
           lastActivityAt: (data.lastActivityAt as FirestoreTimestamp)?.toDate ? (data.lastActivityAt as FirestoreTimestamp).toDate() : data.lastActivityAt
         } as ChatSession;
       });
-    } catch (error) {
+    } catch {
       // Error getting chat sessions
       return [];
     }
@@ -173,49 +173,53 @@ export class FirebaseService {
     }
   }
 
-  async deleteStorageFiles(paths: string[]): Promise<void> {
+  async deleteStorageFiles(paths: string[]): Promise<{ deleted: number; failed: number; errors: string[] }> {
+    let deleted = 0;
+    let failed = 0;
+    const errors: string[] = [];
     await Promise.all(
       paths.map(path =>
-        deleteObject(ref(storage, path)).catch(() => { /* already deleted or missing — ignore */ })
+        deleteObject(ref(storage, path))
+          .then(() => { deleted++; })
+          .catch((err: unknown) => {
+            const code = (err as { code?: string })?.code;
+            if (code === 'storage/object-not-found') {
+              deleted++; // already gone, counts as success
+            } else {
+              failed++;
+              errors.push(`${path}: ${code || String(err)}`);
+            }
+          })
       )
     );
+    return { deleted, failed, errors };
   }
 
   async deleteChatSession(sessionId: string): Promise<void> {
-    try {
-      console.log('🗑️ Firebase: Deleting chat session:', sessionId);
-      const sessionRef = doc(db, 'chatSessions', sessionId);
-      const sessionSnap = await getDoc(sessionRef);
-      if (sessionSnap.exists()) {
-        const data = sessionSnap.data();
-        const messages: Array<{ storagePaths?: string[] }> = Array.isArray(data.messages) ? data.messages : [];
-        const allPaths = messages.flatMap(m => m.storagePaths ?? []);
-        if (allPaths.length > 0) {
-          await this.deleteStorageFiles(allPaths);
-        }
+    const sessionRef = doc(db, 'chatSessions', sessionId);
+    const sessionSnap = await getDoc(sessionRef);
+    if (sessionSnap.exists()) {
+      const data = sessionSnap.data();
+      const messages: Array<{ storagePaths?: string[] }> = Array.isArray(data.messages) ? data.messages : [];
+      const allPaths = messages.flatMap(m => m.storagePaths ?? []);
+      if (allPaths.length > 0) {
+        await this.deleteStorageFiles(allPaths);
       }
-      await deleteDoc(sessionRef);
-      console.log('✅ Firebase: Chat session deleted successfully');
-    } catch (error) {
-      console.error('❌ Firebase: Error deleting chat session:', error);
-      throw error;
     }
+    await deleteDoc(sessionRef);
   }
 
   async deleteSessionMessages(sessionId: string): Promise<void> {
     try {
-      console.log('🗑️ Firebase: Deleting messages for session:', sessionId);
       const messagesRef = collection(db, 'messages');
       const q = query(messagesRef, where('sessionId', '==', sessionId));
       const snapshot = await getDocs(q);
-      
-      console.log(`🗑️ Firebase: Found ${snapshot.docs.length} messages to delete`);
-      const deletePromises = snapshot.docs.map(docSnapshot => 
+
+      const deletePromises = snapshot.docs.map(docSnapshot =>
         deleteDoc(doc(db, 'messages', docSnapshot.id))
       );
-      
+
       await Promise.all(deletePromises);
-      console.log('✅ Firebase: Session messages deleted successfully');
     } catch (error) {
       console.error('❌ Firebase: Error deleting session messages:', error);
       throw error;
@@ -370,7 +374,7 @@ export class FirebaseService {
       }
       
       return null;
-    } catch (error) {
+    } catch {
       // Error checking for duplicates
       return null;
     }
@@ -466,34 +470,20 @@ export class FirebaseService {
 
   async deleteFlashcardSet(setId: string, userId: string): Promise<void> {
     try {
-      console.log('🔍 Checking flashcard set for deletion:', { setId, userId });
-      
       // First verify the flashcard set belongs to the user
       const setRef = doc(db, 'flashcardSets', setId);
       const setDoc = await getDoc(setRef);
-      
+
       if (!setDoc.exists()) {
-        console.error('❌ Flashcard set not found in Firebase:', setId);
         throw new Error('Flashcard set not found');
       }
-      
+
       const setData = setDoc.data();
-      console.log('📋 Flashcard set data:', { 
-        setId, 
-        setUserId: setData.userId, 
-        requestingUserId: userId,
-        title: setData.title,
-        hasLocalId: setId.startsWith('set_')
-      });
-      
       if (setData.userId !== userId) {
-        console.error('❌ Access denied - flashcard set belongs to different user');
         throw new Error('Access denied - flashcard set belongs to different user');
       }
-      
-      console.log('✅ User authorized, proceeding with deletion');
+
       await deleteDoc(setRef);
-      console.log('✅ Successfully deleted flashcard set from Firebase');
     } catch (error) {
       console.error('Error deleting flashcard set:', error);
       throw error;
@@ -615,10 +605,6 @@ export class FirebaseService {
         }
       }
       
-      if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} expired chat sessions (24+ hours old)`);
-      }
-      
       return deletedCount;
     } catch (error) {
       console.error('Error cleaning up expired sessions:', error);
@@ -669,10 +655,6 @@ export class FirebaseService {
             console.error(`Error deleting old flashcard ${flashcardDoc.id}:`, error);
           }
         }
-      }
-      
-      if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} expired flashcard sets (24+ hours old)`);
       }
       
       return deletedCount;
@@ -744,7 +726,7 @@ export class FirebaseService {
       for (const sessionId of toDelete) {
         try {
           await deleteDoc(doc(db, 'chatSessions', sessionId));
-        } catch (error) {
+        } catch {
           // Error deleting individual session
         }
       }
@@ -825,10 +807,44 @@ export class FirebaseService {
     }
   }
 
+  /**
+   * Save a single user-level context document in Firestore.
+   * Collection: userContext / document: {userId}
+   */
+  async saveUserContext(userId: string, mdContent: string): Promise<void> {
+    try {
+      if (!userId || !mdContent) return;
+      const ref = doc(db, 'userContext', userId);
+      await setDoc(ref, { content: mdContent, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (error) {
+      console.error('Error saving user context:', error);
+    }
+  }
+
+  /**
+   * Fetch the user's context from Firestore. Returns empty string if none exists.
+   */
+  async getUserContext(userId: string): Promise<string> {
+    try {
+      const ref = doc(db, 'userContext', userId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) return (snap.data().content as string) ?? '';
+      return '';
+    } catch {
+      return '';
+    }
+  }
+
   // Chat Image Storage
   generateChatFilePath(userId: string, fileName: string): string {
     const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
     return `chatImages/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  }
+
+  // Chat Document Storage
+  generateChatDocPath(userId: string, fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
+    return `chatDocs/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   }
 
   async uploadChatFileToPath(blob: Blob, path: string, mimeType: string): Promise<string> {
@@ -846,7 +862,7 @@ export class FirebaseService {
         lastLoginAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch {
       // If user doesn't exist, create them
       try {
         await addDoc(collection(db, 'users'), {
@@ -882,12 +898,13 @@ export class FirebaseService {
     }
   }
 
-  async saveUserSettings(userId: string, settings: { educationLevel: string; major: string }): Promise<void> {
+  async saveUserSettings(userId: string, settings: { educationLevel: string; major: string; responsePreferences: string }): Promise<void> {
     try {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
         educationLevel: settings.educationLevel,
         major: settings.major,
+        responsePreferences: settings.responsePreferences,
         updatedAt: serverTimestamp()
       });
     } catch (error: unknown) {
@@ -897,6 +914,7 @@ export class FirebaseService {
           id: userId,
           educationLevel: settings.educationLevel,
           major: settings.major,
+          responsePreferences: settings.responsePreferences,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -906,23 +924,23 @@ export class FirebaseService {
     }
   }
 
-  async getUserSettings(userId: string): Promise<{ educationLevel: string; major: string }> {
+  async getUserSettings(userId: string): Promise<{ educationLevel: string; major: string; responsePreferences: string }> {
     try {
       const userRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userRef);
-      
+
       if (userDoc.exists()) {
         const data = userDoc.data();
         return {
           educationLevel: data.educationLevel || '',
-          major: data.major || ''
+          major: data.major || '',
+          responsePreferences: data.responsePreferences || ''
         };
       }
-      
-      return { educationLevel: '', major: '' };
-    } catch (error) {
-      // Error getting user settings
-      return { educationLevel: '', major: '' };
+
+      return { educationLevel: '', major: '', responsePreferences: '' };
+    } catch {
+      return { educationLevel: '', major: '', responsePreferences: '' };
     }
   }
 
@@ -944,6 +962,62 @@ export class FirebaseService {
     } catch (error) {
       console.error('Error batch saving messages:', error);
       throw error;
+    }
+  }
+
+  // ── Message Ratings ──────────────────────────────────────────────────────────
+
+  async saveMessageRating(data: {
+    messageId: string;
+    sessionId: string;
+    userId: string;
+    rating: 'good' | 'bad';
+    assistantContent: string;
+    userContent: string;
+    feedback?: string;
+  }): Promise<void> {
+    try {
+      // Use messageId as the document ID so switching ratings overwrites rather than duplicates
+      const ratingRef = doc(db, 'messageRatings', data.messageId);
+      await setDoc(ratingRef, {
+        ...data,
+        assistantContent: data.assistantContent.substring(0, 2000),
+        userContent: data.userContent.substring(0, 500),
+        timestamp: serverTimestamp()
+      });
+    } catch {
+      // Silent — non-critical analytics
+    }
+  }
+
+  async deleteMessageRating(messageId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'messageRatings', messageId));
+    } catch {
+      // Silent
+    }
+  }
+
+  // ── User Memory ───────────────────────────────────────────────────────────────
+
+  async getUserMemory(userId: string): Promise<string> {
+    try {
+      const ref = doc(db, 'userMemory', userId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) return (snap.data().content as string) ?? '';
+      return '';
+    } catch {
+      return '';
+    }
+  }
+
+  async saveUserMemory(userId: string, content: string): Promise<void> {
+    try {
+      if (!userId) return;
+      const ref = doc(db, 'userMemory', userId);
+      await setDoc(ref, { content, updatedAt: serverTimestamp() }, { merge: true });
+    } catch {
+      // Silent — non-critical background save
     }
   }
 

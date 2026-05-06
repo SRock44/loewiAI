@@ -4,6 +4,7 @@ import { firebaseAuthService } from './firebaseAuthService';
 export interface UserProfile {
   educationLevel: string;
   major: string;
+  responsePreferences: string;
 }
 
 export class UserProfileService {
@@ -13,7 +14,7 @@ export class UserProfileService {
   static async getUserProfile(): Promise<UserProfile> {
     const user = firebaseAuthService.getCurrentUser();
     if (!user) {
-      return { educationLevel: '', major: '' };
+      return { educationLevel: '', major: '', responsePreferences: '' };
     }
 
     // Return cached profile if available and user hasn't changed
@@ -26,9 +27,9 @@ export class UserProfileService {
       this.currentProfile = settings;
       this.currentUserId = user.id;
       return settings;
-    } catch (error) {
+    } catch {
       // Error loading user profile
-      return { educationLevel: '', major: '' };
+      return { educationLevel: '', major: '', responsePreferences: '' };
     }
   }
 
@@ -42,7 +43,7 @@ export class UserProfileService {
       await firebaseService.saveUserSettings(user.id, profile);
       this.currentProfile = profile;
       this.currentUserId = user.id;
-    } catch (error) {
+    } catch {
       throw new Error('Failed to save user profile');
     }
   }
@@ -62,21 +63,35 @@ export class UserProfileService {
 
   static async buildPersonalizationContext(): Promise<string> {
     const profile = await this.getUserProfile();
-    
-    if (!profile.educationLevel && !profile.major) {
+
+    const hasPreferences = !!profile.responsePreferences?.trim();
+    const hasProfile = !!(profile.educationLevel || profile.major);
+
+    if (!hasPreferences && !hasProfile) {
       return '';
     }
 
-    let context = 'USER PROFILE INFORMATION:\n';
-    
+    let context = '';
+
+    // Response preferences take top priority — always listed first
+    if (hasPreferences) {
+      context += 'RESPONSE STYLE REQUIREMENTS (always follow these — they are set by the user and override your defaults):\n';
+      context += profile.responsePreferences.trim() + '\n';
+      context += '\n';
+    }
+
+    if (!hasProfile) return context;
+
+    context += 'USER PROFILE INFORMATION:\n';
+
     if (profile.educationLevel) {
       context += `- Education Level: ${this.getEducationLevelDisplayName(profile.educationLevel)}\n`;
     }
-    
+
     if (profile.major) {
       context += `- Field of Study: ${profile.major}\n`;
     }
-    
+
     context += '\nPERSONALIZATION INSTRUCTIONS:\n';
     context += '- Tailor your explanations to the user\'s education level\n';
     context += '- Use appropriate terminology and complexity\n';

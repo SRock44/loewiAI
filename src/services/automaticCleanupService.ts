@@ -56,7 +56,7 @@ class AutomaticCleanupService {
       const { firebaseAuthService } = await import('./firebaseAuthService');
       const currentUser = firebaseAuthService.getCurrentUser();
       return currentUser !== null;
-    } catch (error) {
+    } catch {
       // If we can't check auth, assume we don't have it
       return false;
     }

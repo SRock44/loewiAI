@@ -1,0 +1,335 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ProfessionalDocumentPanel — Screen styles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.prof-doc-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.prof-doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #1e293b;
+  color: #e2e8f0;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.prof-doc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.prof-doc-filename {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+  font-family: 'Work Sans', -apple-system, sans-serif;
+}
+
+.prof-doc-style-badge {
+  background: #3b6de0;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  font-family: 'Work Sans', -apple-system, sans-serif;
+}
+
+.prof-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.prof-doc-print-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-family: 'Work Sans', -apple-system, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.prof-doc-print-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.prof-doc-print-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.prof-doc-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.prof-doc-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.prof-doc-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 16px;
+  background: #f1f5f9;
+}
+
+/* ── Page (letter-sized preview) ─────────────────────────────────────────── */
+.prof-page {
+  width: 816px;
+  min-height: 1056px;
+  padding: 96px;
+  background: #ffffff;
+  margin: 0 auto;
+  box-shadow: 0 2px 24px rgba(15, 23, 42, 0.12);
+  box-sizing: border-box;
+  /* Establish font baseline for the entire page */
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 2;
+  color: #000;
+  /* Override #root { text-align: center } from index.css */
+  text-align: left;
+}
+
+/* ── Title block ─────────────────────────────────────────────────────────── */
+.prof-title-block {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 2;
+  color: #000;
+  margin-bottom: 0;
+}
+
+.prof-title-block p {
+  margin: 0;
+  padding: 0;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 2;
+  color: #000;
+  text-align: left !important;
+}
+
+.prof-title-centered {
+  text-align: center !important;
+}
+
+.prof-title-main {
+  font-size: 12pt;
+  font-weight: normal;
+}
+
+.prof-title-meta p {
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Document content — Times New Roman enforced on EVERY element
+   ═══════════════════════════════════════════════════════════════════════════ */
+.prof-doc-content {
+  font-family: 'Times New Roman', Times, serif !important;
+  font-size: 12pt !important;
+  line-height: 2 !important;
+  color: #000 !important;
+}
+
+/* Blanket override — hit every descendant */
+.prof-doc-content * {
+  font-family: 'Times New Roman', Times, serif !important;
+  color: #000 !important;
+  font-size: 12pt !important;
+}
+
+/* Paragraphs: body text left-aligned, first-line indent */
+.prof-doc-content p {
+  text-align: left !important;
+  text-indent: 0.5in !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 2 !important;
+}
+
+/* No indent on first paragraph after a heading */
+.prof-doc-content h1 + p,
+.prof-doc-content h2 + p,
+.prof-doc-content h3 + p {
+  text-indent: 0 !important;
+}
+
+/* h1 — document title (if AI includes it anyway, keep centered) */
+.prof-doc-content h1 {
+  font-size: 12pt !important;
+  font-weight: normal !important;
+  text-align: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 2 !important;
+  text-indent: 0 !important;
+}
+
+/* h2 — section headings (Introduction, Conclusion, Works Cited, etc.) */
+.prof-doc-content h2 {
+  font-size: 12pt !important;
+  font-weight: bold !important;
+  text-align: center !important;   /* MLA/APA center section headings */
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 2 !important;
+  text-indent: 0 !important;
+}
+
+.prof-doc-content h3 {
+  font-size: 12pt !important;
+  font-weight: bold !important;
+  font-style: italic !important;
+  text-align: left !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 2 !important;
+  text-indent: 0 !important;
+}
+
+/* Bold and italic inline */
+.prof-doc-content strong,
+.prof-doc-content b {
+  font-weight: bold !important;
+}
+
+.prof-doc-content em,
+.prof-doc-content i {
+  font-style: italic !important;
+}
+
+/* Works Cited / References / Bibliography entries — hanging indent.
+   Scoped to .works-cited-heading so body section paragraphs are NOT affected. */
+.prof-doc-content .works-cited-heading ~ p {
+  text-indent: -0.5in !important;  /* hanging indent: first line flush, continuation indented */
+  padding-left: 0.5in !important;
+  text-align: left !important;
+}
+
+/* Lists (shouldn't appear in body, but if they do in Works Cited) */
+.prof-doc-content ul,
+.prof-doc-content ol {
+  padding-left: 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
+}
+
+.prof-doc-content li {
+  text-align: left !important;
+  padding-left: 0.5in !important;
+  text-indent: -0.5in !important;
+  margin: 0 !important;
+  line-height: 2 !important;
+}
+
+/* Code — if it appears at all, keep readable */
+.prof-doc-content code,
+.prof-doc-content pre {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 11pt !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Horizontal rule (section break) */
+.prof-doc-content hr {
+  border: none !important;
+  border-top: 1px solid #000 !important;
+  margin: 0 !important;
+}
+
+/* Blockquote */
+.prof-doc-content blockquote {
+  margin: 0 0 0 1in !important;
+  padding: 0 !important;
+  border: none !important;
+  font-size: 12pt !important;
+  line-height: 2 !important;
+}
+
+/* Tables */
+.prof-doc-content table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 12pt !important;
+}
+
+.prof-doc-content th,
+.prof-doc-content td {
+  border: 1px solid #000 !important;
+  padding: 4px 8px !important;
+  font-size: 12pt !important;
+  text-align: left !important;
+}
+
+/* KaTeX math — allow KaTeX to use its own fonts for correct rendering */
+.prof-doc-content .katex,
+.prof-doc-content .katex * {
+  font-family: unset !important;
+  font-size: unset !important;
+  color: #000 !important;
+}
+
+.prof-math-block {
+  text-align: center;
+  margin: 0;
+  line-height: 2;
+}
+
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .prof-page {
+    width: 100%;
+    padding: 32px 20px;
+  }
+}
